@@ -20,10 +20,10 @@ index 9dd431e..1883117 100644
 \ No newline at end of file
 +endif()
 diff --git a/src/automation.c b/src/automation.c
-index e973225..7c35200 100644
+index e973225..ef47da9 100644
 --- a/src/automation.c
 +++ b/src/automation.c
-@@ -103,6 +103,17 @@ typedef int sock_t;
+@@ -103,6 +103,18 @@ typedef int sock_t;
     the same instant overflows the keyboard's 16-byte FIFO and loses keys. */
  #define KEY_GAP_MS 2
  
@@ -33,6 +33,7 @@ index e973225..7c35200 100644
 +extern int qt_automation_screenshot_ui(const char *path, int w, int h);
 +extern int qt_automation_focus_out(void);
 +extern int qt_automation_power_ui(const char *operation);
++extern int qt_automation_model_ui(const char *model, const char *layout);
 +extern int qt_automation_fullscreen_test(const char *path);
 +extern int qt_automation_mouse_capture_test(void);
 +extern int qt_automation_cabinet_test(const char *directory);
@@ -41,7 +42,7 @@ index e973225..7c35200 100644
  #ifdef ENABLE_AUTOMATION_LOG
  int automation_do_log = ENABLE_AUTOMATION_LOG;
  
-@@ -2196,7 +2207,50 @@ handle_request(char *line)
+@@ -2196,7 +2208,57 @@ handle_request(char *line)
              mouse_set_buttons_ex(atoi(argv[3]));
              respond_ok_time();
          }
@@ -66,6 +67,13 @@ index e973225..7c35200 100644
 +                      state & 1 ? "true" : "false", state & 2 ? "true" : "false",
 +                      state & 4 ? "true" : "false", state & 8 ? "true" : "false", state & 16 ? "true" : "false",
 +                      state & 32 ? "true" : "false", state & 64 ? "true" : "false", (unsigned) state >> 8, runctl_pause_reasons());
++        }
++    } else if (!strcmp(argv[0], "ui-model") && argc == 3) {
++        const int state = qt_automation_model_ui(argv[1], argv[2]);
++        if (state < 0) respond_error("usage: ui-model <pc1512|pc1640> <dd|sd|hd20> (headless runs only)");
++        else {
++            resp.len = 0;
++            sb_printf(&resp, "{\"ok\":true,\"queued\":true}");
 +        }
 +    } else if (!strcmp(argv[0], "ui-cabinet-test") && argc >= 2) {
 +        if (qt_automation_cabinet_test(rest[1]))
@@ -1410,17 +1418,50 @@ index 6265157..08a9eeb 100644
  
  /* How the CPU thread paces emulated time against host time. */
 diff --git a/src/machine/m_amstrad.c b/src/machine/m_amstrad.c
-index 852d597..28ede6c 100644
+index 852d597..eca1fc2 100644
 --- a/src/machine/m_amstrad.c
 +++ b/src/machine/m_amstrad.c
-@@ -3091,9 +3091,17 @@ machine_amstrad_init(const machine_t *model, int type)
+@@ -913,7 +913,8 @@ vid_init_1640(amstrad_t *ams)
+     rom_init(&vid->bios_rom, "roms/machines/pc1640/40100",
+              0xc0000, 0x8000, 0x7fff, 0, 0);
+ 
+-    ega_init(&vid->ega, 9, 0);
++    /* The IGA's monitor switches: 7 = PC-CD (200-line, CGA-class), 9 = PC-ECD. */
++    ega_init(&vid->ega, device_get_config_int("monitor_type"), 0);
+     vid->cga.vram    = vid->ega.vram;
+     vid->cga_enabled = 1;
+     cga_init(&vid->cga);
+@@ -962,6 +963,21 @@ vid_speed_changed_1640(void *priv)
+ 
+ const device_config_t vid_1640_config[] = {
+     // clang-format off
++    {
++        .name           = "monitor_type",
++        .description    = "Monitor",
++        .type           = CONFIG_SELECTION,
++        .default_string = NULL,
++        .default_int    = 9,
++        .file_filter    = NULL,
++        .spinner        = { 0 },
++        .selection      = {
++            { .description = "PC-CD (colour, 200 lines)",           .value = 7 },
++            { .description = "PC-ECD (enhanced colour, 350 lines)", .value = 9 },
++            { .description = ""                                                }
++        },
++        .bios           = { { 0 } }
++    },
+     {
+         .name           = "double_type",
+         .description    = "Line doubling type",
+@@ -3091,9 +3107,18 @@ machine_amstrad_init(const machine_t *model, int type)
      io_sethandler(0x0060, 7,
                    kbd_read, NULL, NULL, kbd_write, NULL, NULL, ams);
      timer_add(&ams->send_delay_timer, kbd_poll, ams, 1);
 -    if (type == AMS_PC1512)
 -        keyboard_set_table(scancode_xt);
 -    else
-+    if (type == AMS_PC1512) {
++    if ((type == AMS_PC1512) || (type == AMS_PC1640)) {
++        /* The PC1640 shipped with the PC1512's keyboard. */
 +        static scancode scancode_pc1512[512];
 +
 +        memcpy(scancode_pc1512, scancode_xt, sizeof(scancode_pc1512));
@@ -1434,6 +1475,33 @@ index 852d597..28ede6c 100644
          keyboard_set_table(scancode_pc200);
      keyboard_send = kbd_adddata_ex;
      keyboard_scan = 1;
+@@ -3114,6 +3139,26 @@ machine_amstrad_init(const machine_t *model, int type)
+     standalone_gameport_type = &gameport_200_device;
+ }
+ 
++/* Cabinet front end: select the PC1512 or PC1640 for the next hard reset, as
++   the Settings dialog would. Both run an 8086 at the historical 8 MHz. */
++void
++machine_amstrad_select(int machine_id, int ram_kb)
++{
++    cpu_family_t *family = cpu_get_family("8086");
++
++    machine  = machine_id;
++    mem_size = ram_kb;
++    if (family != NULL) {
++        cpu_f = family;
++        cpu   = 0;
++        for (int i = 0; family->cpus[i].cpu_type != 0; i++)
++            if (family->cpus[i].rspeed == 8000000) {
++                cpu = i;
++                break;
++            }
++    }
++}
++
+ int
+ machine_pc1512_init(const machine_t *model)
+ {
 diff --git a/src/qt/86Box-qt.rc b/src/qt/86Box-qt.rc
 index 6ddbfff..89e1e20 100644
 --- a/src/qt/86Box-qt.rc
@@ -1530,7 +1598,7 @@ index d4d8f5d..20162e4 100644
  #define SETTINGS_CHANGED            1
  #define SETTINGS_REQUIRE_HARD_RESET 2
 diff --git a/src/qt/qt_main.cpp b/src/qt/qt_main.cpp
-index f694a38..3e51534 100644
+index f694a38..1376fcb 100644
 --- a/src/qt/qt_main.cpp
 +++ b/src/qt/qt_main.cpp
 @@ -32,6 +32,14 @@
@@ -1596,7 +1664,7 @@ index f694a38..3e51534 100644
  
  // Void Cast
  #define VC(x) const_cast<wchar_t *>(x)
-@@ -100,6 +135,338 @@ extern "C" {
+@@ -100,6 +135,353 @@ extern "C" {
  extern QElapsedTimer elapsed_timer;
  extern MainWindow   *main_window;
  
@@ -1643,6 +1711,21 @@ index f694a38..3e51534 100644
 +        emit qApp->applicationStateChanged(Qt::ApplicationInactive);
 +    }, Qt::BlockingQueuedConnection);
 +    return 1;
++}
++
++/* ui-model <pc1512|pc1640> <dd|sd|hd20>: the model badge's choice, without
++   its confirmation. Queued, like the power button: the CPU thread must leave
++   automation_poll before the handler can wait for its safe point. Poll
++   "info" for the result. */
++extern "C" int qt_automation_model_ui(const char *model, const char *layout)
++{
++    if (!main_window || !main_window->testAttribute(Qt::WA_DontShowOnScreen)) return -1;
++    const QString m = QString::fromUtf8(model), l = QString::fromUtf8(layout);
++    const int bay = l == "dd" ? amstrad::BayFloppy : l == "sd" ? amstrad::BayBlank : l == "hd20" ? amstrad::BayHdd : -1;
++    if ((m != "pc1512" && m != "pc1640") || bay < 0) return -1;
++    QMetaObject::invokeMethod(main_window, "setAmstradModel", Qt::QueuedConnection,
++                              Q_ARG(bool, m == "pc1640"), Q_ARG(int, bay));
++    return 0;
 +}
 +
 +extern "C" int qt_automation_power_ui(const char *operation)
@@ -1807,7 +1890,7 @@ index f694a38..3e51534 100644
 +        const Target targets[] = {
 +            { "left-drive", amstrad::masterBay(0).adjusted(0,0,0,-36), 5 },
 +            { "right-drive", amstrad::masterBay(1).adjusted(0,0,0,-36), 5 },
-+            { "configuration", amstrad::masterModelBadge(), 4 },
++            { "configuration", amstrad::masterModelBadge(), amstrad::pc1640Enabled() ? 8 : 4 },
 +            { "monitor", amstrad::masterMonitorBadge(), 2 }
 +        };
 +        for (const auto &target : targets) {
@@ -1935,7 +2018,7 @@ index f694a38..3e51534 100644
  extern "C" {
  #include <86box/keyboard.h>
  #include "cpu.h"
-@@ -178,6 +545,11 @@ keyboard_getkeymap()
+@@ -178,6 +560,11 @@ keyboard_getkeymap()
  void
  win_keyboard_handle(uint32_t scancode, int up, int e0, int e1)
  {
@@ -1947,7 +2030,7 @@ index f694a38..3e51534 100644
      /* If it's not a scan code that starts with 0xE1 */
      if (e1) {
          if (scancode == 0x1D) {
-@@ -389,7 +761,7 @@ emu_LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
+@@ -389,7 +776,7 @@ emu_LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
          ret = TRUE;
      else if ((lpKdhs->scanCode == 0x39) && (lpKdhs->flags & LLKHF_ALTDOWN) && !(lpKdhs->flags & (LLKHF_UP | LLKHF_EXTENDED)))
          ret = TRUE;
@@ -1956,7 +2039,7 @@ index f694a38..3e51534 100644
          ret = TRUE;
      else if ((lpKdhs->scanCode >= 0x5b) && (lpKdhs->scanCode <= 0x5d) && (lpKdhs->flags & LLKHF_EXTENDED))
          ret = TRUE;
-@@ -483,6 +855,17 @@ int
+@@ -483,6 +870,17 @@ int
  main(int argc, char *argv[])
  {
  #ifdef Q_OS_WINDOWS
@@ -1974,7 +2057,7 @@ index f694a38..3e51534 100644
  #    ifdef USE_QDARKSTYLE
      bool wasDarkTheme = false;
  #    endif
-@@ -737,6 +1120,10 @@ main(int argc, char *argv[])
+@@ -737,6 +1135,10 @@ main(int argc, char *argv[])
  #endif
  
      main_window = new MainWindow();
@@ -1986,7 +2069,7 @@ index f694a38..3e51534 100644
          main_window->showMaximized();
      } else {
 diff --git a/src/qt/qt_mainwindow.cpp b/src/qt/qt_mainwindow.cpp
-index 8b91429..75c400d 100644
+index 8b91429..0dffe7b 100644
 --- a/src/qt/qt_mainwindow.cpp
 +++ b/src/qt/qt_mainwindow.cpp
 @@ -33,6 +33,8 @@
@@ -1998,7 +2081,17 @@ index 8b91429..75c400d 100644
  
  #include "qt_cgasettingsdialog.hpp"
  
-@@ -92,6 +94,7 @@ extern bool cpu_thread_running;
+@@ -71,6 +73,9 @@ extern int qt_nvr_save(void);
+ extern void nmi_raise(void);
+ 
+ extern bool cpu_thread_running;
++
++/* m_amstrad.c: configure the PC1512 or PC1640 for the next hard reset. */
++extern void machine_amstrad_select(int machine_id, int ram_kb);
+ };
+ 
+ #include <QGuiApplication>
+@@ -92,6 +97,7 @@ extern bool cpu_thread_running;
  #include <QScreen>
  #include <QString>
  #include <QDir>
@@ -2006,7 +2099,7 @@ index 8b91429..75c400d 100644
  #include <QSysInfo>
  #include <QEventLoop>
  #if QT_CONFIG(vulkan)
-@@ -539,6 +542,9 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -539,6 +545,9 @@ MainWindow::MainWindow(QWidget *parent)
      });
  
      connect(this, &MainWindow::updateStatusBarPanes, this, &MainWindow::refreshMediaMenu);
@@ -2016,7 +2109,7 @@ index 8b91429..75c400d 100644
      connect(this, &MainWindow::updateStatusBarTip, status.get(), &MachineStatus::updateTip);
      connect(this, &MainWindow::statusBarMessage, status.get(), &MachineStatus::message, Qt::QueuedConnection);
  
-@@ -559,6 +565,39 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -559,6 +568,39 @@ MainWindow::MainWindow(QWidget *parent)
      ui->actionApply_fullscreen_stretch_mode_when_maximized->setVisible(false);
  #endif
  
@@ -2056,7 +2149,7 @@ index 8b91429..75c400d 100644
      if ((QApplication::platformName().contains("eglfs") || QApplication::platformName() == "haiku")) {
          if ((vid_api == RENDERER_OPENGL3) || (vid_api == RENDERER_VULKAN))
              fprintf(stderr, "OpenGL renderers are unsupported on %s.\n", QApplication::platformName().toUtf8().data());
-@@ -872,7 +911,17 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -872,7 +914,17 @@ MainWindow::MainWindow(QWidget *parent)
      if (!vnc_enabled)
          video_setblit(qt_blit);
  
@@ -2075,7 +2168,7 @@ index 8b91429..75c400d 100644
          connect(ui->stackedWidget, &RendererStack::blitToRenderer, this, [this]() {
              if (start_in_fullscreen) {
                  QTimer::singleShot(100, ui->actionFullscreen, &QAction::trigger);
-@@ -1004,6 +1053,20 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -1004,6 +1056,20 @@ MainWindow::MainWindow(QWidget *parent)
      updateShortcuts();
  }
  
@@ -2096,7 +2189,7 @@ index 8b91429..75c400d 100644
  void
  MainWindow::closeEvent(QCloseEvent *event)
  {
-@@ -1035,12 +1098,7 @@ MainWindow::closeEvent(QCloseEvent *event)
+@@ -1035,12 +1101,7 @@ MainWindow::closeEvent(QCloseEvent *event)
              config_save_global_setting("Emulator", "confirm_exit");
      }
      if (window_remember && !video_fullscreen) {
@@ -2110,7 +2203,7 @@ index 8b91429..75c400d 100644
          for (int i = 1; i < MONITORS_NUM; i++) {
              if (renderers[i]) {
                  monitor_settings[i].mon_window_w = renderers[i]->geometry().width();
-@@ -1144,7 +1202,14 @@ MainWindow::updateShortcuts()
+@@ -1144,7 +1205,14 @@ MainWindow::updateShortcuts()
  
      accID = FindAccelerator("fullscreen");
      seq   = QKeySequence::fromString(acc_keys[accID].seq);
@@ -2126,7 +2219,7 @@ index 8b91429..75c400d 100644
  
      accID = FindAccelerator("pause");
      seq   = QKeySequence::fromString(acc_keys[accID].seq);
-@@ -1296,6 +1361,20 @@ MainWindow::showEvent(QShowEvent *event)
+@@ -1296,6 +1364,20 @@ MainWindow::showEvent(QShowEvent *event)
              window_h = 200;
      }
  
@@ -2147,7 +2240,7 @@ index 8b91429..75c400d 100644
      if (window_remember && !QApplication::platformName().contains("wayland")) {
          setGeometry(window_x, window_y, window_w, window_h + menuBar()->height() + (hide_status_bar ? 0 : statusBar()->height()) + (hide_tool_bar ? 0 : ui->toolBar->height()));
      }
-@@ -1358,6 +1437,8 @@ MainWindow::on_actionHard_Reset_triggered()
+@@ -1358,6 +1440,8 @@ MainWindow::on_actionHard_Reset_triggered()
  void
  MainWindow::on_actionCtrl_Alt_Del_triggered()
  {
@@ -2156,7 +2249,7 @@ index 8b91429..75c400d 100644
      pc_send_cad();
  }
  
-@@ -1439,6 +1520,8 @@ MainWindow::on_actionSettings_triggered()
+@@ -1439,6 +1523,8 @@ MainWindow::on_actionSettings_triggered()
      /* Also changed by soft saves, which reject the dialog */
      ui->actionFast_forward_on_start->setChecked(fast_forward_on_start);
      runctl_resume(RUN_PAUSE_SYNC);
@@ -2165,7 +2258,7 @@ index 8b91429..75c400d 100644
  }
  
  void
-@@ -1648,7 +1731,10 @@ MainWindow::on_actionFullscreen_triggered()
+@@ -1648,7 +1734,10 @@ MainWindow::on_actionFullscreen_triggered()
  {
      if (video_fullscreen > 0) {
          video_fullscreen = 0;
@@ -2177,7 +2270,7 @@ index 8b91429..75c400d 100644
          ui->menubar->show();
          if (!hide_status_bar)
              ui->statusbar->show();
-@@ -1659,7 +1745,12 @@ MainWindow::on_actionFullscreen_triggered()
+@@ -1659,7 +1748,12 @@ MainWindow::on_actionFullscreen_triggered()
              emit resizeContents(vid_resize == 2 ? fixed_size_x : monitors[0].mon_scrnsz_x, vid_resize == 2 ? fixed_size_y : monitors[0].mon_scrnsz_y);
          }
      } else {
@@ -2191,7 +2284,7 @@ index 8b91429..75c400d 100644
              emit setMouseCapture(true);
          video_fullscreen = 1;
          pclog("Full screen: %ix%i\n", QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
-@@ -1714,6 +1805,39 @@ MainWindow::keyMatchesAccelerator(const QKeyEvent *ke, const char *name)
+@@ -1714,6 +1808,39 @@ MainWindow::keyMatchesAccelerator(const QKeyEvent *ke, const char *name)
  bool
  MainWindow::eventFilter(QObject *receiver, QEvent *event)
  {
@@ -2231,7 +2324,7 @@ index 8b91429..75c400d 100644
      /* Keys typed into the memory viewer are its own, not the guest's. */
      if ((event->type() == QEvent::KeyPress) || (event->type() == QEvent::KeyRelease) || (event->type() == QEvent::ShortcutOverride)) {
          auto *widget = qobject_cast<QWidget *>(receiver);
-@@ -1871,6 +1995,7 @@ MainWindow::refreshMediaMenu()
+@@ -1871,6 +1998,7 @@ MainWindow::refreshMediaMenu()
  {
      mm->refresh(ui->menuMedia);
      status->setSoundMenu(ui->menuSound);
@@ -2239,7 +2332,7 @@ index 8b91429..75c400d 100644
      status->setDynarecMenu(dynarecMenu);
      status->refresh(ui->statusbar);
      ui->actionMCA_devices->setVisible(machine_has_bus(machine, MACHINE_BUS_MCA));
-@@ -1914,6 +2039,12 @@ MainWindow::hasKanaLock()
+@@ -1914,6 +2042,12 @@ MainWindow::hasKanaLock()
  void
  MainWindow::updatePowerOffAction()
  {
@@ -2252,7 +2345,7 @@ index 8b91429..75c400d 100644
      const bool has_power_button = device_has_power_button();
      if (acpi_enabled || has_power_button) {
          ui->actionACPI_Shutdown->setText(tr("Power &off (soft)"));
-@@ -2733,7 +2864,9 @@ MainWindow::changeEvent(QEvent *event)
+@@ -2733,7 +2867,9 @@ MainWindow::changeEvent(QEvent *event)
  #endif
      QWidget::changeEvent(event);
      if (isVisible()) {
@@ -2263,7 +2356,7 @@ index 8b91429..75c400d 100644
          config_save();
      }
      /* The renderer can get its resize event before the window reports being
-@@ -2916,6 +3049,10 @@ MainWindow::on_actionPen_triggered()
+@@ -2916,6 +3052,10 @@ MainWindow::on_actionPen_triggered()
  void
  MainWindow::on_actionACPI_Shutdown_triggered()
  {
@@ -2274,7 +2367,7 @@ index 8b91429..75c400d 100644
      if (acpi_enabled) {
          acpi_pwrbut_press();
          return;
-@@ -2950,3 +3087,348 @@ MainWindow::on_actionCGA_composite_settings_triggered()
+@@ -2950,3 +3090,394 @@ MainWindow::on_actionCGA_composite_settings_triggered()
      isNonPause = false;
      config_save();
  }
@@ -2433,26 +2526,37 @@ index 8b91429..75c400d 100644
 +        else delete recent;
 +    };
 +
-+    /* The left bay fit, which is also the model: DD, SD (plain or sticker), HD20. */
++    /* The model: the machine (PC1512 or PC1640) and its left bay fit, which
++       gives the suffix: DD, SD (plain or sticker), HD20. One row per machine. */
 +    auto addModelChoices = [&](QMenu *target) {
 +        struct Choice {
 +            amstrad::LeftBay bay;
-+            const char      *title, *text;
++            const char      *suffix, *text;
 +        };
 +        static const Choice choices[amstrad::LeftBayCount] = {
-+            { amstrad::BayFloppy, QT_TR_NOOP("PC1512 DD"), QT_TR_NOOP("Two 5Â¼\" floppy drives: A: and B:.") },
-+            { amstrad::BayBlank, QT_TR_NOOP("PC1512 SD"), QT_TR_NOOP("One floppy drive, A:. Blank plate in the left bay.") },
-+            { amstrad::BayBlankSticker, QT_TR_NOOP("PC1512 SD, factory sticker"), QT_TR_NOOP("As SD, with the second-drive warning label on the plate.") },
-+            { amstrad::BayHdd, QT_TR_NOOP("PC1512 HD20"), QT_TR_NOOP("20 MB hard disk C: and one floppy drive, A:.") },
++            { amstrad::BayFloppy, QT_TR_NOOP("DD"), QT_TR_NOOP("Two 5Â¼\" floppy drives: A: and B:.") },
++            { amstrad::BayBlank, QT_TR_NOOP("SD"), QT_TR_NOOP("One floppy drive, A:. Blank plate in the left bay.") },
++            { amstrad::BayBlankSticker, QT_TR_NOOP("SD, factory sticker"), QT_TR_NOOP("As SD, with the second-drive warning label on the plate.") },
++            { amstrad::BayHdd, QT_TR_NOOP("HD20"), QT_TR_NOOP("20 MB hard disk C: and one floppy drive, A:.") },
 +        };
-+        amstrad::addCaption(target, tr("Machine configuration"), tr("PC1512 Â· Choose a drive layout. Hardware changes restart the PC."));
-+        auto *grid = amstrad::addGrid(target);
-+        for (const Choice &c : choices) {
-+            amstrad::Front preview = front;
-+            preview.left           = c.bay;
-+            const int bay          = c.bay;
-+            amstrad::addTile(grid, picture(preview, lowerFront), tr(c.title), tr(c.text), front.left == c.bay,
-+                             [this, bay] { setAmstradLeftBay(bay); });
++        amstrad::addCaption(target, tr("Machine configuration"),
++                            tr("Choose the computer and its drive layout. Hardware changes restart the PC."));
++        for (const bool pc1640 : { false, true }) {
++            if (pc1640 && !amstrad::pc1640Enabled())
++                continue;
++            amstrad::addCaption(target, pc1640 ? tr("PC1640 Â· 640K memory, EGA graphics")
++                                               : tr("PC1512 Â· 512K memory, CGA graphics"));
++            auto *grid = amstrad::addGrid(target);
++            for (const Choice &c : choices) {
++                amstrad::Front preview = front;
++                preview.pc1640         = pc1640;
++                preview.left           = c.bay;
++                const int bay          = c.bay;
++                amstrad::addTile(grid, picture(preview, lowerFront),
++                                 QString(pc1640 ? "PC1640 " : "PC1512 ") + tr(c.suffix), tr(c.text),
++                                 front.pc1640 == pc1640 && front.left == c.bay,
++                                 [this, pc1640, bay] { setAmstradModel(pc1640, bay); }, amstrad::LeftBayCount);
++            }
 +        }
 +    };
 +
@@ -2528,24 +2632,40 @@ index 8b91429..75c400d 100644
 +}
 +
 +void
-+MainWindow::setAmstradLeftBay(int bayIndex)
++MainWindow::setAmstradModel(bool pc1640, int bayIndex)
 +{
 +    const auto bay   = static_cast<amstrad::LeftBay>(bayIndex);
 +    const auto front = SoftwareRenderer::machineFront();
 +    auto blank = [](amstrad::LeftBay b) { return b == amstrad::BayBlank || b == amstrad::BayBlankSticker; };
 +    if (blank(bay))
 +        SoftwareRenderer::setBlankSticker(bay == amstrad::BayBlankSticker);
-+    if (bay == front.left)
++    if (pc1640 && !amstrad::pc1640Enabled())
 +        return;
++    const bool machineChange = pc1640 != front.pc1640;
 +    /* A sticker is only artwork: no hardware change. */
-+    if (blank(bay) && blank(front.left)) {
++    const bool bayChange = bay != front.left && !(blank(bay) && blank(front.left));
++    if (!machineChange && !bayChange) {
 +        refreshAmstradFront();
 +        return;
 +    }
 +
++    int machineId = machine;
++    if (machineChange) {
++        machineId = machine_get_machine_from_internal_name(pc1640 ? "pc1640" : "pc1512");
++        if (machineId < 0 || !machine_available(machineId)) {
++            QMessageBox::warning(this, pc1640 ? tr("Amstrad PC1640") : tr("Amstrad PC1512"),
++                pc1640 ? tr("The PC1640 firmware is missing.\n"
++                            "Place 40043.v3, 40044.v3 and 40100 under roms/machines/pc1640 and try again.")
++                       : tr("The PC1512 firmware is missing.\n"
++                            "Place 40043, 40044 and 40078 under roms/machines/pc1512 and try again."));
++            return;
++        }
++    }
++
++    const bool fitHdd = bayChange && bay == amstrad::BayHdd;
 +    QString hd20Image;
 +    int     hdcId = 0;
-+    if (bay == amstrad::BayHdd) {
++    if (fitHdd) {
 +        hdcId = hdc_get_from_internal_name(hd20_controller);
 +        if (hdcId <= 0 || !hdc_available(hdcId)) {
 +            QMessageBox::warning(this, tr("Hard disk"),
@@ -2562,17 +2682,30 @@ index 8b91429..75c400d 100644
 +        QT_TR_NOOP("a second floppy drive"), QT_TR_NOOP("a blank plate"),
 +        QT_TR_NOOP("a blank plate"), QT_TR_NOOP("a 20 MB hard disk")
 +    };
-+    QString question = tr("Fitting %1 in the left bay restarts the PC. Unsaved work in it is lost.").arg(tr(fitted[bay]));
-+    if (front.left == amstrad::BayFloppy && drives[1].image_path[0])
-+        question += tr("\nThe disk in drive B: is ejected; drive A: moves to the right bay.");
-+    else if (front.left == amstrad::BayFloppy)
-+        question += tr("\nDrive A: moves to the right bay.");
-+    if (bay == amstrad::BayHdd && !QFileInfo::exists(hd20Image))
++    QString question;
++    if (machineChange)
++        question = (pc1640 ? tr("Replacing the PC1512 with a PC1640 (640K memory, EGA graphics) restarts the PC.")
++                           : tr("Replacing the PC1640 with a PC1512 (512K memory, CGA graphics) restarts the PC."))
++                   + tr(" Unsaved work in it is lost.\nDisks and drives stay as they are.");
++    if (bayChange) {
++        if (machineChange)
++            question += tr("\nThe left bay gets %1.").arg(tr(fitted[bay]));
++        else
++            question = tr("Fitting %1 in the left bay restarts the PC. Unsaved work in it is lost.").arg(tr(fitted[bay]));
++        if (front.left == amstrad::BayFloppy && drives[1].image_path[0])
++            question += tr("\nThe disk in drive B: is ejected; drive A: moves to the right bay.");
++        else if (front.left == amstrad::BayFloppy)
++            question += tr("\nDrive A: moves to the right bay.");
++    }
++    if (fitHdd && !QFileInfo::exists(hd20Image))
 +        question += tr("\nA new, empty 20 MB disk is created: partition it with FDISK and FORMAT it from DOS.");
-+    if (QMessageBox::question(this, tr("Change drive bay"), question + tr("\n\nContinue?")) != QMessageBox::Yes)
++    /* The headless regression (ui-model) has nobody to ask. */
++    if (!testAttribute(Qt::WA_DontShowOnScreen) &&
++        QMessageBox::question(this, machineChange ? tr("Change computer") : tr("Change drive bay"),
++                              question + tr("\n\nContinue?")) != QMessageBox::Yes)
 +        return;
 +
-+    if (bay == amstrad::BayHdd && !QFileInfo::exists(hd20Image)) {
++    if (fitHdd && !QFileInfo::exists(hd20Image)) {
 +        QFile image(hd20Image);
 +        if (!image.open(QIODevice::WriteOnly | QIODevice::NewOnly) ||
 +            !image.resize(qint64(hd20_tracks) * hd20_heads * hd20_sectors * 512)) {
@@ -2581,13 +2714,19 @@ index 8b91429..75c400d 100644
 +        }
 +    }
 +
-+    if (front.left == amstrad::BayFloppy && drives[1].image_path[0])
++    if (bayChange && front.left == amstrad::BayFloppy && drives[1].image_path[0])
 +        mm->floppyEject(1);
 +
 +    runctl_pause_wait(RUN_PAUSE_SYNC);
++    if (machineChange) {
++        /* Like Settings: the next hard reset builds the other machine. Both
++           are 8 MHz 8086s; each keeps its own NVR file and BIOS language. */
++        machine_amstrad_select(machineId, pc1640 ? 640 : 512);
++    }
 +    /* The second floppy exists only in the DD; its sound profile is kept. */
-+    fdd_set_type(&drives[1], bay == amstrad::BayFloppy ? fdd_get_from_internal_name(const_cast<char *>("525_2dd")) : 0);
-+    if (front.left == amstrad::BayHdd) {
++    if (bayChange)
++        fdd_set_type(&drives[1], bay == amstrad::BayFloppy ? fdd_get_from_internal_name(const_cast<char *>("525_2dd")) : 0);
++    if (bayChange && front.left == amstrad::BayHdd) {
 +        /* Remember the disk for a later HD20, then remove it and its controller. */
 +        for (int i = 0; i < HDD_NUM; ++i)
 +            if (hdd_is_valid(i) && hdd[i].bus_type == HDD_BUS_MFM) {
@@ -2600,7 +2739,7 @@ index 8b91429..75c400d 100644
 +                hdc_current[c] = 0;
 +        }
 +    }
-+    if (bay == amstrad::BayHdd) {
++    if (fitHdd) {
 +        int slot = 0;
 +        while (slot < HDD_NUM - 1 && hdd_is_valid(slot))
 +            ++slot;
@@ -2624,7 +2763,7 @@ index 8b91429..75c400d 100644
 +    refreshAmstradFront();
 +}
 diff --git a/src/qt/qt_mainwindow.hpp b/src/qt/qt_mainwindow.hpp
-index e085af5..438fe17 100644
+index e085af5..48b05c9 100644
 --- a/src/qt/qt_mainwindow.hpp
 +++ b/src/qt/qt_mainwindow.hpp
 @@ -85,6 +85,9 @@ public slots:
@@ -2637,15 +2776,16 @@ index e085af5..438fe17 100644
  private slots:
      void on_actionForce_interpretation_triggered();
      void on_actionFullscreen_triggered();
-@@ -182,7 +185,15 @@ private slots:
+@@ -182,7 +185,16 @@ private slots:
  
      void on_actionCGA_composite_settings_triggered();
  
 +    /* Cabinet right-click menus: drive bays, model and monitor badges. */
 +    void showAmstradMenu(QPoint pos, QPoint globalPos);
++    /* The machine (PC1512/PC1640) and its left bay (amstrad::LeftBay). */
++    void setAmstradModel(bool pc1640, int bay);
 +
  private:
-+    void setAmstradLeftBay(int bay);
 +    void setAmstradMonochrome(bool mono);
 +    void refreshAmstradFront();
 +    void rememberWindowGeometry();
@@ -2653,7 +2793,7 @@ index e085af5..438fe17 100644
      Ui::MainWindow                *ui;
      std::unique_ptr<MachineStatus> status;
      std::shared_ptr<MediaMenu>     mm;
-@@ -233,6 +244,8 @@ private:
+@@ -233,6 +245,8 @@ private:
      bool window_blocked = false;
  
      bool skip_exit_confirmation = false;
@@ -2937,7 +3077,7 @@ index 4703b31..3cf8300 100644
      QBoxLayout *boxLayout = nullptr;
  
 diff --git a/src/qt/qt_softwarerenderer.cpp b/src/qt/qt_softwarerenderer.cpp
-index 5fd1599..83fb790 100644
+index 5fd1599..bb99894 100644
 --- a/src/qt/qt_softwarerenderer.cpp
 +++ b/src/qt/qt_softwarerenderer.cpp
 @@ -17,12 +17,20 @@
@@ -2961,7 +3101,7 @@ index 5fd1599..83fb790 100644
  #include <algorithm>
  #include <cstring>
  #include "qt_util.hpp"
-@@ -33,6 +41,20 @@ extern "C" {
+@@ -33,6 +41,21 @@ extern "C" {
  #include <86box/path.h>
  #include <86box/plat.h>
  #include <86box/video.h>
@@ -2977,12 +3117,13 @@ index 5fd1599..83fb790 100644
 +#include <86box/mo.h>
 +#include <86box/scsi_tape.h>
 +#include <86box/network.h>
++#include <86box/machine.h>
 +#include <86box/machine_status.h>
 +#include <86box/runctl.h>
  }
  
  SoftwareRenderer::SoftwareRenderer(QWidget *parent)
-@@ -40,6 +62,66 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
+@@ -40,6 +63,66 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
  {
      RendererCommon::parentWidget = parent;
  
@@ -3049,7 +3190,7 @@ index 5fd1599..83fb790 100644
      images[0] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
      images[1] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
  
-@@ -47,6 +129,13 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
+@@ -47,6 +130,13 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
      buf_usage[0].clear();
      buf_usage[1].clear();
      this->setMouseTracking(true);
@@ -3063,7 +3204,7 @@ index 5fd1599..83fb790 100644
      /* Every paint covers the whole update region, so skip Qt's background erase. */
      this->setAttribute(Qt::WA_OpaquePaintEvent);
  
-@@ -88,10 +177,28 @@ SoftwareRenderer::Worker::stop()
+@@ -88,10 +178,28 @@ SoftwareRenderer::Worker::stop()
      thread.reset();
  }
  
@@ -3093,7 +3234,7 @@ index 5fd1599..83fb790 100644
      qt_osd_shutdown();
  }
  
-@@ -131,11 +238,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
+@@ -131,11 +239,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
  void
  SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
  {
@@ -3108,7 +3249,7 @@ index 5fd1599..83fb790 100644
  
      /* Only repaint the rows that changed since the last frame, which the other
         buffer still holds until it is released below. Every frame is blitted
-@@ -171,7 +281,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
+@@ -171,7 +282,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
          bottom      = std::min(bottom + 1, h);
          int dtop    = dest.y() + ((top * dest.height()) / h) - 1;
          int dbottom = dest.y() + (((bottom * dest.height()) + h - 1) / h) + 1;
@@ -3122,7 +3263,7 @@ index 5fd1599..83fb790 100644
      }
  
      if (monitors[r_monitor_index].mon_screenshots || monitors[r_monitor_index].mon_screenshots_clipboard || monitors[r_monitor_index].mon_screenshots_raw_clipboard)
-@@ -192,8 +307,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
+@@ -192,8 +308,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
      const bool relayout = (l.gen != w_layout_gen);
      w_layout_gen        = l.gen;
  
@@ -3143,7 +3284,7 @@ index 5fd1599..83fb790 100644
      presentBuffer(back, painted);
  
      const QRect r     = painted.boundingRect();
-@@ -212,11 +337,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -212,11 +338,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
          img      = QImage(l.size, QImage::Format_RGB32);
          relayout = true;
      }
@@ -3166,7 +3307,7 @@ index 5fd1599..83fb790 100644
          painted               = (changed | stale[back]) & all;
      }
  
-@@ -225,9 +360,27 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -225,9 +361,27 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
      if (!painted.isEmpty()) {
          QPainter painter(&img);
          painter.setClipRegion(painted);
@@ -3197,7 +3338,7 @@ index 5fd1599..83fb790 100644
              painter.setRenderHint(QPainter::SmoothPixmapTransform, video_filter_method > 0);
              /* The frame's alpha bytes are not set; adding it onto black ignores them
                 and leaves the result opaque, so the GUI thread can copy it as is. */
-@@ -248,6 +401,151 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
+@@ -248,6 +402,152 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
      stale[back ^ 1] |= painted;
  }
  
@@ -3289,7 +3430,8 @@ index 5fd1599..83fb790 100644
 +SoftwareRenderer::machineFront()
 +{
 +    amstrad::Front front;
-+    front.mono = video_grayscale != 0;
++    front.mono   = video_grayscale != 0;
++    front.pc1640 = !strcmp(machine_get_internal_name(), "pc1640");
 +    if (fdd_get_type(&drives[1]) != 0) {
 +        front.left = amstrad::BayFloppy;
 +        return front;
@@ -3349,7 +3491,7 @@ index 5fd1599..83fb790 100644
  SoftwareRenderer::Layout
  SoftwareRenderer::currentLayout()
  {
-@@ -335,6 +633,8 @@ SoftwareRenderer::publishLayout()
+@@ -335,6 +635,8 @@ SoftwareRenderer::publishLayout()
      std::scoped_lock lk(layout_mutex);
      layout.dest  = destination;
      layout.size  = QSize(qRound(width() * pixelRatio), qRound(height() * pixelRatio));
@@ -3358,7 +3500,7 @@ index 5fd1599..83fb790 100644
      layout.ratio = pixelRatio;
      layout.gen++;
  }
-@@ -343,12 +643,29 @@ void
+@@ -343,12 +645,29 @@ void
  SoftwareRenderer::resizeEvent(QResizeEvent *event)
  {
      layoutPicture();
@@ -3388,7 +3530,7 @@ index 5fd1599..83fb790 100644
      bool res = false;
      if (!eventDelegate(event, res))
          return QWidget::event(event);
-@@ -362,12 +679,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -362,12 +681,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
      const int  shown = frontBuffer();
      /* Repaint when the OSD is up, or once more right after it closes so a
       * lingering overlay is cleared even while the machine is paused. */
@@ -3407,7 +3549,7 @@ index 5fd1599..83fb790 100644
  
      if (osd) {
          painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-@@ -385,6 +705,31 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -385,6 +707,31 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
          QTimer::singleShot(16, this, [this] { update(); });
  }
  
@@ -3747,10 +3889,10 @@ new file mode 100644
 +    auto *a=new QWidgetAction(menu); a->setDefaultWidget(w); menu->addAction(a); return g;
 +}
 +inline MenuCard *addTile(QGridLayout *g,const QPixmap &picture,const QString &title,const QString &text,
-+                        bool checked,std::function<void()> handler)
++                        bool checked,std::function<void()> handler,int columns=2)
 +{
 +    auto *card=new MenuCard(picture,title,text,checked,std::move(handler),true);
-+    const int i=g->count(); g->addWidget(card,i/2,i%2); return card;
++    const int i=g->count(); g->addWidget(card,i/columns,i%columns); return card;
 +}
 +inline void addCaption(QMenu *menu,const QString &title,const QString &subtitle={})
 +{
@@ -4643,7 +4785,7 @@ diff --git a/src/qt/qt_amstradscene.hpp b/src/qt/qt_amstradscene.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradscene.hpp
-@@ -0,0 +1,364 @@
+@@ -0,0 +1,390 @@
 +// Amstrad cabinet presentation, GPL-2.0-or-later, same terms as 86Box.
 +// Geometry is measured in the unchanged 1254 x 1254 approved master image.
 +#ifndef QT_AMSTRADSCENE_HPP
@@ -4661,6 +4803,10 @@ new file mode 100644
 +#include <cmath>
 +
 +namespace amstrad {
++
++/* The PC1640 is implemented but switched off for now: its row in the model
++   menu and the machine switch appear only with AMSTRAD_PC1640=1 set. */
++inline bool pc1640Enabled() { return qEnvironmentVariable("AMSTRAD_PC1640") == "1"; }
 +// Sampled from the former charcoal backdrop beside the monitor. The cabinet
 +// now has a transparent exterior, so this fills the entire rendering surface.
 +inline QColor backgroundColor() { return QColor(19, 19, 28); }
@@ -4765,7 +4911,8 @@ new file mode 100644
 +struct Front {
 +    LeftBay left = BayFloppy;
 +    bool    mono = false;
-+    bool operator==(const Front &o) const { return left == o.left && mono == o.mono; }
++    bool    pc1640 = false; // the emulated machine: PC1512 (master artwork) or PC1640
++    bool operator==(const Front &o) const { return left == o.left && mono == o.mono && pc1640 == o.pc1640; }
 +    bool operator!=(const Front &o) const { return !(*this == o); }
 +    // Logical floppy drive (0 = A:, 1 = B:) shown in the right-hand bay.
 +    int rightDrive() const { return left == BayFloppy ? 1 : 0; }
@@ -4778,6 +4925,7 @@ new file mode 100644
 +    QImage model[3];          // DD, SD, HD20 suffix
 +    QImage monitor[2];        // CM, MM first letter
 +    QImage hddOff, hddOn;
++    QImage system1640;        // "1640" numerals over the master's "1512"; optional
 +    bool valid() const
 +    {
 +        for (int i = BayBlank; i < LeftBayCount; ++i)
@@ -4804,6 +4952,7 @@ new file mode 100644
 +    f.monitor[1]           = load(badgesDir + "/monitor-mm.png");
 +    f.hddOff               = load(ledsDir + "/hdd-off.png");
 +    f.hddOn                = load(ledsDir + "/hdd-on.png");
++    f.system1640           = load(badgesDir + "/system-1640.png");
 +    return f;
 +}
 +
@@ -4827,6 +4976,10 @@ new file mode 100644
 +        p.drawImage(at(masterBay(0)), f.bay[front.left]);
 +        p.drawImage(at(masterModelBadge()), f.model[front.left == BayHdd ? 2 : 1]);
 +    }
++    // The number overlay is opaque over the numerals only, so it follows
++    // (and is independent of) the DD/SD/HD20 suffix patch.
++    if (front.pc1640 && !f.system1640.isNull())
++        p.drawImage(at(masterModelBadge()), f.system1640);
 +    if (front.mono)
 +        p.drawImage(at(masterMonitorBadge()), f.monitor[1]);
 +    return art;
@@ -4873,7 +5026,7 @@ new file mode 100644
 +
 +inline QRectF ledRect(const Layout &l, int led)
 +{
-+    static const QPointF pos[LedCount] = {{208, 960}, {522, 1015}, {980, 1015}};
++    static const QPointF pos[LedCount] = {{208, 960}, {511, 1014}, {969, 1014}};
 +    return QRectF(l.cabinet.left() + pos[led].x() * l.scale, l.cabinet.top() + pos[led].y() * l.scale,
 +                  48 * l.scale, 48 * l.scale);
 +}
@@ -4899,11 +5052,26 @@ new file mode 100644
 +    static const char *const names[DriveFaceCount] = {"open-empty", "closed-black", "closed-yellow",
 +                                                      "closed-green", "closed-blue", "closed-red"};
 +    Drives drives;
-+    for (int d = 0; d < 2; ++d)
++    for (int d = 0; d < 2; ++d) {
++        const QString prefix = QFileInfo::exists(dir + "/drive-open-empty.png")
++                                   ? dir + "/drive-"
++                                   : dir + (d ? "/drive-b-" : "/drive-a-");
++        const QImage mechanism = QImage(prefix + "closed-mechanism.png")
++                                     .convertToFormat(QImage::Format_ARGB32_Premultiplied);
 +        for (int f = 0; f < DriveFaceCount; ++f) {
-+            drives.face[d][f].load(dir + (d ? "/drive-b-" : "/drive-a-") + names[f] + ".png");
++            drives.face[d][f].load(prefix + names[f] + ".png");
 +            drives.face[d][f] = drives.face[d][f].convertToFormat(QImage::Format_ARGB32_Premultiplied);
++            // New artwork shares one closed mechanism across disk-only
++            // colour layers. Older complete-face sets remain supported.
++            if (f != DriveOpen && !mechanism.isNull() && !drives.face[d][f].isNull()) {
++                QImage combined = mechanism.copy();
++                QPainter painter(&combined);
++                painter.drawImage(0, 0, drives.face[d][f]);
++                painter.end();
++                drives.face[d][f] = combined;
++            }
 +        }
++    }
 +    return drives;
 +}
 +

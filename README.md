@@ -12,6 +12,7 @@ The executable and app window use `assets/front/pc1512-front.ico`, with transpar
 - On the PC1512, the modern ISO key between left Shift and Z sends the original key's `2Bh` scan code (including key release). The guest BIOS and DOS keyboard driver determine its character for the selected language; with `KEYBUK`, it types `\`, or `|` with Shift.
 - Use the upstream **Media** menu to insert/eject disks independently in A: and B:.
 - Hover briefly over the cabinet's drive bays, model badge or monitor badge to open graphical controls, or left-click to open them immediately. Right-click also works. Choose disks using labelled floppy cards; configuration and monitor choices show picture previews. Move away, click outside or press Escape to dismiss. [Menu details](docs/CABINET-MENUS.md).
+- **PC1640 support is implemented but disabled for now.** The model badge's menu offers only the PC1512 layouts. Setting the environment variable `AMSTRAD_PC1640=1` before launch adds the PC1640 row (640K, EGA). [PC1640 details](docs/PC1640.md).
 - Resize freely: the cabinet stays square and the inset display stays 4:3.
 - The front image is transparent outside the hardware. The whole rendering area uses the former backdrop's sampled charcoal (`#13131c`), including wide/tall margins and fullscreen.
 - Press **F11** or **Alt+Enter** to switch between windowed and fullscreen. The existing Ctrl+Alt+PageUp shortcut also remains available.
@@ -43,6 +44,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-scene.ps1
 python scripts/verify-milestone.py
 python scripts/verify-milestone.py --shader
 python scripts/verify-milestone.py --floppy-sounds
+python scripts/verify-milestone.py --machine pc1640
 ```
 
 Verification boots a separate disposable VM offscreen, issues scancode keyboard input, reads both drives, tests focus-loss key release, saves application/raw captures and checks clean exit. Normal launches open no automation socket. [Milestone report](docs/MILESTONE-1.md) records exact revisions, results and limitations. [Implementation handoff](docs/IMPLEMENTATION-HANDOFF.md) records the initial scope; floppy sounds are now enabled, while other mechanical sounds, disk animations and full GEM/mouse compatibility work remain later stages.

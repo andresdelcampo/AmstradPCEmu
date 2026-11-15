@@ -14,7 +14,7 @@ The monitor selector uses the complete existing monitor photograph (casing, glas
 
 Each drive offers **Choose disk**, **Choose protected disk**, **New disk** and **Eject disk**. Recent disks appear in a submenu as labelled floppy cards (the first four), followed by any further history entries. Each drive keeps its independent upstream MediaMenu history. The file chooser works without configuring a collection folder. Export to 86F remains in the menu bar Media menu.
 
-The model badge opens **Machine configuration**, with DD, SD, SD with factory sticker, and HD20. The left bay also links to that panel. Hardware changes retain the existing restart confirmation. The generic grid and cards can accommodate future PC1640 configurations; PC1640 emulation is not implemented by this change. A disk collection box beside the computer remains an exploratory future idea.
+The PC1640 row is disabled for now and appears only with `AMSTRAD_PC1640=1` ([details](PC1640.md)). When enabled, the model badge opens **Machine configuration**: one row of DD, SD, SD with factory sticker and HD20 for the **PC1512** (512K, CGA) and the same row for the **PC1640** (640K, EGA). One choice sets both the computer and its drive layout, with a single restart confirmation; disks, drives and the hard disk image carry over, and the badge numerals follow the machine. The left bay also links to that panel. See [PC1640](PC1640.md). A disk collection box beside the computer remains an exploratory future idea.
 
 ## Code
 
@@ -24,7 +24,7 @@ All source paths below are under `upstream/86Box/src/qt/`.
 | --- | --- |
 | Hover timer, click dispatch, guest capture guard | `qt_rendererstack.cpp` / `.hpp` |
 | Part geometry in master-image pixels | `qt_amstradscene.hpp`: `hotspot()` |
-| Menu contents and applying configuration | `qt_mainwindow.cpp`: `showAmstradMenu`, `setAmstradLeftBay`, `setAmstradMonochrome` |
+| Menu contents and applying configuration | `qt_mainwindow.cpp`: `showAmstradMenu`, `setAmstradModel`, `setAmstradMonochrome` |
 | Shared popup theme, backdrop capture/blur, native menus and text shadows | qt_amstradpopup.hpp |
 | Popup placement/dismissal, cards, grids, disk drawing | `qt_amstradmenu.hpp` |
 | Photographic monitor selector and CGA sample | `qt_amstradmonitor.hpp` |
@@ -33,7 +33,7 @@ All source paths below are under `upstream/86Box/src/qt/`.
 
 Widgets use logical pixels and render artwork at the display pixel ratio. Cards expose accessible names and descriptions. Tab navigates focus; arrow keys move within a card grid; Enter and Space activate. Handlers close popups before running on the next event-loop pass, allowing file dialogs and confirmations to open safely.
 
-To add a machine family later, give it real emulator configuration/state and artwork, then populate the same configuration grid. Keep the machine family separate from its drive-layout variants. Do not infer PC1640 hardware from a PC1512 badge or bay choice.
+The machine family is real emulator state (`machine`, memory, firmware), kept separate from its drive-layout variants: `amstrad::Front::pc1640` comes from the configured machine, never from a badge or bay choice. To add another family, give it the same: configuration, artwork, then a row in the grid.
 
 ## Verification
 

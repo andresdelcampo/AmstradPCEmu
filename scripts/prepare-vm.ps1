@@ -1,6 +1,9 @@
 param(
     [ValidatePattern('^[a-zA-Z0-9_-]+$')][string]$Name = 'amstrad',
-    [string]$Installation = 'C:\Emulators\86Box'
+    [string]$Installation = 'C:\Emulators\86Box',
+    # The machine a NEW VM starts as. An existing VM keeps its own; switch it
+    # from the cabinet's model badge instead.
+    [ValidateSet('pc1512', 'pc1640')][string]$Machine = 'pc1512'
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -14,12 +17,17 @@ function Get-SHA256([string]$Path) {
 }
 $vm = Join-Path $root "local\$Name"
 $roms = Join-Path $Installation 'roms'
-foreach ($rom in '40043', '40044', '40078') {
-    $romPath = Join-Path $roms "machines\pc1512\$rom"
+$firmware = if ($Machine -eq 'pc1640') { @{ '40043.v3' = 16384; '40044.v3' = 16384; '40100' = 32768 } }
+            else { @{ '40043' = 8192; '40044' = 8192; '40078' = 8192 } }
+$label = $Machine.ToUpperInvariant()
+foreach ($rom in $firmware.Keys) {
+    $romPath = Join-Path $roms "machines\$Machine\$rom"
     if (!(Test-Path $romPath)) {
-        throw "Missing PC1512 ROM $rom. Supply your firmware under $roms\machines\pc1512."
+        throw "Missing $label ROM $rom. Supply your firmware under $roms\machines\$Machine."
     }
-    if ((Get-Item $romPath).Length -ne 8192) { throw "Invalid PC1512 ROM size: $romPath. Expected 8192 bytes." }
+    if ((Get-Item $romPath).Length -ne $firmware[$rom]) {
+        throw "Invalid $label ROM size: $romPath. Expected $($firmware[$rom]) bytes."
+    }
 }
 New-Item -ItemType Directory -Force (Join-Path $vm 'media') | Out-Null
 $records = foreach ($pair in @(@('PC1512 A1 - MSDOS.img', 'dos.img'), @('PC1512 A2 - GEM1.img', 'gem1.img'))) {
@@ -73,7 +81,8 @@ fdd_01_writeprot = 1
 fdd_02_writeprot = 1
 fdd_01_audio = panasonic_ju4755_40t
 fdd_02_audio = panasonic_ju4755_40t
-'@ | Set-Content -LiteralPath $config -Encoding ASCII
+'@.Replace('machine = pc1512', "machine = $Machine").Replace('mem_size = 512', "mem_size = $(if ($Machine -eq 'pc1640') { 640 } else { 512 })") |
+        Set-Content -LiteralPath $config -Encoding ASCII
 }
 $global = Join-Path $vm 'global.cfg'
 if (!(Test-Path $global)) {

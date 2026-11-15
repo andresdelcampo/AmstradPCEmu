@@ -1,4 +1,4 @@
-"""Run the real PC1512 offscreen using 86Box's authenticated local test socket.
+"""Run the real PC1512 (or, with --machine pc1640, the PC1640) offscreen using 86Box's authenticated local test socket.
 
 No desktop screenshots or injected host input. Firmware and disks stay external.
 Run prepare-vm.ps1 first. Captures come from the application and its video core.
@@ -19,7 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
 SCANS = dict(zip('abcdefghijklmnopqrstuvwxyz',
     [0x1e,0x30,0x2e,0x20,0x12,0x21,0x22,0x23,0x17,0x24,0x25,0x26,
      0x32,0x31,0x18,0x19,0x10,0x13,0x1f,0x14,0x16,0x2f,0x11,0x2d,0x15,0x2c]))
-SCANS.update({' ':0x39, ':':0x27, '\n':0x1c})
+SCANS.update({' ':0x39, ':':0x27, '\n':0x1c, ',':0x33, '0':0x0b})
+SCANS.update({str(d):d+1 for d in range(1, 10)})
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -32,13 +33,20 @@ def main():
     parser.add_argument('--shader', action='store_true', help='Use WGL with an unshown application window')
     parser.add_argument('--windows', action='store_true', help='Test native Windows platform without the CRT filter')
     parser.add_argument('--floppy-sounds', action='store_true', help='Record and verify Panasonic audio independently for A: and B:')
+    parser.add_argument('--machine', choices=['pc1512', 'pc1640'], default='pc1512',
+                        help='Boot a disposable VM created as this machine')
     args = parser.parse_args()
+    pc1640 = args.machine == 'pc1640'
+    assert not (pc1640 and (args.pattern or args.windows or args.floppy_sounds)), \
+        '--machine pc1640 combines only with --shader'
     args.installation = args.installation.resolve()
     name = 'verify-shader-vm' if args.shader else ('verify-windows-vm' if args.windows else ('verify-pattern-vm' if args.pattern else 'verify-vm'))
     if args.floppy_sounds:
         name = 'verify-floppy-vm'
+    if pc1640:
+        name = 'verify-pc1640-vm'
     subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
-                    str(ROOT/'scripts/prepare-vm.ps1'), '-Name', name,
+                    str(ROOT/'scripts/prepare-vm.ps1'), '-Name', name, '-Machine', args.machine,
                     '-Installation', str(args.installation)], check=True)
     vm = ROOT / 'local' / name
     # A reused disposable VM can remember fullscreen from a previous run.
@@ -48,6 +56,8 @@ def main():
     out = ROOT / ('local/verification-shader' if args.shader else ('local/verification-windows' if args.windows else ('local/verification-pattern' if args.pattern else 'local/verification')))
     if args.floppy_sounds:
         out = ROOT / 'local/verification-floppy'
+    if pc1640:
+        out = ROOT / ('local/verification-pc1640-shader' if args.shader else 'local/verification-pc1640')
     out.mkdir(parents=True, exist_ok=True)
     exe = args.executable.resolve()
     env = os.environ.copy()
@@ -55,6 +65,8 @@ def main():
     env['AMSTRAD_HEADLESS'] = '1'
     env['AMSTRAD_POWER_ON'] = '1'
     env['AMSTRAD_CRT'] = '1' if args.shader else '0'
+    # The PC1640 is disabled in normal use; only its own run switches it on.
+    env['AMSTRAD_PC1640'] = '1' if pc1640 else '0'
     for override in ['AMSTRAD_CRT_SAMPLING', 'AMSTRAD_CRT_CONVERGENCE', 'AMSTRAD_CRT_SHADER']:
         env.pop(override, None)
     env['AMSTRAD_CRT_LOG'] = str(out/'crt.log')
@@ -87,6 +99,14 @@ def main():
                       args.installation/'Disks/PC1512 A2 - GEM1.img']
     before = {str(p):digest(p) for p in original_paths}
     report['original_media_before'] = before
+    # A reused VM must start as the requested machine and layout, whatever a
+    # previous (possibly failed) run of the model-switch check left behind.
+    saved = config.read_text()
+    saved = re.sub(r'(?m)^machine\s*=.*$', f'machine = {args.machine}', saved)
+    saved = re.sub(r'(?m)^mem_size\s*=.*$', f'mem_size = {640 if pc1640 else 512}', saved)
+    if 'fdd_02_type' not in saved:
+        saved = saved.replace('fdd_01_type = 525_2dd', 'fdd_01_type = 525_2dd\nfdd_02_type = 525_2dd')
+    config.write_text(saved)
     (out/'config-before.cfg').write_bytes((vm/'86box.cfg').read_bytes())
     process = None
     stream = None
@@ -144,13 +164,43 @@ def main():
                     if row.rstrip() == 'A>' and reply['cursor'][1] == 2:
                         return
                 raise AssertionError('DOS did not return to an idle A> prompt')
-            def enter(text):
+            def type_line(text):
                 for ch in text.lower()+'\n':
                     if ch == ':': key(0x2a)
                     key(SCANS[ch]); key(SCANS[ch], False)
                     if ch == ':': key(0x2a, False)
                     request('step 20')
+            def enter(text):
+                type_line(text)
                 wait_prompt()
+            def memory(address, count=1):
+                return bytes.fromhex(request(f'memr {address:#x} {count}')['data'])
+            def machine_checks(model):
+                # BIOS data area: base memory in KiB; the PC1640's EGA BIOS is
+                # an option ROM at C000:0000, which the PC1512 does not have.
+                kib = int.from_bytes(memory(0x413, 2), 'little')
+                assert kib == (640 if model == 'pc1640' else 512), f'{model}: base memory {kib} KiB'
+                assert (memory(0xc0000, 2) == b'\x55\xaa') == (model == 'pc1640'), f'{model}: EGA BIOS presence'
+                report['checks'][f'{model}_memory_and_video_rom'] = True
+            def ega_graphics_check():
+                # DEBUG assembles a three-instruction program: set EGA mode 10h
+                # (640x350, 16 colours), fill the screen through the BIOS, exit.
+                type_line('debug'); request('step 3000')
+                for line in ['a 100', 'mov ax,10', 'int 10', 'mov ax,0941', 'mov bx,2', 'mov cx,640',
+                             'int 10', 'int 20', '', 'g']:
+                    type_line(line); request('step 600')
+                request('step 2000')
+                assert memory(0x449)[0] == 0x10, f'EGA mode 10h not set: {memory(0x449)[0]:#x}'
+                status = request('status')
+                assert (status['w'], status['h']) == (640, 350), f'EGA frame is {status["w"]}x{status["h"]}'
+                capture('ega-640x350')
+                # Still inside DEBUG: assemble and run a return to text mode 3.
+                # (This DOS's MODE rejects "co80".)
+                for line in ['a 100', 'mov ax,3', 'int 10', 'int 20', '', 'g', 'q']:
+                    type_line(line); request('step 600')
+                wait_prompt()
+                assert memory(0x449)[0] == 3, 'Text mode not restored'
+                report['checks']['pc1640_ega_640x350_and_text_restore'] = True
             def drive_audio_begin(drive):
                 # Expire the previous drive's motor timeout and let its physical
                 # playback thread finish the stop sample before recording.
@@ -176,7 +226,11 @@ def main():
                 report.setdefault('floppy_audio', {})[drive] = {
                     'peak_pcm16': peak, 'samples': len(samples), 'recording': str(folder / 'fdd.wav')}
                 report['checks'][f'panasonic_audio_{drive}'] = True
-            result = request('wait text 20000 AMSTRAD')
+            # PC1512: "AMSTRAD PC 512K"; PC1640: "Amstrad PC 640K (V3.1)".
+            result = request('wait text 20000 ' + ('640K' if pc1640 else 'AMSTRAD'))
+            if not result['matched']:
+                screen('post-missing'); capture('post-missing')
+                report['post_missing_status'] = request('status')
             assert result['matched'], 'POST banner missing'
             request('step 100')
             screen('post')
@@ -187,6 +241,10 @@ def main():
             assert 'MOUSE' in text and 'A>' in text, text
             report['checks']['post_dos'] = True
             capture('dos-boot')
+            assert report['info'].get('machine', args.machine) == args.machine, report['info']
+            machine_checks(args.machine)
+            if pc1640:
+                ega_graphics_check()
             if args.pattern:
                 capture('pattern-wide', 1500, 850)
                 capture('pattern-tall', 650, 1050)
@@ -246,6 +304,24 @@ def main():
                 if not args.windows and not args.shader:
                     request(f'ui-cabinet-test {out}')
                     report['checks']['cabinet_click_hover_and_capture_guard'] = True
+                    if pc1640:
+                        # The model badge's choice: swap the machine, boot it,
+                        # then swap back. Disks and drives carry over.
+                        other = 'pc1512' if pc1640 else 'pc1640'
+                        for model in [other, args.machine]:
+                            request(f'ui-model {model} dd')   # queued; poll for it
+                            for _ in range(100):
+                                request('step 100'); time.sleep(0.05)
+                                reply = request('info')
+                                if reply['machine'] == model: break
+                            assert reply['machine'] == model and reply['mem_kb'] == (640 if model == 'pc1640' else 512), reply
+                            assert request('wait text 20000 ' + ('640K' if model == 'pc1640' else 'AMSTRAD'))['matched'], \
+                                f'{model}: no POST banner after the switch'
+                            assert request('wait text 40000 V5.00')['matched'], f'{model}: DOS did not boot after the switch'
+                            wait_prompt()
+                            machine_checks(model)
+                            capture(f'switched-{model}')
+                        report['checks']['model_badge_switches_machine_both_ways'] = True
                 request('ui-mouse-capture-test')
                 report['checks']['mouse_capture_only_on_screen_clicks'] = True
                 request(f'ui-fullscreen-test {out / "fullscreen.png"}')
