@@ -2,7 +2,7 @@ $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Drawing
 $root=Split-Path -Parent $PSScriptRoot
 $out=Join-Path $root 'assets/front/drives'
-$colors=@('black','yellow','green','blue','red')
+$colors=@('black','yellow','green','blue','red','purple')
 $hashes=@{}
 function Get-FileHash($path){$sha=[Security.Cryptography.SHA256]::Create();try{return @{Hash=[BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($path))).Replace('-','')}}finally{$sha.Dispose()}}
 foreach($name in @('closed','opened')){$hashes[$name]=(Get-FileHash (Join-Path $out "masters/$name.png")).Hash}
@@ -47,15 +47,16 @@ $m | Add-Member -NotePropertyName open_master_sha256 -NotePropertyValue $hashes[
 foreach($d in $m.drives){
     $d.open_empty='drive-open-empty.png';$d.closed_mechanism='drive-closed-mechanism.png';$d.closed_black='drive-closed-black.png'
     $d.PSObject.Properties.Remove('disk_color_mask')
-    foreach($color in $colors){$d.closed_variants.$color="drive-closed-$color.png"}
+    foreach($color in $colors){$d.closed_variants | Add-Member -NotePropertyName $color -NotePropertyValue "drive-closed-$color.png" -Force}
 }
+$m.disk_colors=$colors
 $m | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $out 'placement.json') -Encoding UTF8
 $ledPath=Join-Path $root 'assets/front/leds/placement.json'
 $leds=Get-Content $ledPath -Raw | ConvertFrom-Json
 foreach($led in $leds.indicators){if($led.id -eq 'drive-a'){$led.x=511;$led.y=1014};if($led.id -eq 'drive-b'){$led.x=969;$led.y=1014}}
 $leds | ConvertTo-Json -Depth 8 | Set-Content $ledPath -Encoding UTF8
 $font=[Drawing.Font]::new('Segoe UI',12)
-$sheet=[Drawing.Bitmap]::new(460,960);$sg=[Drawing.Graphics]::FromImage($sheet);$sg.Clear([Drawing.Color]::FromArgb(28,29,32));$row=0
+$sheet=[Drawing.Bitmap]::new(460,(160*($colors.Count+1)));$sg=[Drawing.Graphics]::FromImage($sheet);$sg.Clear([Drawing.Color]::FromArgb(28,29,32));$row=0
 foreach($state in @('open-empty')+@($colors | ForEach-Object {"closed-$_"})){
     $sg.DrawString($state,$font,[Drawing.Brushes]::White,10,($row*160))
     if($state -ne 'open-empty'){$sg.DrawImageUnscaled($closed,5,($row*160+20))}

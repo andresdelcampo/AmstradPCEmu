@@ -2099,19 +2099,21 @@ index f694a38..1376fcb 100644
          main_window->showMaximized();
      } else {
 diff --git a/src/qt/qt_mainwindow.cpp b/src/qt/qt_mainwindow.cpp
-index 8b91429..c4ed3b4 100644
+index 8b91429..d38c0af 100644
 --- a/src/qt/qt_mainwindow.cpp
 +++ b/src/qt/qt_mainwindow.cpp
-@@ -33,6 +33,8 @@
+@@ -32,7 +32,10 @@
+ #include <QPointer>
  
  #include "qt_rendererstack.hpp"
++#include "qt_softwarerenderer.hpp"
  #include "qt_renderercommon.hpp"
 +#include "qt_amstradscene.hpp"
 +#include "qt_amstradpopup.hpp"
  
  #include "qt_cgasettingsdialog.hpp"
  
-@@ -71,6 +73,9 @@ extern int qt_nvr_save(void);
+@@ -71,6 +74,9 @@ extern int qt_nvr_save(void);
  extern void nmi_raise(void);
  
  extern bool cpu_thread_running;
@@ -2121,7 +2123,7 @@ index 8b91429..c4ed3b4 100644
  };
  
  #include <QGuiApplication>
-@@ -92,6 +97,7 @@ extern bool cpu_thread_running;
+@@ -92,6 +98,7 @@ extern bool cpu_thread_running;
  #include <QScreen>
  #include <QString>
  #include <QDir>
@@ -2129,17 +2131,21 @@ index 8b91429..c4ed3b4 100644
  #include <QSysInfo>
  #include <QEventLoop>
  #if QT_CONFIG(vulkan)
-@@ -539,6 +545,9 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -539,6 +546,13 @@ MainWindow::MainWindow(QWidget *parent)
      });
  
      connect(this, &MainWindow::updateStatusBarPanes, this, &MainWindow::refreshMediaMenu);
++    connect(mm.get(), &MediaMenu::floppyMediaChanged, this, [this](int drive, bool hadDisk, bool hasDisk) {
++        if (auto *sw = ui->stackedWidget->softwareRenderer())
++            sw->animateUnpoweredDisk(drive, hadDisk, hasDisk);
++    });
 +    connect(ui->stackedWidget, &RendererStack::amstradContextMenu, this, &MainWindow::showAmstradMenu);
 +    connect(ui->stackedWidget, &RendererStack::amstradPowerToggleRequested, this, &MainWindow::toggleAmstradPower);
 +    connect(this, &MainWindow::hardResetCompleted, this, &MainWindow::finishAmstradPowerOn);
      connect(this, &MainWindow::updateStatusBarTip, status.get(), &MachineStatus::updateTip);
      connect(this, &MainWindow::statusBarMessage, status.get(), &MachineStatus::message, Qt::QueuedConnection);
  
-@@ -559,6 +568,39 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -559,6 +573,39 @@ MainWindow::MainWindow(QWidget *parent)
      ui->actionApply_fullscreen_stretch_mode_when_maximized->setVisible(false);
  #endif
  
@@ -2179,7 +2185,7 @@ index 8b91429..c4ed3b4 100644
      if ((QApplication::platformName().contains("eglfs") || QApplication::platformName() == "haiku")) {
          if ((vid_api == RENDERER_OPENGL3) || (vid_api == RENDERER_VULKAN))
              fprintf(stderr, "OpenGL renderers are unsupported on %s.\n", QApplication::platformName().toUtf8().data());
-@@ -872,7 +914,17 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -872,7 +919,17 @@ MainWindow::MainWindow(QWidget *parent)
      if (!vnc_enabled)
          video_setblit(qt_blit);
  
@@ -2198,7 +2204,7 @@ index 8b91429..c4ed3b4 100644
          connect(ui->stackedWidget, &RendererStack::blitToRenderer, this, [this]() {
              if (start_in_fullscreen) {
                  QTimer::singleShot(100, ui->actionFullscreen, &QAction::trigger);
-@@ -1004,6 +1056,20 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -1004,6 +1061,20 @@ MainWindow::MainWindow(QWidget *parent)
      updateShortcuts();
  }
  
@@ -2219,7 +2225,7 @@ index 8b91429..c4ed3b4 100644
  void
  MainWindow::closeEvent(QCloseEvent *event)
  {
-@@ -1035,12 +1101,7 @@ MainWindow::closeEvent(QCloseEvent *event)
+@@ -1035,12 +1106,7 @@ MainWindow::closeEvent(QCloseEvent *event)
              config_save_global_setting("Emulator", "confirm_exit");
      }
      if (window_remember && !video_fullscreen) {
@@ -2233,7 +2239,7 @@ index 8b91429..c4ed3b4 100644
          for (int i = 1; i < MONITORS_NUM; i++) {
              if (renderers[i]) {
                  monitor_settings[i].mon_window_w = renderers[i]->geometry().width();
-@@ -1144,7 +1205,14 @@ MainWindow::updateShortcuts()
+@@ -1144,7 +1210,14 @@ MainWindow::updateShortcuts()
  
      accID = FindAccelerator("fullscreen");
      seq   = QKeySequence::fromString(acc_keys[accID].seq);
@@ -2249,7 +2255,7 @@ index 8b91429..c4ed3b4 100644
  
      accID = FindAccelerator("pause");
      seq   = QKeySequence::fromString(acc_keys[accID].seq);
-@@ -1296,6 +1364,20 @@ MainWindow::showEvent(QShowEvent *event)
+@@ -1296,6 +1369,20 @@ MainWindow::showEvent(QShowEvent *event)
              window_h = 200;
      }
  
@@ -2270,7 +2276,7 @@ index 8b91429..c4ed3b4 100644
      if (window_remember && !QApplication::platformName().contains("wayland")) {
          setGeometry(window_x, window_y, window_w, window_h + menuBar()->height() + (hide_status_bar ? 0 : statusBar()->height()) + (hide_tool_bar ? 0 : ui->toolBar->height()));
      }
-@@ -1358,6 +1440,8 @@ MainWindow::on_actionHard_Reset_triggered()
+@@ -1358,6 +1445,8 @@ MainWindow::on_actionHard_Reset_triggered()
  void
  MainWindow::on_actionCtrl_Alt_Del_triggered()
  {
@@ -2279,7 +2285,7 @@ index 8b91429..c4ed3b4 100644
      pc_send_cad();
  }
  
-@@ -1439,6 +1523,8 @@ MainWindow::on_actionSettings_triggered()
+@@ -1439,6 +1528,8 @@ MainWindow::on_actionSettings_triggered()
      /* Also changed by soft saves, which reject the dialog */
      ui->actionFast_forward_on_start->setChecked(fast_forward_on_start);
      runctl_resume(RUN_PAUSE_SYNC);
@@ -2288,7 +2294,7 @@ index 8b91429..c4ed3b4 100644
  }
  
  void
-@@ -1648,7 +1734,10 @@ MainWindow::on_actionFullscreen_triggered()
+@@ -1648,7 +1739,10 @@ MainWindow::on_actionFullscreen_triggered()
  {
      if (video_fullscreen > 0) {
          video_fullscreen = 0;
@@ -2300,7 +2306,7 @@ index 8b91429..c4ed3b4 100644
          ui->menubar->show();
          if (!hide_status_bar)
              ui->statusbar->show();
-@@ -1659,7 +1748,12 @@ MainWindow::on_actionFullscreen_triggered()
+@@ -1659,7 +1753,12 @@ MainWindow::on_actionFullscreen_triggered()
              emit resizeContents(vid_resize == 2 ? fixed_size_x : monitors[0].mon_scrnsz_x, vid_resize == 2 ? fixed_size_y : monitors[0].mon_scrnsz_y);
          }
      } else {
@@ -2314,7 +2320,7 @@ index 8b91429..c4ed3b4 100644
              emit setMouseCapture(true);
          video_fullscreen = 1;
          pclog("Full screen: %ix%i\n", QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
-@@ -1714,6 +1808,39 @@ MainWindow::keyMatchesAccelerator(const QKeyEvent *ke, const char *name)
+@@ -1714,6 +1813,39 @@ MainWindow::keyMatchesAccelerator(const QKeyEvent *ke, const char *name)
  bool
  MainWindow::eventFilter(QObject *receiver, QEvent *event)
  {
@@ -2354,7 +2360,7 @@ index 8b91429..c4ed3b4 100644
      /* Keys typed into the memory viewer are its own, not the guest's. */
      if ((event->type() == QEvent::KeyPress) || (event->type() == QEvent::KeyRelease) || (event->type() == QEvent::ShortcutOverride)) {
          auto *widget = qobject_cast<QWidget *>(receiver);
-@@ -1871,6 +1998,7 @@ MainWindow::refreshMediaMenu()
+@@ -1871,6 +2003,7 @@ MainWindow::refreshMediaMenu()
  {
      mm->refresh(ui->menuMedia);
      status->setSoundMenu(ui->menuSound);
@@ -2362,7 +2368,7 @@ index 8b91429..c4ed3b4 100644
      status->setDynarecMenu(dynarecMenu);
      status->refresh(ui->statusbar);
      ui->actionMCA_devices->setVisible(machine_has_bus(machine, MACHINE_BUS_MCA));
-@@ -1914,6 +2042,12 @@ MainWindow::hasKanaLock()
+@@ -1914,6 +2047,12 @@ MainWindow::hasKanaLock()
  void
  MainWindow::updatePowerOffAction()
  {
@@ -2375,7 +2381,7 @@ index 8b91429..c4ed3b4 100644
      const bool has_power_button = device_has_power_button();
      if (acpi_enabled || has_power_button) {
          ui->actionACPI_Shutdown->setText(tr("Power &off (soft)"));
-@@ -2733,7 +2867,9 @@ MainWindow::changeEvent(QEvent *event)
+@@ -2733,7 +2872,9 @@ MainWindow::changeEvent(QEvent *event)
  #endif
      QWidget::changeEvent(event);
      if (isVisible()) {
@@ -2386,7 +2392,7 @@ index 8b91429..c4ed3b4 100644
          config_save();
      }
      /* The renderer can get its resize event before the window reports being
-@@ -2916,6 +3052,10 @@ MainWindow::on_actionPen_triggered()
+@@ -2916,6 +3057,10 @@ MainWindow::on_actionPen_triggered()
  void
  MainWindow::on_actionACPI_Shutdown_triggered()
  {
@@ -2397,7 +2403,7 @@ index 8b91429..c4ed3b4 100644
      if (acpi_enabled) {
          acpi_pwrbut_press();
          return;
-@@ -2950,3 +3090,401 @@ MainWindow::on_actionCGA_composite_settings_triggered()
+@@ -2950,3 +3095,387 @@ MainWindow::on_actionCGA_composite_settings_triggered()
      isNonPause = false;
      config_save();
  }
@@ -2503,56 +2509,42 @@ index 8b91429..c4ed3b4 100644
 +    amstrad::CabinetMenu menu(this);
 +    menu.setSeparatorsCollapsible(true);
 +
-+    /* A floppy drive: its face with the current disk, then the Media actions
-+       except the 86F export. */
++    /* A floppy drive: the bay with its disk (click to eject), then the box of
++       disks to put in it. See addDrivePanel() in qt_amstradmenu.hpp. */
 +    auto addFloppy = [&](int drive) {
-+        const fdd_drive_t &d    = drives[drive];
-+        const QString      path = QString::fromUtf8(d.image_path);
-+        const bool         empty = path.isEmpty();
-+        const int          bay   = (front.left == amstrad::BayFloppy && drive == 0) ? 0 : 1;
-+        const int          face  = empty ? amstrad::DriveOpen : amstrad::diskColour(path);
-+        QString            text  = empty ? tr("No disk. Insert an image below.")
-+                                         : QFileInfo(path).fileName();
-+        if (!empty && (d.read_only || d.writeprot))
-+            text += tr("  Â·  write-protected");
-+        amstrad::addCard(&menu, picture(front, bayCrop(bay), bay == 0 ? face : -1, bay == 1 ? face : -1),
-+                         tr("Drive %1:  5Â¼\" 360K").arg(QChar('A' + drive)), text);
-+        auto *grid = amstrad::addGrid(&menu);
-+        amstrad::addTile(grid, amstrad::diskPicture(tr("CHOOSE DISK"), QColor("#353b40"), ratio),
-+            tr("Choose diskâ€¦"), tr("Insert a disk image into this drive."), false,
-+            [this, drive] { mm->floppySelectImage(drive, false); });
-+        amstrad::addTile(grid, amstrad::diskPicture(tr("READ ONLY"), QColor("#59786c"), ratio),
-+            tr("Choose protected diskâ€¦"), tr("Use an image without writing to it."), false,
-+            [this, drive] { mm->floppySelectImage(drive, true); });
-+        amstrad::addTile(grid, amstrad::diskPicture(tr("BLANK DISK"), QColor("#8e704e"), ratio),
-+            tr("New diskâ€¦"), tr("Create a blank disk image."), false,
-+            [this, drive] { mm->floppyNewImage(drive); });
-+        auto *eject = amstrad::addTile(grid,
-+            picture(front, bayCrop(bay), bay == 0 ? amstrad::DriveOpen : -1, bay == 1 ? amstrad::DriveOpen : -1),
-+            tr("Eject disk"), empty ? tr("The drive is already empty.") : QFileInfo(path).fileName(), false,
-+            [this, drive] { mm->floppyEject(drive); });
-+        eject->setEnabled(!empty);
-+
-+        // Reuse the actual history actions: filenames, availability and mount
-+        // behavior stay owned by MediaMenu, including separate A:/B: histories.
-+        auto *recent = new amstrad::CabinetMenu(&menu);
-+        recent->setTitle(tr("Recent disks"));
-+        amstrad::addCaption(recent, tr("Recent disks"), tr("Choose a labelled disk to insert it."));
-+        auto *historyGrid = amstrad::addGrid(recent);
-+        int count = 0;
-+        for (QAction *a : mm->floppyHistoryActions(drive)) {
-+            if (!a->isVisible() || !a->isEnabled()) continue;
-+            QString label = a->text();
-+            // The upstream menu adds a numbered mnemonic before each path.
-+            if (label.size() > 3 && label[0] == '&' && label[1].isDigit() && label[2] == ' ')
-+                label.remove(0, 3);
-+            if (count++ < 4) {
-+                amstrad::addTile(historyGrid, amstrad::diskPicture(QFileInfo(label).fileName(), QColor("#41494e"), ratio),
-+                    QFileInfo(label).fileName(), label, false, [a] { a->trigger(); });
-+            } else recent->addAction(a);
++        const QString path = QString::fromUtf8(drives[drive].image_path);
++        const int     bay  = (front.left == amstrad::BayFloppy && drive == 0) ? 0 : 1;
++        const int     face = path.isEmpty() ? amstrad::DriveOpen : amstrad::diskColour(path, front.left == amstrad::BayHdd);
++        auto bayPicture    = [&](int f) { return picture(front, bayCrop(bay), bay == 0 ? f : -1, bay == 1 ? f : -1); };
++        amstrad::DrivePanel panel;
++        panel.drive     = drive;
++        panel.hardDisk  = front.left == amstrad::BayHdd;
++        panel.vmFolder  = QString::fromUtf8(usr_path);
++        panel.artFolder = QFileInfo(qEnvironmentVariable("AMSTRAD_CABINET")).dir().filePath("disks");
++        for (int d = 0; d < 2; ++d)
++            panel.mounted[d] = QString::fromUtf8(drives[d].image_path);
++        panel.mountedProtected = drives[drive].read_only || drives[drive].writeprot;
++        panel.closed           = bayPicture(face);
++        panel.open             = bayPicture(amstrad::DriveOpen);
++        panel.insert = [this, drive](const QString &image, bool wp) { mm->floppyMount(drive, image, wp); };
++        panel.browse = [this, drive](bool wp) { mm->floppySelectImage(drive, wp); };
++        panel.create = [this, drive] { mm->floppyNewImage(drive); };
++        panel.eject  = [this, drive] { mm->floppyEject(drive); };
++        panel.locate = [this, drive](int disc) {
++            const QString image = mm->floppyChooseImage();
++            if (image.isEmpty())
++                return;
++            amstrad::DiskBox(QString::fromUtf8(usr_path), true).setSystemDisc(disc, image);
++            mm->floppyMount(drive, image, true);
++        };
++        if (amstrad::DiskBox box(panel.vmFolder); !box.started()) {
++            QStringList history;
++            for (int d = 0; d < 2; ++d)
++                for (const QString &image : mm->floppyHistory(d))
++                    history.prepend(image);
++            box.start(history);
 +        }
-+        if (count) menu.addMenu(recent);
-+        else delete recent;
++        amstrad::addDrivePanel(&menu, panel, ratio);
 +    };
 +
 +    /* The model: the machine (PC1512 or PC1640) and its left bay fit, which
@@ -2840,10 +2832,18 @@ index e085af5..48b05c9 100644
  
  #endif // QT_MAINWINDOW_HPP
 diff --git a/src/qt/qt_mediamenu.cpp b/src/qt/qt_mediamenu.cpp
-index 26d8e9f..7e95f46 100644
+index 26d8e9f..b824c37 100644
 --- a/src/qt/qt_mediamenu.cpp
 +++ b/src/qt/qt_mediamenu.cpp
-@@ -27,6 +27,8 @@
+@@ -18,6 +18,7 @@
+  */
+ #include "qt_preferences.hpp"
+ #include "qt_machinestatus.hpp"
++#include "qt_amstraddiskbox.hpp"
+ 
+ #include <QMenu>
+ #include <QFile>
+@@ -27,6 +28,8 @@
  #include <QApplication>
  #include <QStyle>
  #include <QDirIterator>
@@ -2852,7 +2852,7 @@ index 26d8e9f..7e95f46 100644
  #include <QTextStream>
  
  extern "C" {
-@@ -54,6 +56,7 @@ extern "C" {
+@@ -54,6 +57,7 @@ extern "C" {
  #include <86box/cartridge.h>
  #include <86box/fdd.h>
  #include <86box/fdd_86f.h>
@@ -2860,7 +2860,7 @@ index 26d8e9f..7e95f46 100644
  #include <86box/cdrom.h>
  #include <86box/scsi_device.h>
  #include <86box/rdisk.h>
-@@ -443,8 +446,10 @@ MediaMenu::cassetteSelectImage(bool wp)
+@@ -443,8 +447,10 @@ MediaMenu::cassetteSelectImage(bool wp)
                                                   getMediaOpenDirectory(),
                                                   tr("Cassette images") % util::DlgFilter({ "pcm", "raw", "wav", "cas" }) % tr("All files") % util::DlgFilter({ "*" }, true));
  
@@ -2872,7 +2872,7 @@ index 26d8e9f..7e95f46 100644
  }
  
  void
-@@ -555,6 +560,7 @@ MediaMenu::cartridgeSelectImage(int i)
+@@ -555,6 +561,7 @@ MediaMenu::cartridgeSelectImage(int i)
      if (filename.isEmpty()) {
          return;
      }
@@ -2880,19 +2880,36 @@ index 26d8e9f..7e95f46 100644
      cartridgeMount(i, filename);
  }
  
-@@ -630,8 +636,10 @@ MediaMenu::floppySelectImage(int i, bool wp)
+@@ -610,8 +617,9 @@ MediaMenu::floppyNewImage(int i)
+     }
+ }
+ 
+-void
+-MediaMenu::floppySelectImage(int i, bool wp)
++/* The floppy image chooser alone; empty when cancelled. */
++QString
++MediaMenu::floppyChooseImage()
+ {
+     auto filename = QFileDialog::getOpenFileName(
+         parentWidget,
+@@ -630,6 +638,16 @@ MediaMenu::floppySelectImage(int i, bool wp)
          tr("All files") %
          util::DlgFilter({ "*" }, true));
  
--    if (!filename.isEmpty())
-+    if (!filename.isEmpty()) {
++    if (!filename.isEmpty())
 +        rememberMediaOpenDirectory(filename);
++    return filename;
++}
++
++void
++MediaMenu::floppySelectImage(int i, bool wp)
++{
++    const QString filename = floppyChooseImage();
++
+     if (!filename.isEmpty())
          floppyMount(i, filename, wp);
-+    }
  }
- 
- void
-@@ -640,6 +648,7 @@ MediaMenu::floppyMount(int i, const QString &filename, bool wp)
+@@ -640,6 +658,7 @@ MediaMenu::floppyMount(int i, const QString &filename, bool wp)
      fdd_drive_t *drv = &drives[i];
  
      auto previous_image = QFileInfo(drv->image_path);
@@ -2900,23 +2917,28 @@ index 26d8e9f..7e95f46 100644
      fdd_close(&drives[i]);
      drv->read_only = wp ? 1 : 0;
      if (!filename.isEmpty()) {
-@@ -654,6 +663,7 @@ MediaMenu::floppyMount(int i, const QString &filename, bool wp)
+@@ -654,6 +673,11 @@ MediaMenu::floppyMount(int i, const QString &filename, bool wp)
          mhm.addImageToHistory(i, ui::MediaType::Floppy, previous_image.filePath(), QString(filenameBytes));
      } else
          mhm.addImageToHistory(i, ui::MediaType::Floppy, previous_image.filePath(), filename);
 +    fdd_audio_play_media(i, had_disk, drv->image_path[0] != '\0');
++    emit floppyMediaChanged(i, had_disk, drv->image_path[0] != '\0');
++    /* The cabinet's disk box keeps what was used and how its tab was set. */
++    if (drv->image_path[0] != '\0')
++        amstrad::DiskBox(QString::fromUtf8(usr_path)).remember(QString::fromUtf8(drv->image_path), drv->read_only || drv->writeprot);
      ui_sb_update_icon_state(SB_FLOPPY | i, drv->empty);
      ui_sb_update_icon_wp(SB_FLOPPY | i, drv->writeprot);
      floppyUpdateMenu(i);
-@@ -667,6 +677,7 @@ MediaMenu::floppyEject(int i)
+@@ -667,6 +691,8 @@ MediaMenu::floppyEject(int i)
      fdd_drive_t *drv = &drives[i];
  
      mhm.addImageToHistory(i, ui::MediaType::Floppy, drv->image_path, QString());
 +    fdd_audio_play_media(i, drv->image_path[0] != '\0', 0);
++    emit floppyMediaChanged(i, drv->image_path[0] != '\0', false);
      fdd_close(&drives[i]);
      ui_sb_update_icon_state(SB_FLOPPY | i, 1);
      floppyUpdateMenu(i);
-@@ -797,6 +808,8 @@ MediaMenu::cdromMount(int i, int dir, const QString &arg)
+@@ -797,6 +823,8 @@ MediaMenu::cdromMount(int i, int dir, const QString &arg)
      if (filename.isEmpty())
          return;
  
@@ -2925,7 +2947,7 @@ index 26d8e9f..7e95f46 100644
      cdromMount(i, filename);
  }
  
-@@ -1405,8 +1418,10 @@ MediaMenu::moSelectImage(int i, bool wp)
+@@ -1405,8 +1433,10 @@ MediaMenu::moSelectImage(int i, bool wp)
                                                                                                  },
                                                                                                  true));
  
@@ -2937,7 +2959,7 @@ index 26d8e9f..7e95f46 100644
  }
  
  void
-@@ -1514,8 +1529,10 @@ MediaMenu::tapeSelectImage(int i, bool wp)
+@@ -1514,8 +1544,10 @@ MediaMenu::tapeSelectImage(int i, bool wp)
          getMediaOpenDirectory(),
          tr("Tape images") % util::DlgFilter({ "tap" }) % tr("All files") % util::DlgFilter({ "*" }, true));
  
@@ -2949,7 +2971,7 @@ index 26d8e9f..7e95f46 100644
  }
  
  void
-@@ -1989,8 +2006,18 @@ MediaMenu::usbPortSelectImage(const QString &label, bool wp)
+@@ -1989,8 +2021,18 @@ MediaMenu::usbPortSelectImage(const QString &label, bool wp)
                                                      tr("Flash drive images") % util::DlgFilter({ "img", "ima", "bin", "raw" }) %
                                                      tr("All files") % util::DlgFilter({ "*" }, true));
  
@@ -2969,7 +2991,7 @@ index 26d8e9f..7e95f46 100644
  }
  
  QString
-@@ -2002,11 +2029,26 @@ MediaMenu::getMediaOpenDirectory()
+@@ -2002,11 +2044,26 @@ MediaMenu::getMediaOpenDirectory()
      if (open_dir_usr_path > 0 && firstCall) {
          openDirectory = QString::fromUtf8(usr_path);
          firstCall     = false;
@@ -2997,10 +3019,27 @@ index 26d8e9f..7e95f46 100644
  extern "C" {
  void
 diff --git a/src/qt/qt_mediamenu.hpp b/src/qt/qt_mediamenu.hpp
-index e1228f7..e8b0173 100644
+index e1228f7..6d17f1d 100644
 --- a/src/qt/qt_mediamenu.hpp
 +++ b/src/qt/qt_mediamenu.hpp
-@@ -41,6 +41,23 @@ public:
+@@ -36,11 +36,40 @@ public:
+ 
+     void floppyNewImage(int i);
+     void floppySelectImage(int i, bool wp);
++    QString floppyChooseImage();
++    /* Images drive i held before, newest first; write-protected ones as wp://. */
++    QStringList floppyHistory(int i)
++    {
++        QStringList result;
++        for (int slot = 0; slot < MAX_PREV_IMAGES; ++slot) {
++            const QString image = mhm.getImageForSlot(i, slot, ui::MediaType::Floppy);
++            if (!image.isEmpty())
++                result.append(image);
++        }
++        return result;
++    }
+     void floppyMount(int i, const QString &filename, bool wp);
+     void floppyEject(int i);
      void floppyMenuSelect(int index, int slot);
      void floppyExportTo86f(int i);
      void floppyUpdateMenu(int i);
@@ -3024,7 +3063,15 @@ index e1228f7..e8b0173 100644
  
      void cdromMute(int i);
      void cdromMount(int i, int dir, const QString &arg);
-@@ -115,6 +132,7 @@ private:
+@@ -96,6 +125,7 @@ public slots:
+     void cdromUpdateUi(int i);
+ 
+ signals:
++    void floppyMediaChanged(int drive, bool hadDisk, bool hasDisk);
+     void onCdromUpdateUi(int i);
+ 
+ private:
+@@ -115,6 +145,7 @@ private:
      QAction           *usbPortsBefore = nullptr; /* the port submenus go before it */
  
      QString                 getMediaOpenDirectory();
@@ -3243,7 +3290,7 @@ index 4703b31..3cf8300 100644
      QBoxLayout *boxLayout = nullptr;
  
 diff --git a/src/qt/qt_softwarerenderer.cpp b/src/qt/qt_softwarerenderer.cpp
-index 5fd1599..613532e 100644
+index 5fd1599..f888f11 100644
 --- a/src/qt/qt_softwarerenderer.cpp
 +++ b/src/qt/qt_softwarerenderer.cpp
 @@ -17,12 +17,20 @@
@@ -3515,7 +3562,7 @@ index 5fd1599..613532e 100644
              painter.setRenderHint(QPainter::SmoothPixmapTransform, video_filter_method > 0);
              /* The frame's alpha bytes are not set; adding it onto black ignores them
                 and leaves the result opaque, so the GUI thread can copy it as is. */
-@@ -248,6 +413,152 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
+@@ -248,6 +413,154 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
      stale[back ^ 1] |= painted;
  }
  
@@ -3576,7 +3623,7 @@ index 5fd1599..613532e 100644
 +        if (std::strncmp(drive_path[i], drives[i].image_path, sizeof(drive_path[i])) != 0) {
 +            std::strncpy(drive_path[i], drives[i].image_path, sizeof(drive_path[i]) - 1);
 +            drive_path[i][sizeof(drive_path[i]) - 1] = '\0';
-+            drive_colour[i] = amstrad::diskColour(QString::fromUtf8(drive_path[i]));
++            drive_colour[i] = amstrad::diskColour(QString::fromUtf8(drive_path[i]), machineFront().left == amstrad::BayHdd);
 +        }
 +        return drive_colour[i];
 +    };
@@ -3639,7 +3686,9 @@ index 5fd1599..613532e 100644
 +        layout.front = front;
 +        layout.gen++; /* a new layout generation repaints the whole cabinet */
 +    }
-+    if (repaint && worker.context())
++    if (repaint && (!power_led.load() || awaiting_power_frame.load()))
++        update(); // The unpowered cabinet has no video frames to trigger a repaint.
++    else if (repaint && worker.context())
 +        QMetaObject::invokeMethod(worker.context(), [this] { scaleFrame(QRegion(), true); }, Qt::QueuedConnection);
 +}
 +
@@ -3668,7 +3717,7 @@ index 5fd1599..613532e 100644
  SoftwareRenderer::Layout
  SoftwareRenderer::currentLayout()
  {
-@@ -335,6 +646,8 @@ SoftwareRenderer::publishLayout()
+@@ -335,6 +648,8 @@ SoftwareRenderer::publishLayout()
      std::scoped_lock lk(layout_mutex);
      layout.dest  = destination;
      layout.size  = QSize(qRound(width() * pixelRatio), qRound(height() * pixelRatio));
@@ -3677,7 +3726,7 @@ index 5fd1599..613532e 100644
      layout.ratio = pixelRatio;
      layout.gen++;
  }
-@@ -343,12 +656,29 @@ void
+@@ -343,12 +658,29 @@ void
  SoftwareRenderer::resizeEvent(QResizeEvent *event)
  {
      layoutPicture();
@@ -3707,7 +3756,7 @@ index 5fd1599..613532e 100644
      bool res = false;
      if (!eventDelegate(event, res))
          return QWidget::event(event);
-@@ -362,12 +692,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -362,12 +694,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
      const int  shown = frontBuffer();
      /* Repaint when the OSD is up, or once more right after it closes so a
       * lingering overlay is cleared even while the machine is paused. */
@@ -3726,7 +3775,7 @@ index 5fd1599..613532e 100644
  
      if (osd) {
          painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-@@ -385,6 +718,48 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -385,6 +720,69 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
          QTimer::singleShot(16, this, [this] { update(); });
  }
  
@@ -3736,6 +3785,17 @@ index 5fd1599..613532e 100644
 +    awaiting_power_frame = on;
 +    power_led = on;
 +    if (power_peek) power_peek->changed(on);
++    update();
++}
++
++void
++SoftwareRenderer::animateUnpoweredDisk(int drive, bool hadDisk, bool hasDisk)
++{
++    if (drive < 0 || drive >= 2 || power_led.load() || cabinet.isNull())
++        return;
++    unpowered_disk_started[drive] = QDateTime::currentMSecsSinceEpoch();
++    unpowered_disk_had[drive] = hadDisk;
++    unpowered_disk_has[drive] = hasDisk;
 +    update();
 +}
 +
@@ -3753,19 +3813,29 @@ index 5fd1599..613532e 100644
 +                        front, scene, unpowered_shown);
 +}
 +
-+/* GUI thread: the front-panel state of a machine that is switched off. LEDs
-+   are dark; the drive faces follow the insert/eject sounds as in ledState(). */
++/* GUI thread: the front-panel state of a switched-off machine. The media
++   action starts this visual sequence directly; audio playback is on another
++   thread and may start late or stop while the machine is paused. */
 +unsigned
 +SoftwareRenderer::unpoweredState()
 +{
 +    auto face = [this](int i) {
 +        amstrad::DriveFace &shown = unpowered_face[i];
-+        if ((shown != amstrad::DriveOpen) && fdd_audio_media_ejecting(i))
-+            return shown; /* the latch has not moved yet */
-+        if (!drives[i].image_path[0] || fdd_audio_media_inserting(i))
++        const qint64 elapsed = QDateTime::currentMSecsSinceEpoch() - unpowered_disk_started[i];
++        if (unpowered_disk_started[i] && elapsed >= 0) {
++            // The recordings are 1.60 s (eject) and 2.09 s (insert). The
++            // latch opens one quarter into eject and closes two thirds into
++            // insert, matching the powered-on front.
++            if (unpowered_disk_had[i] && elapsed < 400)
++                return shown;
++            const qint64 closeAt = (unpowered_disk_had[i] ? 1600 : 0) + 1390;
++            if (unpowered_disk_has[i] && elapsed < closeAt)
++                return shown = amstrad::DriveOpen;
++        }
++        if (!drives[i].image_path[0])
 +            shown = amstrad::DriveOpen;
 +        else
-+            shown = amstrad::diskColour(QString::fromUtf8(drives[i].image_path));
++            shown = amstrad::diskColour(QString::fromUtf8(drives[i].image_path), machineFront().left == amstrad::BayHdd);
 +        return shown;
 +    };
 +    /* As machineFront(): with a drive B: fitted it is the right bay, else A: is. */
@@ -3776,7 +3846,7 @@ index 5fd1599..613532e 100644
  SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
  {
 diff --git a/src/qt/qt_softwarerenderer.hpp b/src/qt/qt_softwarerenderer.hpp
-index 265bb45..83a268d 100644
+index 265bb45..d95efef 100644
 --- a/src/qt/qt_softwarerenderer.hpp
 +++ b/src/qt/qt_softwarerenderer.hpp
 @@ -7,14 +7,18 @@
@@ -3806,7 +3876,7 @@ index 265bb45..83a268d 100644
      void finalize() override final;
  
      void paintEvent(QPaintEvent *event) override;
-@@ -59,6 +64,69 @@ protected:
+@@ -59,6 +64,73 @@ protected:
      QScopedPointer<QBackingStore> m_backingStore;
  
  private:
@@ -3841,6 +3911,7 @@ index 265bb45..83a268d 100644
 +    // Cabinet power indicator; on while the machine runs. Thread-safe.
 +    std::atomic<bool> power_led{true};
 +    void setCabinetPower(bool on);
++    void animateUnpoweredDisk(int drive, bool hadDisk, bool hasDisk);
 +    AmstradPowerPeek *powerPeek() const { return power_peek; }
 +signals:
 +    void amstradPowerToggleRequested();
@@ -3868,6 +3939,9 @@ index 265bb45..83a268d 100644
 +    unsigned unpoweredState();
 +    unsigned unpowered_shown = ~0u;
 +    amstrad::DriveFace unpowered_face[2] = {amstrad::DriveOpen, amstrad::DriveOpen};
++    qint64 unpowered_disk_started[2] = {};
++    bool unpowered_disk_had[2] = {};
++    bool unpowered_disk_has[2] = {};
 +    // Surface lifetime stays on the GUI thread; filter GL objects stay on worker.
 +    std::unique_ptr<QOffscreenSurface> crt_surface;
 +    std::unique_ptr<IBMulatorCRT> crt_filter;
@@ -3876,7 +3950,7 @@ index 265bb45..83a268d 100644
      /* A thread with an event loop and an object living on it, to deliver work to.
         Stopping it waits for the work in progress to finish. */
      class Worker {
-@@ -84,6 +152,9 @@ private:
+@@ -84,6 +156,9 @@ private:
          QSize size;
          qreal ratio = 1.0;
          int   gen   = 0;
@@ -3886,7 +3960,7 @@ index 265bb45..83a268d 100644
      };
  
      /* Worker thread: scale the current frame into the back buffer, where dirty
-@@ -102,6 +173,7 @@ private:
+@@ -102,6 +177,7 @@ private:
      int   cur_image = -1;
      QRect wsource { 0, 0, 0, 0 };
      int   w_layout_gen = -1;
@@ -3955,15 +4029,176 @@ index c12a7d1..4b86579 100644
          givealbuffer_fdd(fdd_float_buffer, SOUNDBUFLEN * 2);
  
          frames_rendered += SOUNDBUFLEN;
+diff --git a/src/qt/qt_amstraddiskbox.hpp b/src/qt/qt_amstraddiskbox.hpp
+new file mode 100644
+--- /dev/null
++++ b/src/qt/qt_amstraddiskbox.hpp
+@@ -0,0 +1,155 @@
++// The box of floppy disks beside the cabinet: the four Amstrad system discs,
++// the user's recently used images and their write-protect tabs. Kept in the
++// VM's amstrad.ini. GPL-2.0-or-later, like 86Box.
++#ifndef QT_AMSTRADDISKBOX_HPP
++#define QT_AMSTRADDISKBOX_HPP
++#include "qt_amstradscene.hpp"
++#include <QDir>
++#include <QFileInfo>
++#include <QSettings>
++#include <QStringList>
++
++namespace amstrad {
++
++class DiskBox {
++public:
++    // Discs 1-4 came with every machine; disc 5, the hard disc utilities, only
++    // with hard disc models. Without one it is just another of the user's disks.
++    static constexpr int SystemDiscs = 5, Kept = 12;
++    // Relative image paths resolve against the VM folder, like the emulator's.
++    explicit DiskBox(const QString &vmFolder, bool hardDisk = false)
++        : discs(hardDisk ? SystemDiscs : SystemDiscs - 1), base(vmFolder), settings(QDir(vmFolder).filePath("amstrad.ini"), QSettings::IniFormat) {}
++
++    // An image path as the box keeps it: no wp:// marker, absolute, tidy.
++    QString plain(QString path) const
++    {
++        if (path.startsWith("wp://", Qt::CaseInsensitive)) path.remove(0, 5);
++        if (path.isEmpty() || path.contains("://")) return path;
++        return QDir::cleanPath(QFileInfo(path).isRelative() ? base.absoluteFilePath(path) : path);
++    }
++    int systemDiscs() const { return discs; }
++    static bool same(const QString &a, const QString &b)
++    {
++#ifdef Q_OS_WINDOWS
++        return !a.compare(b, Qt::CaseInsensitive);
++#else
++        return a == b;
++#endif
++    }
++
++    // System disc n (0-3): the image the user pointed at, otherwise the best
++    // match by name among the folders in use. Empty when there is none.
++    QString systemDisc(int n) const
++    {
++        if (n >= discs) return {};
++        const QString chosen = settings.value(QString("disks/system%1").arg(n + 1)).toString();
++        if (chosen == QLatin1String("none")) return {};  // unlinked by the user: do not guess again
++        if (!chosen.isEmpty() && QFileInfo(chosen).isFile()) return chosen;
++        static const DriveFace colour[SystemDiscs] = { DiskRed, DiskBlue, DiskGreen, DiskYellow, DiskPurple };
++        QStringList folders { base.filePath("media"), settings.value("media/open_dir").toString() };
++        for (const QString &disk : stored("disks/recent")) folders << QFileInfo(disk).absolutePath();
++        QString best; int bestScore = -1;
++        QStringList seen;
++        for (const QString &folder : folders) {
++            if (folder.isEmpty() || seen.contains(folder, Qt::CaseInsensitive)) continue;
++            seen << folder;
++            for (const QFileInfo &file : QDir(folder).entryInfoList(QDir::Files, QDir::Name)) {
++                if (diskColour(file.fileName()) != colour[n]) continue;
++                // A 360K image named as part of the PC1512 set beats a look-alike.
++                // The VM's own working copies come before anything else.
++                const int score = (seen.size() == 1 ? 8 : 0) + (file.size() == 368640 ? 4 : 0)
++                    + (file.fileName().contains("1512") || file.fileName().contains("amstrad", Qt::CaseInsensitive) ? 2 : 0)
++                    + (file.suffix().compare("img", Qt::CaseInsensitive) ? 0 : 1);
++                if (score > bestScore) { bestScore = score; best = QDir::cleanPath(file.absoluteFilePath()); }
++            }
++        }
++        return best;
++    }
++    void setSystemDisc(int n, const QString &path) { settings.setValue(QString("disks/system%1").arg(n + 1), plain(path)); }
++    // Forget which image is disc n; it stays unlinked until one is chosen.
++    void unlinkSystemDisc(int n) { settings.setValue(QString("disks/system%1").arg(n + 1), QStringLiteral("none")); }
++    int systemIndex(const QString &path) const
++    {
++        const QString p = plain(path);
++        for (int n = 0; n < discs && !p.isEmpty(); ++n)
++            if (same(p, systemDisc(n))) return n;
++        return -1;
++    }
++
++    // The user's own disks, most recently used first; images that have gone
++    // are left out but not forgotten (they may be on a removable drive).
++    QStringList recent() const
++    {
++        QString system[SystemDiscs];
++        for (int n = 0; n < SystemDiscs; ++n) system[n] = systemDisc(n);
++        QStringList result;
++        for (const QString &disk : stored("disks/recent")) {
++            bool skip = !QFileInfo(disk).isFile();
++            for (const QString &s : system) skip |= same(disk, s);
++            if (!skip) result << disk;
++        }
++        return result;
++    }
++    // A new box starts with what the drives' own histories hold: oldest first.
++    bool started() const { return settings.contains("disks/recent"); }
++    void start(const QStringList &oldestFirst)
++    {
++        settings.setValue("disks/recent", QStringList());
++        for (const QString &path : oldestFirst) remember(path, path.startsWith("wp://", Qt::CaseInsensitive));
++    }
++    // Put a disk at the front of the box. The tab follows how it was mounted.
++    void remember(const QString &path, bool writeProtected)
++    {
++        const QString p = plain(path);
++        if (p.isEmpty() || p.contains("://")) return;
++        QStringList list = without(stored("disks/recent"), p);
++        list.prepend(p);
++        while (list.size() > Kept) list.removeLast();
++        settings.setValue("disks/recent", list);
++        setProtected(p, writeProtected);
++    }
++    // As remember(), for a disk found already in a drive: it keeps its place.
++    void note(const QString &path, bool writeProtected)
++    {
++        const QString p = plain(path);
++        if (p.isEmpty() || p.contains("://")) return;
++        if (without(stored("disks/recent"), p).size() == stored("disks/recent").size()) remember(p, writeProtected);
++        else setProtected(p, writeProtected);
++    }
++    void forget(const QString &path)
++    {
++        settings.setValue("disks/recent", without(stored("disks/recent"), plain(path)));
++        setProtected(path, false);
++    }
++
++    bool isProtected(const QString &path) const
++    { const QString p = plain(path); return without(stored("disks/protected"), p).size() != stored("disks/protected").size(); }
++    void setProtected(const QString &path, bool on)
++    {
++        QStringList list = without(stored("disks/protected"), plain(path));
++        if (on) list.prepend(plain(path));
++        settings.setValue("disks/protected", list);
++    }
++    // Whether an image picked with "Open" goes in with the tab on. On unless
++    // changed: a refused write is obvious, a silently altered original is not.
++    bool openProtected() const { return settings.value("disks/open_protected", true).toBool(); }
++    void setOpenProtected(bool on) { settings.setValue("disks/open_protected", on); }
++
++    // What to write on a disk's label.
++    static QString labelFor(const QString &path) { return QFileInfo(path).completeBaseName(); }
++
++private:
++    QStringList stored(const QString &key) const { return settings.value(key).toStringList(); }
++    static QStringList without(QStringList list, const QString &path)
++    {
++        for (int i = list.size() - 1; i >= 0; --i)
++            if (same(list[i], path)) list.removeAt(i);
++        return list;
++    }
++    int       discs;
++    QDir      base;
++    QSettings settings;
++};
++
++}
++#endif
 diff --git a/src/qt/qt_amstradmenu.hpp b/src/qt/qt_amstradmenu.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradmenu.hpp
-@@ -0,0 +1,270 @@
+@@ -0,0 +1,622 @@
 +// Graphical cabinet controls. GPL-2.0-or-later, like 86Box.
 +#ifndef QT_AMSTRADMENU_HPP
 +#define QT_AMSTRADMENU_HPP
 +#include "qt_amstradpopup.hpp"
++#include "qt_amstraddiskbox.hpp"
 +#include <QApplication>
 +#include <QAbstractButton>
 +#include <QElapsedTimer>
@@ -3975,6 +4210,7 @@ new file mode 100644
 +#include <QMouseEvent>
 +#include <QPainter>
 +#include <QScreen>
++#include <QTextLayout>
 +#include <QTimer>
 +#include <QWidgetAction>
 +#include <algorithm>
@@ -4213,20 +4449,370 @@ new file mode 100644
 +    auto *a=new QWidgetAction(menu);
 +    a->setDefaultWidget(new MenuCaption(title,subtitle,false,MenuCard::Width,left)); a->setEnabled(false); menu->addAction(a);
 +}
-+// A 5.25-inch disk drawn as UI, with a readable paper label at any DPI.
-+inline QPixmap diskPicture(const QString &label,const QColor &colour,qreal ratio)
++// ---- The disk box: floppies as pictures, shared by tiles and the drive card ----
++// Artwork is in the 924 x 895 frame of scripts/make-disk-assets.ps1.
++struct DiskArt {
++    QImage sleeved[DiskBox::SystemDiscs], bare[DiskBox::SystemDiscs], black;
++    // A plain jacket with a blank label, should a picture be missing.
++    static QImage plain(const QColor &jacket)
++    {
++        QImage image(640,620,QImage::Format_ARGB32_Premultiplied); image.fill(Qt::transparent);
++        QPainter p(&image); p.setRenderHint(QPainter::Antialiasing); p.scale(640/924.0,620/895.0); p.setPen(Qt::NoPen);
++        p.setBrush(jacket); p.drawRoundedRect(QRectF(46,35,825,825),5,5);
++        p.setBrush(QColor("#f1ead9")); p.drawRoundedRect(QRectF(92,64,630,222),9,9);
++        p.setBrush(QColor("#1d1917")); p.drawEllipse(QPointF(458.5,447.5),123,123); p.drawRoundedRect(QRectF(419,599,78,207),39,39);
++        return image;
++    }
++    static const DiskArt &load(const QString &folder)
++    {
++        static DiskArt art; static QString loaded;
++        if (loaded == folder && !art.black.isNull()) return art;
++        static const char *const ids[DiskBox::SystemDiscs] = { "msdos-1", "gem-startup-2", "gem-desktop-3", "dosplus-4", "hdutils-5" };
++        static const char *const jackets[DiskBox::SystemDiscs] = { "#c81e28", "#2a69bb", "#1b8f4b", "#ebcb28", "#72389b" };
++        auto read = [&](const QString &name, const char *jacket) {
++            const QImage image(QDir(folder).filePath(name));
++            return image.isNull() ? plain(QColor(jacket)) : image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
++        };
++        for (int n = 0; n < DiskBox::SystemDiscs; ++n) {
++            art.sleeved[n] = read(QString("disk-%1.png").arg(ids[n]), jackets[n]);
++            art.bare[n] = read(QString("disk-%1-bare.png").arg(ids[n]), jackets[n]);
++        }
++        art.black = read("disk-generic-black-bare.png", "#28282b");
++        loaded = folder; return art;
++    }
++};
++struct DiskFace {
++    QPixmap picture;
++    QString label;        // written on the blank label of a black disk
++    bool action = false;  // "Open" / "New": printed, not handwritten
++    bool tab = false;     // write-protect tab over the notch
++    bool notchLit = false;
++    static QPixmap scaled(const QImage &art, int width, qreal ratio)
++    {
++        QPixmap p = QPixmap::fromImage(art.scaledToWidth(qRound(width*ratio),Qt::SmoothTransformation));
++        p.setDevicePixelRatio(ratio); return p;
++    }
++};
++inline QRectF diskPart(const QRectF &t,qreal x,qreal y,qreal w,qreal h)
++{ return QRectF(t.x()+t.width()*x/924,t.y()+t.height()*y/895,t.width()*w/924,t.height()*h/895); }
++// The area that takes clicks for the tab: the notch is far too small itself.
++inline QRectF diskNotchZone(const QRectF &t)
 +{
-+    QPixmap image(QSize(244,103)*ratio); image.setDevicePixelRatio(ratio); image.fill(Qt::transparent);
-+    QPainter p(&image); p.setRenderHint(QPainter::Antialiasing); p.translate(71,2);
-+    p.setBrush(colour); p.setPen(QPen(colour.lighter(160),1)); p.drawRoundedRect(QRectF(0,0,100,99),3,3);
-+    p.setPen(Qt::NoPen); p.setBrush(QColor("#eee7d5")); p.drawRoundedRect(QRectF(8,7,84,29),2,2);
-+    p.fillRect(QRectF(8,7,84,4),QColor("#b86745"));
-+    QFont f=p.font(); f.setPixelSize(9); f.setBold(true); p.setFont(f); p.setPen(QColor("#34352f"));
-+    p.drawText(QRectF(11,13,78,19),Qt::AlignCenter|Qt::TextWordWrap,QFontMetrics(f).elidedText(label,Qt::ElideMiddle,148));
-+    p.setPen(QPen(QColor("#77796e"),1)); p.setBrush(QColor("#24252b")); p.drawEllipse(QPointF(50,56),15,15);
-+    p.setBrush(QColor("#8c8b7d")); p.drawEllipse(QPointF(50,56),5,5);
-+    p.setBrush(QColor("#24252b")); p.drawRoundedRect(QRectF(43,77,14,18),5,5); p.drawEllipse(QPointF(76,68),2,2);
-+    return image;
++    const QPointF c = diskPart(t,848,222,23,62).center();
++    const qreal r = std::max<qreal>(13,t.width()*.1);
++    return QRectF(c.x()-r,c.y()-r,2*r,2*r);
++}
++// Wrapped text, as large as fits; whole lines only when even the smallest overflows.
++inline void drawDiskLabel(QPainter &p,const QRectF &r,const QString &text,QFont f,const QColor &ink,int largest,int smallest)
++{
++    for (int px = largest; ; --px) {
++        f.setPixelSize(px);
++        QTextLayout layout(text,f);
++        QTextOption option(Qt::AlignHCenter); option.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
++        layout.setTextOption(option);
++        // Script faces carry tall line gaps; set the lines closer, as written by hand.
++        const qreal step = px*1.28;
++        qreal h = 0, whole = 0, lift = 0;
++        layout.beginLayout();
++        for (QTextLine line = layout.createLine(); line.isValid(); line = layout.createLine()) {
++            lift = std::max<qreal>(0,(line.height()-step)/2);
++            line.setLineWidth(r.width()); line.setPosition(QPointF(0,h-lift)); h += std::min(step,line.height());
++            if (h <= r.height()) whole = h;
++        }
++        layout.endLayout();
++        if (h > r.height() && px > smallest) continue;
++        const qreal used = whole > 0 ? whole : h, top = r.top()+std::max<qreal>(0,(r.height()-used)/2);
++        p.save(); p.setPen(ink);
++        p.setClipRect(QRectF(r.left(),h > r.height() ? top : r.top(),r.width(),h > r.height() ? used+1 : r.height()));
++        layout.draw(&p,QPointF(r.left(),top));
++        p.restore(); return;
++    }
++}
++inline void paintDisk(QPainter &p,const QRectF &t,const DiskFace &d)
++{
++    if (d.picture.isNull()) return;
++    p.drawPixmap(t,d.picture,QRectF(d.picture.rect()));
++    if (!d.label.isEmpty()) {
++        const QRectF label = diskPart(t,92,64,630,222);
++        const qreal pad = label.width()*.05;
++        const int base = std::max(8,qRound(t.width()/14));
++        if (d.action) {
++            QFont f("Arial"); f.setBold(true);
++            drawDiskLabel(p,label.adjusted(pad,0,-pad,0),d.label,f,QColor("#5b6068"),base+3,8);
++        } else {
++            QFont f("Segoe Print"); f.setBold(true);
++            if (!QFontInfo(f).exactMatch()) { f = QFont("Arial"); f.setItalic(true); }
++            drawDiskLabel(p,label.adjusted(pad,0,-pad,0),d.label,f,QColor("#1f2f6b"),base,7);
++        }
++    }
++    const QRectF tab = diskPart(t,813,220,60,66);
++    if (d.tab) {
++        // Foil folded over the edge, like the tabs on the system discs.
++        QLinearGradient foil(tab.topLeft(),tab.bottomRight());
++        foil.setColorAt(0,QColor("#f1e3a0")); foil.setColorAt(.55,QColor("#cfae52")); foil.setColorAt(1,QColor("#a8862e"));
++        p.setPen(QPen(QColor(70,52,10,190),.8)); p.setBrush(foil); p.drawRect(tab);
++        p.setPen(QPen(QColor(255,248,210,170),.8));
++        p.drawLine(QPointF(tab.left()+tab.width()*.15,tab.top()+tab.height()*.35),QPointF(tab.right()-tab.width()*.3,tab.top()+tab.height()*.12));
++    }
++    if (d.notchLit) {
++        p.setPen(QPen(PopupTheme::text(),1.5)); p.setBrush(QColor(255,255,255,d.tab ? 0 : 60));
++        p.drawRoundedRect(tab.adjusted(-3,-3,3,3),3,3);
++    }
++}
++
++// A card showing a disk whose write-protect tab can be clicked on and off
++// without closing the panel; the rest of the card is an ordinary button.
++class DiskButton : public MenuCard {
++public:
++    using MenuCard::MenuCard;
++    // changed(on) runs at once, while the panel is open.
++    void setTab(bool on,std::function<void(bool)> changed = {})
++    { face.tab = on; tabChanged = std::move(changed); setMouseTracking(bool(tabChanged)); if (tabChanged) setFocusPolicy(Qt::StrongFocus); describe(); }
++    // Right-click; runs after the panel has closed, like a click.
++    void setSecondary(std::function<void()> f) { secondary = std::move(f); }
++    DiskFace face;
++protected:
++    virtual QRectF diskRect() const = 0;
++    bool overNotch(const QPoint &pos) const { return tabChanged && isEnabled() && diskNotchZone(diskRect()).contains(pos); }
++    void describe()
++    {
++        if (!tabChanged) return;
++        const QString state = face.tab ? tr("Write-protected") : tr("Writable");
++        setToolTip(face.notchLit ? (face.tab ? tr("Write-protect tab fitted. Click to peel it off.")
++                                             : tr("Open notch: the disk can be written. Click to fit a write-protect tab."))
++                                 : body + QStringLiteral("\n") + state + tr(" (click the notch, or press P, to change)"));
++        setAccessibleDescription(body + QStringLiteral(". ") + state);
++    }
++    void flip() { face.tab = !face.tab; describe(); update(); if (tabChanged) tabChanged(face.tab); }
++    void mouseMoveEvent(QMouseEvent *e) override
++    {
++        const bool over = overNotch(e->pos());
++        if (over != face.notchLit) { face.notchLit = over; describe(); update(); }
++        MenuCard::mouseMoveEvent(e);
++    }
++    void leaveEvent(QEvent *e) override { face.notchLit = false; describe(); MenuCard::leaveEvent(e); }
++    void mousePressEvent(QMouseEvent *e) override
++    {
++        pressedNotch = e->button() == Qt::LeftButton && overNotch(e->pos());
++        if (e->button() == Qt::RightButton && secondary) {
++            const auto run = secondary;
++            while (QWidget *popup = QApplication::activePopupWidget()) popup->close();
++            QTimer::singleShot(0,qApp,run); e->accept(); return;
++        }
++        if (pressedNotch) { e->accept(); return; }
++        MenuCard::mousePressEvent(e);
++    }
++    void mouseReleaseEvent(QMouseEvent *e) override
++    {
++        if (pressedNotch) { pressedNotch = false; if (overNotch(e->pos())) flip(); e->accept(); return; }
++        MenuCard::mouseReleaseEvent(e);
++    }
++    void keyPressEvent(QKeyEvent *e) override
++    {
++        if (tabChanged && e->key() == Qt::Key_P) { flip(); e->accept(); }
++        else MenuCard::keyPressEvent(e);
++    }
++    std::function<void(bool)> tabChanged;
++    std::function<void()> secondary;
++    bool pressedNotch = false;
++};
++
++// One disk in the box. Sleeved system discs carry a caption; black disks say
++// what they are on their own label.
++class DiskTile : public DiskButton {
++public:
++    static constexpr int Width = 160, Disk = 142, Columns = 4;
++    DiskTile(const QImage &art,QString label,QString caption,QString tip,std::function<void()> insert,qreal ratio,bool action = false)
++        : DiskButton({},caption.isEmpty() ? label : caption,std::move(tip),false,std::move(insert),true), caption(std::move(caption))
++    {
++        face.picture = DiskFace::scaled(art,Disk,ratio); face.label = std::move(label); face.action = action;
++        setFixedSize(sizeHint());
++    }
++    // Shown pale: not in the box (in a drive, or its image is yet to be found).
++    void setFaded(bool on) { faded = on; update(); }
++    QSize sizeHint() const override { return QSize(Width,qRound(Disk*895/924.0)+(caption.isEmpty() ? 14 : 36)); }
++protected:
++    QRectF diskRect() const override { return QRectF((Width-Disk)/2.0,7,Disk,Disk*895/924.0); }
++    void paintEvent(QPaintEvent *) override
++    {
++        QPainter p(this); p.setRenderHint(QPainter::Antialiasing); p.setRenderHint(QPainter::SmoothPixmapTransform);
++        const bool lit = callback && isEnabled() && (underMouse() || hasFocus());
++        drawChoiceBox(p,QRectF(rect()).adjusted(1,1,-1,-1),false,lit,hasFocus());
++        p.setOpacity(faded || !isEnabled() ? .35 : 1);
++        paintDisk(p,diskRect(),face);
++        p.setOpacity(isEnabled() ? 1 : .6);
++        if (!caption.isEmpty())
++            drawPopupText(p,QRectF(4,diskRect().bottom()+3,width()-8,24),Qt::AlignCenter,
++                          QFontMetrics(font()).elidedText(caption,Qt::ElideRight,width()-10));
++    }
++private:
++    QString caption;
++    bool faded = false;
++};
++
++// The drive itself, heading its panel: the bay as it is now, what is in it,
++// and the disk on the right with its tab. Clicking the card ejects.
++class DriveCard : public DiskButton {
++public:
++    static constexpr int Width = DiskTile::Width*DiskTile::Columns+6*(DiskTile::Columns-1), Height = 124, Disk = 104;
++    DriveCard(QPixmap closed,QPixmap open,QString title,QString name,QString note,std::function<void()> eject)
++        : DiskButton(std::move(closed),std::move(title),std::move(name),false,std::move(eject)), open(std::move(open)), note(std::move(note))
++    { setFixedHeight(Height); setMinimumWidth(Width); if (callback) setAccessibleName(text()+tr(": eject disk")); }
++    QSize sizeHint() const override { return QSize(std::max(int(Width),minimumWidth()),Height); }
++protected:
++    QRectF diskRect() const override { return QRectF(width()-Disk-14,(Height-Disk*895/924.0)/2,Disk,Disk*895/924.0); }
++    void paintEvent(QPaintEvent *) override
++    {
++        QPainter p(this); p.setRenderHint(QPainter::Antialiasing); p.setRenderHint(QPainter::SmoothPixmapTransform);
++        const bool lit = callback && (underMouse() || hasFocus()) && !face.notchLit;
++        drawChoiceBox(p,QRectF(rect()).adjusted(1,1,-1,-1),false,lit,hasFocus());
++        // Under the pointer the bay shows what a click does: lever up, disk out.
++        const QPixmap &bay = lit && !open.isNull() ? open : picture;
++        const QRectF well(12,10,MenuCard::PictureBox,height()-20);
++        if (!bay.isNull()) {
++            QSizeF sz = QSizeF(bay.size())/bay.devicePixelRatio(); sz.scale(well.size(),Qt::KeepAspectRatio);
++            p.drawPixmap(QRectF(well.center()-QPointF(sz.width()/2,sz.height()/2),sz),bay,QRectF(bay.rect()));
++        }
++        paintDisk(p,diskRect(),face);
++        const int x = int(well.right())+18, tw = int(face.picture.isNull() ? width()-14 : diskRect().left())-x-12;
++        QFont f = font(); f.setBold(true); f.setPointSizeF(f.pointSizeF()*1.1); p.setFont(f);
++        const QFontMetrics bold(f), plain(font());
++        const QString state = tabChanged ? (face.tab ? tr("Write-protected") : tr("Writable")) : note;
++        const int th = bold.height()+4, lh = plain.lineSpacing()+2, pill = callback ? 24 : 0;
++        int y = (height()-(th+lh+(state.isEmpty() ? 0 : lh)+(pill ? pill+8 : 0)))/2;
++        drawPopupText(p,QRect(x,y,tw,th),Qt::AlignLeft|Qt::AlignVCenter,bold.elidedText(title,Qt::ElideRight,tw)); y += th;
++        p.setFont(font());
++        drawPopupText(p,QRect(x,y,tw,lh),Qt::AlignLeft|Qt::AlignVCenter,plain.elidedText(body,Qt::ElideMiddle,tw)); y += lh;
++        if (!state.isEmpty()) {
++            drawPopupText(p,QRect(x,y,tw,lh),Qt::AlignLeft|Qt::AlignVCenter,plain.elidedText(state,Qt::ElideRight,tw),PopupTheme::secondaryText());
++            y += lh;
++        }
++        if (!pill) return;
++        // Eject: the familiar triangle over a bar, in a pill that lights with the card.
++        const QString word = tr("Eject disk");
++        const QRectF button(x,y+8,plain.horizontalAdvance(word)+46,pill);
++        p.setPen(QPen(lit ? PopupTheme::text() : PopupTheme::border(),1)); p.setBrush(lit ? PopupTheme::hover() : QColor(255,255,255,14));
++        p.drawRoundedRect(button,pill/2.0,pill/2.0);
++        const QPointF g(button.left()+18,button.center().y());
++        for (const bool shadow : { true, false }) {
++            const QPointF o = shadow ? QPointF(1,1) : QPointF();
++            p.setPen(Qt::NoPen); p.setBrush(shadow ? PopupTheme::shadow() : PopupTheme::text());
++            p.drawPolygon(QPolygonF({ g+o+QPointF(-5,1), g+o+QPointF(5,1), g+o+QPointF(0,-5) }));
++            p.drawRect(QRectF(g.x()-5,g.y()+3,10,2).translated(o));
++        }
++        drawPopupText(p,button.adjusted(32,0,-10,0),Qt::AlignLeft|Qt::AlignVCenter,word);
++    }
++private:
++    QPixmap open;
++    QString note;
++};
++
++// Everything a drive's panel needs from the emulator. The actions run after
++// the panel has closed, so they may open dialogs; none may refer to it.
++struct DrivePanel {
++    int drive = 0;                 // 0 is A:
++    bool hardDisk = false;         // a hard disc machine: system disc 5 joins the set
++    QString vmFolder, artFolder;
++    QString mounted[2];            // image in A: and in B:, empty when none
++    bool mountedProtected = false; // this drive's
++    QPixmap closed, open;          // the bay now, and with the lever up
++    std::function<void(const QString &,bool)> insert; // image, write-protected
++    std::function<void(bool)> browse;                 // pick an image file, then insert
++    std::function<void()> create, eject;
++    std::function<void(int)> locate;                  // pick the image of system disc n
++};
++inline void addDrivePanel(QMenu *menu,const DrivePanel &panel,qreal ratio)
++{
++    static const char *const systemNames[DiskBox::SystemDiscs] = {
++        QT_TRANSLATE_NOOP("QObject","1 · MS-DOS"), QT_TRANSLATE_NOOP("QObject","2 · GEM Startup"),
++        QT_TRANSLATE_NOOP("QObject","3 · GEM Desktop"), QT_TRANSLATE_NOOP("QObject","4 · DOS Plus"),
++        QT_TRANSLATE_NOOP("QObject","5 · HD Utilities") };
++    DiskBox box(panel.vmFolder,panel.hardDisk);
++    // Five across when the hard disc utilities join the set.
++    const int columns = std::max(int(DiskTile::Columns),box.systemDiscs());
++    const int width = DiskTile::Width*columns+6*(columns-1);
++    const DiskArt &art = DiskArt::load(panel.artFolder);
++    const QString vm = panel.vmFolder, letter(QChar('A'+panel.drive));
++    QString mounted[2];
++    for (int d = 0; d < 2; ++d) {
++        mounted[d] = box.plain(panel.mounted[d]);
++        if (d == panel.drive && !mounted[d].isEmpty() && box.systemIndex(mounted[d]) < 0)
++            box.note(mounted[d],panel.mountedProtected);
++    }
++    auto inDrive = [&](const QString &path) {
++        for (int d = 0; d < 2; ++d)
++            if (!path.isEmpty() && DiskBox::same(path,mounted[d])) return d;
++        return -1;
++    };
++
++    // The drive and its disk.
++    const QString &current = mounted[panel.drive];
++    const int currentSystem = box.systemIndex(current);
++    auto *card = new DriveCard(panel.closed,current.isEmpty() ? QPixmap() : panel.open,
++        QObject::tr("Drive %1:  5¼\" 360K").arg(letter),
++        current.isEmpty() ? QObject::tr("Empty. Choose a disk below.")
++            : currentSystem >= 0 ? QObject::tr("System disc %1").arg(QObject::tr(systemNames[currentSystem])) : DiskBox::labelFor(current),
++        current.isEmpty() ? QString() : currentSystem >= 0 ? QObject::tr("Write-protected") : QString(),
++        current.isEmpty() ? std::function<void()>() : panel.eject);
++    if (!current.isEmpty()) {
++        card->face.picture = DiskFace::scaled(currentSystem >= 0 ? art.bare[currentSystem] : art.black,DriveCard::Disk,ratio);
++        if (currentSystem < 0) {
++            card->face.label = DiskBox::labelFor(current);
++            // Changing the tab means taking the disk out and putting it back.
++            card->setTab(panel.mountedProtected,[insert = panel.insert,current](bool on) { insert(current,on); });
++        }
++    }
++    card->setMinimumWidth(width);
++    auto *header = new QWidgetAction(menu); header->setDefaultWidget(card); menu->addAction(header);
++
++    auto addRow = [&](const QString &title,const QString &subtitle) {
++        auto *a = new QWidgetAction(menu);
++        a->setDefaultWidget(new MenuCaption(title,subtitle,true,width)); a->setEnabled(false); menu->addAction(a);
++        auto *grid = addGrid(menu); grid->setSpacing(6); grid->setColumnStretch(columns,1);
++        return grid;
++    };
++    auto place = [columns](QGridLayout *grid,DiskTile *tile) {
++        const int i = grid->count(); grid->addWidget(tile,i/columns,i%columns); return tile;
++    };
++
++    // The Amstrad set, in its sleeves. Always protected: the foil tabs stay on.
++    auto *system = addRow(QObject::tr("System discs"),QObject::tr("Always write-protected"));
++    for (int n = 0; n < box.systemDiscs(); ++n) {
++        const QString path = box.systemDisc(n), name = QObject::tr(systemNames[n]);
++        const int where = inDrive(path);
++        const std::function<void()> locate = [locate = panel.locate,n] { locate(n); };
++        const std::function<void()> insert = [insert = panel.insert,path] { insert(path,true); };
++        auto *tile = place(system,new DiskTile(art.sleeved[n],{},
++            where >= 0 ? QObject::tr("In drive %1:").arg(QChar('A'+where)) : path.isEmpty() ? QObject::tr("%1: find…").arg(name) : name,
++            path.isEmpty() ? QObject::tr("No image found for this disc. Click to choose it.")
++                           : QDir::toNativeSeparators(path)+QStringLiteral("\n")+QObject::tr("Right-click to forget this image, then choose another."),
++            path.isEmpty() ? locate : insert,ratio));
++        if (!path.isEmpty()) tile->setSecondary([vm,n] { DiskBox(vm,true).unlinkSystemDisc(n); });
++        tile->setFaded(path.isEmpty() || where >= 0);
++        tile->setEnabled(where < 0);
++    }
++
++    // The user's own, newest first. Right-click takes one out of the box.
++    QStringList recent;
++    for (const QString &path : box.recent())
++        if (inDrive(path) < 0 && recent.size() < 2*columns) recent << path;
++    if (!recent.isEmpty()) {
++        auto *own = addRow(QObject::tr("Your disks"),QObject::tr("Click a notch to fit or peel off its write-protect tab"));
++        for (const QString &path : recent) {
++            auto *tile = place(own,new DiskTile(art.black,DiskBox::labelFor(path),{},
++                QDir::toNativeSeparators(path)+QStringLiteral("\n")+QObject::tr("Right-click to take it out of the box."),
++                [insert = panel.insert,path,vm] { insert(path,DiskBox(vm).isProtected(path)); },ratio));
++            tile->setTab(box.isProtected(path),[vm,path](bool on) { DiskBox(vm).setProtected(path,on); });
++            tile->setSecondary([vm,path] { DiskBox(vm).forget(path); });
++        }
++    }
++
++    // Anything else: pick an image file, or make a blank disk.
++    auto *other = addRow(QObject::tr("Another disk"),QObject::tr("Open an image file, or start a blank disk"));
++    auto *open = place(other,new DiskTile(art.black,QObject::tr("‹ Open… ›"),{},QObject::tr("Choose a disk image and insert it."),
++        [browse = panel.browse,vm] { browse(DiskBox(vm).openProtected()); },ratio,true));
++    open->setTab(box.openProtected(),[vm](bool on) { DiskBox(vm).setOpenProtected(on); });
++    place(other,new DiskTile(art.black,QObject::tr("‹ New… ›"),{},QObject::tr("Create a blank disk image and insert it."),panel.create,ratio,true));
 +}
 +}
 +#endif
@@ -4744,7 +5330,7 @@ diff --git a/src/qt/qt_amstradpower.hpp b/src/qt/qt_amstradpower.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradpower.hpp
-@@ -0,0 +1,379 @@
+@@ -0,0 +1,418 @@
 +// Rear monitor power-button close-up. GPL-2.0-or-later, like 86Box.
 +#ifndef QT_AMSTRADPOWER_HPP
 +#define QT_AMSTRADPOWER_HPP
@@ -4757,6 +5343,7 @@ new file mode 100644
 +#include <QTimer>
 +#include <QVariantAnimation>
 +#include <QMenu>
++#include <QToolButton>
 +#include <QContextMenuEvent>
 +#include <QSettings>
 +#include <QFontMetricsF>
@@ -4767,10 +5354,12 @@ new file mode 100644
 +namespace amstrad {
 +// Warm annotation ink, distinct from the photographed hardware.
 +inline QColor calloutInk() { return QColor(240, 234, 222); }
-+inline QColor calloutKey() { return QColor(19, 19, 28, 210); }
++inline QColor calloutEdge() { return QColor(185, 179, 167, 105); }
 +inline QPen calloutDash(qreal width)
 +{
-+    QPen pen(calloutInk(), width, Qt::CustomDashLine, Qt::FlatCap, Qt::RoundJoin);
++    // The line lies entirely on charcoal; a little more opacity gives it the
++    // same apparent strength as the outline beside pale plastic.
++    QPen pen(QColor(185, 179, 167, 160), width, Qt::CustomDashLine, Qt::FlatCap, Qt::RoundJoin);
 +    pen.setDashPattern({ 5, 4 });
 +    return pen;
 +}
@@ -4800,7 +5389,6 @@ new file mode 100644
 +        const QRectF box = topLine.boundingRect().united(bottomLine.boundingRect())
 +                               .adjusted(-8 * s, -8 * s, 8 * s, 8 * s);
 +        const QRect g = box.toAlignedRect();
-+        a = rearTop - g.topLeft(); b = rearBottom - g.topLeft();
 +        topLine.translate(-g.topLeft()); bottomLine.translate(-g.topLeft());
 +        setGeometry(g);
 +        update();
@@ -4815,22 +5403,15 @@ new file mode 100644
 +        p.setRenderHint(QPainter::Antialiasing);
 +        p.setOpacity(opacity);
 +        for (const QPainterPath &line : { topLine, bottomLine }) {
-+            p.setPen(QPen(amstrad::calloutKey(), 3.2 * s, Qt::SolidLine, Qt::FlatCap));
-+            p.drawPath(line);
-+            QPen dash = amstrad::calloutDash(1.4 * s);
++            QPen dash = amstrad::calloutDash(1.0 * s);
 +            // Finish in the middle of a dash, so the edge never looks detached.
 +            dash.setDashOffset(2.5 - line.length() / dash.widthF());
 +            p.setPen(dash);
 +            p.drawPath(line);
 +        }
-+        p.setPen(QPen(amstrad::calloutInk(), 1.4 * s));
-+        p.setBrush(amstrad::calloutKey());
-+        p.drawEllipse(a, 4.5 * s, 4.5 * s);
-+        p.drawEllipse(b, 4.5 * s, 4.5 * s);
 +    }
 +
 +private:
-+    QPointF a, b;
 +    QPainterPath topLine, bottomLine;
 +    qreal s = 1;
 +    bool drawn = false;
@@ -4845,7 +5426,7 @@ new file mode 100644
 +            if (!atlas.isNull()) {
 +                const int side = atlas.width() / 2;
 +                closePhoto[frame] = softenedPhoto(atlas.copy(frame * side, 0, side,
-+                    qRound(atlas.height() * 204.0 / PhotoW)), 31, 30);
++                    qRound(atlas.height() * 204.0 / PhotoW)), 31, 10);
 +            }
 +            if (!bayAtlas.isNull()) {
 +                const int half = bayAtlas.height() / 2;
@@ -4861,6 +5442,17 @@ new file mode 100644
 +        setAccessibleName(tr("Rear monitor power button"));
 +        setAccessibleDescription(tr("Round pushbutton. Press to switch the PC on or off."));
 +        setToolTip(tr("Right-click to compare the button close-up and rear cable bay."));
++        viewButton = new QToolButton(this);
++        viewButton->setText(QString::fromUtf8("\u22ef"));
++        viewButton->setToolTip(tr("Change power view"));
++        viewButton->setAccessibleName(tr("Change power view"));
++        viewButton->setCursor(Qt::PointingHandCursor);
++        viewButton->setFocusPolicy(Qt::NoFocus);
++        viewButton->setStyleSheet("QToolButton { color: rgba(240,234,222,125); background: transparent; border: none; border-radius: 5px; font: bold 18px 'Segoe UI'; padding: 0; } QToolButton:hover { color: rgba(240,234,222,210); background: rgba(240,234,222,25); }");
++        viewButton->hide();
++        connect(viewButton, &QToolButton::clicked, this, [this] {
++            showViewMenu(viewButton->mapToGlobal(QPoint(0, viewButton->height())));
++        });
 +        leads = new AmstradPowerLeads(parent);
 +        hideTimer.setSingleShot(true);
 +        backdropTimer.setSingleShot(true);
@@ -4896,13 +5488,21 @@ new file mode 100644
 +    {
 +        const auto l = amstrad::sceneLayout(parentWidget()->size());
 +        const qreal s = l.scale;
-+        const QSize sz(qRound(Units * s), qRound((photoHeight() + 44 + CaptionDrop) * s));
-+        const int x = qRound(l.cabinet.left() + 1190 * l.scale);
++        const int leftLimit = qCeil(spot().x() + 24 * s);
++        const qreal available = parentWidget()->width() - leftLimit - 8 * s;
++        const qreal factor = cableView ? std::clamp((available / s - 12) / PhotoW, qreal(1), qreal(2)) : 1;
++        const QSize sz(qRound((PhotoW * factor + 12) * s), qRound((photoHeight() * factor + 50) * s));
++        const int x = qRound(l.cabinet.left() + 1190 * s);
 +        // Preserve the picture's position while giving its caption more air.
-+        const int y = qRound(l.cabinet.top() + 650 * l.scale) - qRound((photoHeight() + 44) * s) / 2;
-+        setGeometry(std::clamp(x, 0, std::max(0, parentWidget()->width() - sz.width())),
++        const int y = qRound(l.cabinet.top() + 650 * s) - qRound((photoHeight() * factor + 44) * s) / 2;
++        const int rightLimit = std::max(leftLimit, parentWidget()->width() - sz.width() - qRound(8 * s));
++        setGeometry(std::clamp(x, leftLimit, rightLimit),
 +                    std::clamp(y, 0, std::max(0, parentWidget()->height() - sz.height())), sz.width(), sz.height());
-+        const QRectF frame(pos().x() + s, pos().y() + s, (Units - 2)*s, (photoHeight() + 10)*s);
++        const int menuSize = std::max(20, qRound(26*s));
++        viewButton->setGeometry(qRound((PhotoX + PhotoW*factor)*s) - menuSize - qRound(8*s),
++                                qRound((photoHeight()*factor + 33)*s) - menuSize/2, menuSize, menuSize);
++        const QRectF frame(pos().x() + s, pos().y() + s,
++                           (PhotoW * factor + 10)*s, (photoHeight() * factor + 10)*s);
 +        // A straight upper leader meets the rounded corner where it remains
 +        // visible, instead of disappearing behind the opaque photograph.
 +        const QPointF upper = frame.topLeft() + QPointF(.0603073792, .6579798567) * (frameRadius()*s);
@@ -4946,11 +5546,13 @@ new file mode 100644
 +
 +    void dismissLater() { if (powered && !menuOpen && !hideTimer.isActive()) hideTimer.start(500); }
 +    void changed(bool on) {
-+        backdrop.invalidate();
 +        powered = on;
 +        switchPending = false;
 +        pressed = false;
 +        update();
++        // Retain the last neutral frost until its replacement is captured;
++        // invalidating here briefly exposed PopupBackdrop's blue fallback.
++        if (isVisible() && !backdropTimer.isActive()) backdropTimer.start(0);
 +        if (on) hideTimer.start(1100);
 +        else reveal();
 +    }
@@ -4958,11 +5560,16 @@ new file mode 100644
 +    // Shared with the authenticated headless UI test: actual circular target.
 +    QPoint buttonCenter() const {
 +        const auto r = photoRect();
-+        return cableView ? QPointF(r.left() + .36 * r.width(), r.top() + .62 * r.height()).toPoint()
++        // The recessed bay switch shifts slightly in the pressed photograph.
++        // Centre the focus ring and hit target on that state.
++        return cableView ? QPointF(r.left() + .367 * r.width(), r.top() + .626 * r.height()).toPoint()
 +                         : QPointF(r.center().x(), r.top() + r.width()/2).toPoint();
 +    }
 +    bool isCableView() const { return cableView; }
-+    QRectF photoRect() const { const qreal s = width() / Units; return QRectF(PhotoX*s, PhotoY*s, PhotoW*s, photoHeight()*s); }
++    QRectF photoRect() const {
++        const qreal s = paintScale(), factor = photoFactor(s);
++        return QRectF(PhotoX*s, PhotoY*s, PhotoW*factor*s, photoHeight()*factor*s);
++    }
 +    void setCableView(bool bay) {
 +        cableView = bay;
 +        QSettings(settingsFile, QSettings::IniFormat).setValue("power/view", bay ? "bay" : "close");
@@ -4971,8 +5578,8 @@ new file mode 100644
 +
 +protected:
 +    void showEvent(QShowEvent *) override { leads->show(); leads->stackUnder(this); backdropTimer.start(0); }
-+    void hideEvent(QHideEvent *) override { leads->hide(); backdropTimer.stop(); backdrop.invalidate(); }
-+    void enterEvent(QEvent *) override { hideTimer.stop(); }
++    void hideEvent(QHideEvent *) override { viewButton->hide(); leads->hide(); backdropTimer.stop(); backdrop.invalidate(); }
++    void enterEvent(QEvent *) override { hideTimer.stop(); viewButton->show(); }
 +
 +    void paintEvent(QPaintEvent *) override
 +    {
@@ -4980,10 +5587,11 @@ new file mode 100644
 +        p.setRenderHint(QPainter::Antialiasing);
 +        p.setRenderHint(QPainter::SmoothPixmapTransform);
 +        p.setOpacity(opacity);
-+        const qreal s = width() / Units;
++        const qreal s = paintScale();
++        const qreal factor = photoFactor(s);
 +        const qreal ph = photoHeight();
 +        p.scale(s, s);
-+        const QRectF card(1, 1, Units - 2, ph + 10);
++        const QRectF card(1, 1, PhotoW*factor + 10, ph*factor + 10);
 +        const QColor rim = pressed ? QColor(208, 187, 146) :
 +                           hovered ? amstrad::calloutInk() : QColor(185, 179, 167, 180);
 +        if (cableView) {
@@ -4993,13 +5601,13 @@ new file mode 100644
 +            p.drawRoundedRect(card.translated(0, 2), frameRadius(), frameRadius());
 +            QPainterPath frostedFrame; frostedFrame.addRoundedRect(card,frameRadius(),frameRadius());
 +            p.save(); p.setClipPath(frostedFrame);
-+            backdrop.paint(p,QRectF(0,0,Units,height()/s));
++            backdrop.paint(p,QRectF(0,0,width()/s,height()/s));
 +            p.restore();
 +            p.setBrush(Qt::NoBrush);
 +            p.setPen(QPen(rim, hovered || pressed ? 1.6 : 1.0));
 +            p.drawRoundedRect(card, frameRadius(), frameRadius());
 +        }
-+        const QRectF photo(PhotoX, PhotoY, PhotoW, ph);
++        const QRectF photo(PhotoX, PhotoY, PhotoW*factor, ph*factor);
 +        const int frame = (switchPending ? requestedPower : (powered || pressed)) ? 1 : 0;
 +        const QImage &art = cableView ? bayPhoto[frame] : closePhoto[frame];
 +        if (!art.isNull()) {
@@ -5009,17 +5617,26 @@ new file mode 100644
 +            p.fillRect(photo, QColor(218, 210, 195));
 +            p.setBrush(QColor(222, 215, 201)); p.setPen(QPen(QColor(135, 126, 112), 2));
 +            const QPointF center = QPointF(buttonCenter()) / s;
-+            p.drawEllipse(center, 28, 28);
++            p.drawEllipse(center, 28*factor, 28*factor);
++        }
++        if (!cableView) {
++            // Give the dashed leaders a definite landing point without boxing
++            // in the plastic as strongly as the cable-bay overlay.
++            QColor edge = hovered || pressed ? QColor(185, 179, 167, 160) : amstrad::calloutEdge();
++            p.setBrush(Qt::NoBrush);
++            p.setPen(QPen(edge, hovered || pressed ? 1.2 : .8));
++            p.drawRoundedRect(card, frameRadius(), frameRadius());
 +        }
 +        // Preserve the original POWER pill and icon below the photograph.
 +        QFont font = p.font(); font.setPixelSize(11); font.setBold(true);
 +        font.setLetterSpacing(QFont::AbsoluteSpacing, 1.6); p.setFont(font);
 +        const QString word = tr("POWER");
 +        const qreal textW = QFontMetricsF(font).horizontalAdvance(word);
-+        const QRectF tag(PhotoX + (PhotoW - (textW + 38)) / 2, PhotoY + ph + 10 + CaptionDrop, textW + 38, 22);
++        const QRectF tag(((PhotoW*factor + 12) - (textW + 38)) / 2,
++                         ph*factor + 22, textW + 38, 22);
 +        QPainterPath frostedTag; frostedTag.addRoundedRect(tag,11,11);
 +        p.save(); p.setClipPath(frostedTag);
-+        backdrop.paint(p,QRectF(0,0,Units,height()/s));
++        backdrop.paint(p,QRectF(0,0,width()/s,height()/s));
 +        p.restore();
 +        p.setPen(QPen(amstrad::calloutInk(), 1)); p.setBrush(Qt::NoBrush);
 +        p.drawRoundedRect(tag, 11, 11);
@@ -5030,7 +5647,7 @@ new file mode 100644
 +        p.drawLine(QPointF(g.x(), g.y() - 6.5), QPointF(g.x(), g.y() - 1));
 +        p.setPen(amstrad::calloutInk());
 +        amstrad::drawPopupText(p,QRectF(tag.left() + 27, tag.top(), textW + 4, tag.height()), Qt::AlignVCenter | Qt::AlignLeft, word,amstrad::calloutInk());
-+        if (hasFocus()) { p.setBrush(Qt::NoBrush); p.setPen(QPen(QColor(91, 81, 63), 1, Qt::DashLine)); p.drawEllipse(QPointF(buttonCenter()) / s, cableView ? 15 : 52, cableView ? 15 : 52); }
++        if (hasFocus()) { p.setBrush(Qt::NoBrush); p.setPen(QPen(QColor(91, 81, 63), 1, Qt::DashLine)); p.drawEllipse(QPointF(buttonCenter()) / s, cableView ? 15*factor : 52, cableView ? 15*factor : 52); }
 +    }
 +
 +    void mouseMoveEvent(QMouseEvent *e) override
@@ -5043,17 +5660,22 @@ new file mode 100644
 +        pressed = false; update(); e->accept();
 +        if (activate) activateSwitch();
 +    }
-+    void leaveEvent(QEvent *) override { pressed = false; hovered = false; update(); dismissLater(); }
++    void leaveEvent(QEvent *) override { viewButton->hide(); pressed = false; hovered = false; update(); dismissLater(); }
 +    void contextMenuEvent(QContextMenuEvent *e) override {
++        showViewMenu(e->globalPos()); e->accept();
++    }
++    void showViewMenu(const QPoint &position) {
 +        hideTimer.stop(); menuOpen = true;
 +        QMenu menu(this);
 +        amstrad::stylePopupMenu(&menu,4);
 +        auto *close = menu.addAction(tr("Button close-up")); close->setCheckable(true); close->setChecked(!cableView);
 +        auto *bay = menu.addAction(tr("Rear cable bay")); bay->setCheckable(true); bay->setChecked(cableView);
 +        bay->setEnabled(!bayAtlas.isNull());
-+        auto *chosen = menu.exec(e->globalPos());
++        auto *chosen = menu.exec(position);
 +        if (chosen == close || chosen == bay) setCableView(chosen == bay);
-+        menuOpen = false; reveal(); e->accept();
++        menuOpen = false; reveal();
++        viewButton->setVisible(underMouse());
++        if (!underMouse()) dismissLater();
 +    }
 +    void keyPressEvent(QKeyEvent *e) override
 +    {
@@ -5065,6 +5687,8 @@ new file mode 100644
 +    }
 +
 +private:
++    qreal paintScale() const { return cableView ? amstrad::sceneLayout(parentWidget()->size()).scale : width() / Units; }
++    qreal photoFactor(qreal s) const { return cableView ? (width()/s - 12) / PhotoW : 1; }
 +    // Feather only the outer plastic into the same frosted surface as the
 +    // frame. Keep the switch and its recessed ring at their original sharpness.
 +    static QImage softenedPhoto(QImage image, qreal corner, qreal feather = 17)
@@ -5105,6 +5729,7 @@ new file mode 100644
 +    bool hit(const QPointF &point) const
 +    { return QLineF(point, buttonCenter()).length() <= photoRect().width() * (cableView ? .075 : .27); }
 +    AmstradPowerLeads *leads = nullptr;
++    QToolButton *viewButton = nullptr;
 +    QPainterPath travelArea;
 +    QImage atlas;
 +    QImage bayAtlas;
@@ -5128,7 +5753,7 @@ diff --git a/src/qt/qt_amstradscene.hpp b/src/qt/qt_amstradscene.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradscene.hpp
-@@ -0,0 +1,390 @@
+@@ -0,0 +1,394 @@
 +// Amstrad cabinet presentation, GPL-2.0-or-later, same terms as 86Box.
 +// Geometry is measured in the unchanged 1254 x 1254 approved master image.
 +#ifndef QT_AMSTRADSCENE_HPP
@@ -5377,7 +6002,7 @@ new file mode 100644
 +// Floppy drive faces: 450 x 180 straight-alpha patches measured in master
 +// pixels (assets/front/drives/placement.json). Open = latch up, no disk;
 +// closed = latch down with a coloured system-disk edge in the slot.
-+enum DriveFace { DriveOpen, DiskBlack, DiskYellow, DiskGreen, DiskBlue, DiskRed, DriveFaceCount };
++enum DriveFace { DriveOpen, DiskBlack, DiskYellow, DiskGreen, DiskBlue, DiskRed, DiskPurple, DriveFaceCount };
 +
 +struct Drives {
 +    QImage face[2][DriveFaceCount];
@@ -5393,7 +6018,7 @@ new file mode 100644
 +inline Drives loadDrives(const QString &dir)
 +{
 +    static const char *const names[DriveFaceCount] = {"open-empty", "closed-black", "closed-yellow",
-+                                                      "closed-green", "closed-blue", "closed-red"};
++                                                      "closed-green", "closed-blue", "closed-red", "closed-purple"};
 +    Drives drives;
 +    for (int d = 0; d < 2; ++d) {
 +        const QString prefix = QFileInfo::exists(dir + "/drive-open-empty.png")
@@ -5429,7 +6054,9 @@ new file mode 100644
 +// colours follow the original PC1512 set. Anything unrecognised is black.
 +//   Disc 1 MS-DOS: red   Disc 2 GEM initialisation: blue
 +//   Disc 3 GEM Desktop (GEM2) / Locomotive BASIC 2: green   Disc 4 DOS Plus: yellow
-+inline DriveFace diskColour(const QString &path)
++//   Disc 5 hard disc utilities: purple. It came with hard disc machines only,
++//   so without one (hardDisk false) it is an ordinary black disk.
++inline DriveFace diskColour(const QString &path, bool hardDisk = true)
 +{
 +    QString name = path;
 +    name.remove(QRegularExpression(QStringLiteral("^[a-z]+://"), QRegularExpression::CaseInsensitiveOption));
@@ -5439,16 +6066,18 @@ new file mode 100644
 +            .match(name).hasMatch();
 +    };
 +    // Product names first: they are explicit, unlike disc numbers.
++    if (has(R"(hd[\s_.-]*util|hard[\s_.-]*dis[ck])"))                    return hardDisk ? DiskPurple : DiskBlack;
 +    if (has(R"(dos[\s_.-]*plus)"))                                      return DiskYellow;
 +    if (has(R"(basic|locomotive|desk[\s_.-]*top|gem[\s_.-]*(2|3|ii|iii|desk)(?!\d))")) return DiskGreen;
 +    if (has(R"(gem)"))                                                  return DiskBlue;
 +    if (has(R"(ms[\s_.-]*dos|(^|[^a-z])dos([^a-z]|$))"))               return DiskRed;
 +    // Fall back on "Disc N" / "Disk N" / "A1".."A4" set numbering.
-+    const auto number = QRegularExpression(QStringLiteral(R"((?:dis[ck]|(?:^|[^a-z])a)[\s_.-]*([1-4])(?!\d))"),
++    const auto number = QRegularExpression(QStringLiteral(R"((?:dis[ck]|(?:^|[^a-z])a)[\s_.-]*([1-5])(?!\d))"),
 +                                           QRegularExpression::CaseInsensitiveOption).match(name);
 +    if (number.hasMatch()) {
-+        static const DriveFace bySet[] = {DiskRed, DiskBlue, DiskGreen, DiskYellow};
-+        return bySet[number.captured(1).toInt() - 1];
++        static const DriveFace bySet[] = {DiskRed, DiskBlue, DiskGreen, DiskYellow, DiskPurple};
++        const DriveFace face = bySet[number.captured(1).toInt() - 1];
++        return face == DiskPurple && !hardDisk ? DiskBlack : face;
 +    }
 +    return DiskBlack;
 +}

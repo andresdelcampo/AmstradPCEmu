@@ -56,6 +56,24 @@ $disks = @(
         Part   = '46004/A'
         Title  = @("DISC 4. DOS Plus$T", 'STARTUP & UTILITIES v1.2', "/GEM PAINT$T v1.0U")
         Small  = @($amstrad, 'Programs', $dri, $arr)
+    },
+    @{
+        # hard-disc models only; purple per DOS Days, no photo of an original found
+        Id     = 'disk-hdutils-5'
+        Jacket = @('#7B3FA6', '#68318F')
+        Part   = '46005'
+        Title  = @('DISC 5. HARD DISC DRIVE', 'INSTALLATION & UTILITIES')
+        Small  = @($amstrad, 'Programs', $dri, $arr, $ms, $arr)
+        SmallSize = 17.5; SmallStep = 19
+    },
+    @{
+        # generic disc: bare only, big blank label for text typed at runtime,
+        # open write-protect notch instead of the foil tab
+        Id     = 'disk-generic-black'
+        Jacket = @('#303033', '#1E1E21')
+        Only   = 'bare'
+        NoTab  = $true
+        Label  = @{ X = 92; Y = 64; W = 630; H = 222 }
     }
 )
 
@@ -213,35 +231,45 @@ function Draw-Disk($d, [string]$path, [bool]$bare = $false) {
     $g.DrawLine((New-Object Drawing.Pen (Col '#FFFFFF' 70), 2), $disk.X + 5, $disk.Y + 1.5, $disk.X + $disk.W - 5, $disk.Y + 1.5)
     $g.DrawPath((New-Object Drawing.Pen (Col '#000000' 60), 1.6), $jp)
 
-    # write-protect foil tab on the right edge, running down into the sleeve
-    $tx = $disk.X + $disk.W - 76; $ty = $sleeve.Y - 76; $tw = 76; $th = 80
-    $foil = New-Object Drawing.Drawing2D.LinearGradientBrush (New-Object Drawing.RectangleF ($tx - 1), ($ty - 1), ($tw + 2), ($th + 2)), (Col '#EBD98A'), (Col '#A8862E'), 55.0
-    $g.FillRectangle($foil, $tx, $ty, $tw, $th)
-    $crease = New-Object Drawing.Pen (Col '#FFF6C8' 150), 2
-    $g.DrawLine($crease, $tx + 6, $ty + 14, $tx + 40, $ty + 4)
-    $g.DrawLine($crease, $tx + 22, $ty + 46, $tx + 62, $ty + 24)
-    $g.DrawLine((New-Object Drawing.Pen (Col '#6B5415' 110), 2), $tx + 10, $ty + 34, $tx + 50, $ty + 60)
-    $g.DrawRectangle((New-Object Drawing.Pen (Col '#5E4A12' 120), 1.4), $tx, $ty, $tw, $th)
+    if ($d.NoTab) {
+        # open write-protect notch: 6.4 mm high, 3.6 mm deep, cut through
+        $nu = $disk.W / 133.4
+        $state = $g.Save()
+        $g.SmoothingMode = 'None'; $g.CompositingMode = 'SourceCopy'
+        $g.FillRectangle((New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(0, 0, 0, 0))), [single]($disk.X + $disk.W - 3.6 * $nu), [single]($disk.Y + 32 * $nu), [single](3.6 * $nu + 20), [single](6.4 * $nu))
+        $g.Restore($state)
+    } else {
+        # write-protect foil tab on the right edge, running down into the sleeve
+        $tx = $disk.X + $disk.W - 76; $ty = $sleeve.Y - 76; $tw = 76; $th = 80
+        $foil = New-Object Drawing.Drawing2D.LinearGradientBrush (New-Object Drawing.RectangleF ($tx - 1), ($ty - 1), ($tw + 2), ($th + 2)), (Col '#EBD98A'), (Col '#A8862E'), 55.0
+        $g.FillRectangle($foil, $tx, $ty, $tw, $th)
+        $crease = New-Object Drawing.Pen (Col '#FFF6C8' 150), 2
+        $g.DrawLine($crease, $tx + 6, $ty + 14, $tx + 40, $ty + 4)
+        $g.DrawLine($crease, $tx + 22, $ty + 46, $tx + 62, $ty + 24)
+        $g.DrawLine((New-Object Drawing.Pen (Col '#6B5415' 110), 2), $tx + 10, $ty + 34, $tx + 50, $ty + 60)
+        $g.DrawRectangle((New-Object Drawing.Pen (Col '#5E4A12' 120), 1.4), $tx, $ty, $tw, $th)
+    }
 
     # -- label --
-    $lp = RoundRect $label.X $label.Y $label.W $label.H 9
-    $g.FillPath((New-Object Drawing.SolidBrush (Col '#000000' 45)), (RoundRect ($label.X + 2) ($label.Y + 3) $label.W $label.H 9))
-    $g.FillPath((VGrad $label.X $label.Y $label.W $label.H '#F6F1E2' '#EAE3D0'), $lp)
+    $lab = $label; if ($d.Label) { $lab = $d.Label }
+    $lp = RoundRect $lab.X $lab.Y $lab.W $lab.H 9
+    $g.FillPath((New-Object Drawing.SolidBrush (Col '#000000' 45)), (RoundRect ($lab.X + 2) ($lab.Y + 3) $lab.W $lab.H 9))
+    $g.FillPath((VGrad $lab.X $lab.Y $lab.W $lab.H '#F6F1E2' '#EAE3D0'), $lp)
     $g.DrawPath((New-Object Drawing.Pen (Col '#B9B09A' 200), 1.4), $lp)
     $ink = New-Object Drawing.SolidBrush (Col '#1B1B22')
-    $y = $label.Y + 14
+    $y = $lab.Y + 14
     foreach ($line in $d.Title) {
-        LabelLine $g $line 'Arial Narrow' 22 ([int][Drawing.FontStyle]::Bold) $ink ($label.X + 16) $y
+        LabelLine $g $line 'Arial Narrow' 22 ([int][Drawing.FontStyle]::Bold) $ink ($lab.X + 16) $y
         $y += 25
     }
     $y += 9
     $ss = 18.5; $st = 20.5
     if ($d.SmallSize) { $ss = $d.SmallSize; $st = $d.SmallStep }
     foreach ($line in $d.Small) {
-        LabelLine $g $line 'Arial Narrow' $ss ([int][Drawing.FontStyle]::Regular) $ink ($label.X + 16) $y
+        LabelLine $g $line 'Arial Narrow' $ss ([int][Drawing.FontStyle]::Regular) $ink ($lab.X + 16) $y
         $y += $st
     }
-    LabelLine $g $d.Part 'Arial Narrow' 10 ([int][Drawing.FontStyle]::Bold) $ink ($label.X + $label.W - 52) ($label.Y + $label.H - 17)
+    if ($d.Part) { LabelLine $g $d.Part 'Arial Narrow' 10 ([int][Drawing.FontStyle]::Bold) $ink ($lab.X + $lab.W - 52) ($lab.Y + $lab.H - 17) }
 
     if ($bare) { Draw-Openings $g } else {
     # -- sleeve --
@@ -281,6 +309,10 @@ function Draw-Disk($d, [string]$path, [bool]$bare = $false) {
 
 New-Item -ItemType Directory -Force $OutDir | Out-Null
 foreach ($d in $disks) {
+    if ($d.Only -eq 'bare') {
+        Draw-Disk $d (Join-Path (Resolve-Path $OutDir) "$($d.Id)-bare.png") $true
+        continue
+    }
     Draw-Disk $d (Join-Path (Resolve-Path $OutDir) "$($d.Id).png")
     Draw-Disk $d (Join-Path (Resolve-Path $OutDir) "$($d.Id)-bare.png") $true
 }

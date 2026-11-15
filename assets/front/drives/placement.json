@@ -29,7 +29,8 @@
                                                "yellow":  "drive-closed-yellow.png",
                                                "green":  "drive-closed-green.png",
                                                "blue":  "drive-closed-blue.png",
-                                               "red":  "drive-closed-red.png"
+                                               "red":  "drive-closed-red.png",
+                                               "purple":  "drive-closed-purple.png"
                                            },
                        "closed_mechanism":  "drive-closed-mechanism.png"
                    },
@@ -46,7 +47,8 @@
                                                "yellow":  "drive-closed-yellow.png",
                                                "green":  "drive-closed-green.png",
                                                "blue":  "drive-closed-blue.png",
-                                               "red":  "drive-closed-red.png"
+                                               "red":  "drive-closed-red.png",
+                                               "purple":  "drive-closed-purple.png"
                                            },
                        "closed_mechanism":  "drive-closed-mechanism.png"
                    }
@@ -56,7 +58,8 @@
                         "yellow",
                         "green",
                         "blue",
-                        "red"
+                        "red",
+                        "purple"
                     ],
     "geometry_revision":  5,
     "mechanism_reference":  "Complete user masters, shared between both bays.",

@@ -8,11 +8,17 @@ The pointer changes to a hand over each part. Briefly passing over a part cancel
 
 All application menus and the custom power popup use **F4 / strong untinted frost**, selected on 2026-11-15. Material, blur strength, fallback colour and label contrast are centralized in `qt_amstradpopup.hpp` (`PopupTheme`). The earlier N6 blue is retained only as the opaque fallback.
 
-The first-pass configuration and disk menus remain available for evaluation: card layouts, picture wells and selection ticks. Disk controls use drawn 5.25-inch floppies with paper labels, plus an open-drive preview for eject. Empty drives disable eject. Their visual direction has not been approved; further work is focused on the monitor selector.
+The monitor, machine configuration and drive panels are all picture choices over the shared frosted backdrop.
 
 The monitor selector uses the complete existing monitor photograph (casing, glass and pedestal) above the shared frosted backdrop. Colour shows the original `IMAGES/HOUSE.IMG` from the installed A5 HDUTILS disk inside the supplied GEM Paint frame, with the title changed to `HOUSE.IMG`. Monochrome shows the supplied tiger capture with its original `TIGER.IMG` title and the entire interface converted to greyscale. Source screen pixels are mapped to the PC1512's CGA/RGBI palette before CRT light falloff, scan lines and glass reflections are added. Content geometry remains flat, with straight edges and square corners. Labels, a rounded box and a tick indicate the fitted monitor. No generated monitor artwork is used. A four-colour sample using the CGA character ROM remains as a missing-asset fallback.
 
-Each drive offers **Choose disk**, **Choose protected disk**, **New disk** and **Eject disk**. Recent disks appear in a submenu as labelled floppy cards (the first four), followed by any further history entries. Each drive keeps its independent upstream MediaMenu history. The file chooser works without configuring a collection folder. Export to 86F remains in the menu bar Media menu.
+Each floppy drive opens a **disk box**. The heading card shows the bay as it is, the disk in it (drawn bare, with its label) and an **Eject disk** pill; the whole card ejects, and under the pointer the bay previews the lever up. Below it:
+
+- **System discs**: the four Amstrad discs in their sleeves. One click inserts a disc, always write-protected. Images are matched by file name (`amstrad::diskColour`) in the VM's `media` folder, the last folder an image was opened from and the folders of recent disks; the VM's own copies win, then 360K images named for the PC1512. A disc with no image is pale and asks for the file on the first click. Right-click a disc to forget its image; it then stays unlinked until one is chosen. A disc already in A: or B: is pale and labelled with its drive. On HD20 machines a fifth, purple disc joins the set: the hard disc utilities, which only came with hard disc models. The row is then five across, and the drive slot shows purple. Without a hard disc the same image is an ordinary black disk among your own.
+- **Your disks**: up to eight recently used images as black disks, the file name handwritten on the label, newest first. One box serves both drives; disks in a drive are left out. Right-click takes a disk out of the box (the image file is untouched).
+- **Another disk**: **Open** picks an image file, **New** creates a blank one (upstream dialog).
+
+Write protection is the disk's own notch: a gold tab over it means protected. Click the notch (or press P on the focused disk) to fit or peel the tab without closing the panel. On a disk in the box this is remembered for its next insertion; on the disk in the drive it re-inserts the disk with the new setting; on **Open** it sets whether picked images go in protected (on by default: a refused write is obvious, a silently altered original is not). System discs keep their foil tabs. The box lives in the VM's `amstrad.ini` under `[disks]` (`recent`, `protected`, `open_protected`, `system1`-`system5`) and starts from the drives' upstream histories. Mounts made from the menu bar's Media menu are recorded too. Export to 86F remains in the Media menu.
 
 The PC1640 row is disabled for now and appears only with `AMSTRAD_PC1640=1` ([details](PC1640.md)). When enabled, the model badge opens **Machine configuration**: a vertical list of DD, SD, SD with factory sticker and HD20 for the **PC1512** (512K, CGA), with the same list as a second column for the **PC1640** (640K, EGA). Each entry shows the system unit's front cut out of the cabinet artwork (no picture well) beside its name, and the fitted one is marked like the monitor selector, with a rounded box and a tick (`drawChoiceBox` in `qt_amstradpopup.hpp`); a hairline separates the machine columns (`ConfigChoice` in `qt_amstradmenu.hpp`; `scripts/preview-config.ps1` renders both forms to `local/config-preview/`). One choice sets both the computer and its drive layout, with a single restart confirmation; disks, drives and the hard disk image carry over, and the badge numerals follow the machine. The left bay also links to that panel. See [PC1640](PC1640.md). A disk collection box beside the computer remains an exploratory future idea.
 
@@ -28,7 +34,8 @@ All source paths below are under `upstream/86Box/src/qt/`.
 | Shared popup theme, backdrop capture/blur, native menus and text shadows | qt_amstradpopup.hpp |
 | Popup placement/dismissal, cards, grids, disk drawing | `qt_amstradmenu.hpp` |
 | Photographic monitor selector and CGA sample | `qt_amstradmonitor.hpp` |
-| Actual disk history actions | `qt_mediamenu.hpp`: `floppyHistoryActions` |
+| Disk box: system disc matching, recent disks, write-protect tabs | `qt_amstraddiskbox.hpp`: `DiskBox`; recorded in `MediaMenu::floppyMount` |
+| Drive panel: disk pictures, tiles, drive card | `qt_amstradmenu.hpp`: `addDrivePanel`, `DiskTile`, `DriveCard` |
 | Cabinet preview crops | `SoftwareRenderer::frontPreview` |
 
 Widgets use logical pixels and render artwork at the display pixel ratio. Cards expose accessible names and descriptions. Tab navigates focus; arrow keys move within a card grid; Enter and Space activate. Handlers close popups before running on the next event-loop pass, allowing file dialogs and confirmations to open safely.
@@ -38,6 +45,8 @@ The machine family is real emulator state (`machine`, memory, firmware), kept se
 ## Verification
 
 `python scripts/verify-milestone.py` runs `ui-cabinet-test` on the authenticated offscreen test socket. It opens all four hotspots through the real renderer delegate, checks delayed hover and cancellation, dismissal/reopen suppression and captured-mouse exclusion, and saves menu PNGs under `local/verification/`. Existing screen mouse-capture checks dismiss cabinet popups before inspecting button release.
+
+`scripts/preview-disks.ps1` renders the drive panel in three states to `local/disk-preview/` and checks the disk box's bookkeeping (matching, ordering, tabs, unlinking) on a throwaway VM folder.
 
 `scripts/preview-monitor.ps1` renders the actual monitor selector in isolation to `local/monitor-preview/monitor.png`, allowing fast visual review without deploying the emulator. It also checks fallback palette and square swatches. `scripts/extract-gem-preview.py` decodes original GEM samples from the installed DOS and HDUTILS floppies and verifies the disks remain unchanged; source/output hashes are recorded under `assets/front/monitor/`. The decoder's PC1512 sample output was checked pixel-for-pixel against FFmpeg's independent GEM decoder.
 

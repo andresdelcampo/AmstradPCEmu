@@ -47,6 +47,24 @@ int main(int argc, char **argv)
             peek.changed(false);
             settle(200);
             require(peek.isVisible(), "Off button did not appear");
+            auto *viewButton = peek.findChild<QToolButton *>();
+            require(viewButton != nullptr, "View menu button missing");
+            QEvent menuLeave(QEvent::Leave);
+            QApplication::sendEvent(&peek, &menuLeave);
+            require(viewButton->isHidden(), "View menu button visible without hover");
+            QEvent menuEnter(QEvent::Enter);
+            QApplication::sendEvent(&peek, &menuEnter);
+            require(viewButton->isVisible(), "View menu button missing on hover");
+            bool menuSeen = false;
+            const int requestsBeforeMenu = requests;
+            QTimer::singleShot(50, [&] {
+                auto *menu = qobject_cast<QMenu *>(QApplication::activePopupWidget());
+                menuSeen = menu && menu->actions().size() == 2;
+                if (menu) menu->close();
+            });
+            viewButton->click();
+            require(menuSeen, "View button did not open both layout choices");
+            require(requests == requestsBeforeMenu, "View menu operated the power switch");
             // The rear-switch callout must remain beside the monitor at all
             // supported shapes, including the former overlapping default.
             for (const QSize size : {QSize(950, 1030), QSize(1106, 1030), QSize(640, 800), QSize(1920, 1080)}) {
@@ -56,6 +74,13 @@ int main(int argc, char **argv)
                 const auto l = amstrad::sceneLayout(size);
                 require(peek.geometry().left() > peek.spot().x() + 24*l.scale, "Callout overlaps the monitor/anchor");
                 require(host.rect().contains(peek.geometry()), "Callout extends beyond the window");
+                const qreal magnification = peek.photoRect().width() / (214 * l.scale);
+                if (bay && size == QSize(1106, 1030))
+                    require(magnification > 1.3, "Rear bay did not grow in the normal window");
+                if (bay && size == QSize(1920, 1080))
+                    require(std::abs(magnification - 2.0) < .02, "Rear bay did not reach 2x in a wide window");
+                if (!bay)
+                    require(std::abs(magnification - 1.0) < .02, "Button close-up changed size");
                 require(std::abs(peek.spot().y() - (l.cabinet.top() + 735*l.scale)) < .01, "Rear-button anchor moved");
                 require(host.grab().save(QDir(QCoreApplication::applicationDirPath()).filePath(
                     QString("power-%1-%2x%3.png").arg(bay ? "bay" : "close").arg(size.width()).arg(size.height()))), "Could not save layout preview");
@@ -112,6 +137,7 @@ int main(int argc, char **argv)
             QApplication::sendEvent(&peek, &leave);
             settle(1300);
             require(peek.isVisible(), "Off button hid after pointer leave");
+            if (bay) peek.setFocus();
             auto photo = [&] {
                 // Compare the sharp switch, excluding plastic edges that blend
                 // with the live frosted backdrop when power changes.
@@ -124,6 +150,9 @@ int main(int argc, char **argv)
             QMouseEvent down(QEvent::MouseButtonPress, center, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
             QApplication::sendEvent(&peek, &down);
             const QImage pressed = photo();
+            if (bay)
+                require(peek.grab().save(QDir(QCoreApplication::applicationDirPath()).filePath(
+                    "power-bay-focus-pressed.png")), "Could not save pressed bay preview");
             require(pressed != released, "Press did not change the button image");
             QMouseEvent up(QEvent::MouseButtonRelease, center, Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
             QApplication::sendEvent(&peek, &up);
@@ -134,6 +163,15 @@ int main(int argc, char **argv)
             QApplication::sendEvent(&peek, &up);
             require(requests == sent, "A pending transition accepted a second activation");
             peek.changed(true);
+            if (bay)
+                require(peek.grab().save(QDir(QCoreApplication::applicationDirPath()).filePath(
+                    "power-bay-power-on-transition.png")), "Could not save rear-bay power-on preview");
+            if (bay) {
+                const QImage transition = peek.grab().toImage();
+                const QColor frame = transition.pixelColor(peek.width()/2,
+                    qMin(peek.height()-1, qRound(peek.photoRect().bottom())+2));
+                require(frame.blue() - frame.red() < 20, "Blue fallback flashed on rear-bay power-on");
+            }
             require(photo() == pressed, "Acknowledgement changed the latched button image");
             settle(1300);
             require(!peek.isVisible(), "Powered-on inset did not auto-hide");

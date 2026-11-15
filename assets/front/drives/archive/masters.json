@@ -1,0 +1,8 @@
+﻿{
+    "open":  "open-empty-approved.png",
+    "open_sha256":  "022481042dcae7f096f6fbb77cc1d1e82c56188b5122e634d5c868af91b72130",
+    "closed":  "closed-clean.png",
+    "closed_geometry_source":  "closed-clean.png (manually corrected by user)",
+    "note":  "Open master frozen. Closed master is user-owned; load it read only and rebuild dependent mechanisms/disk cutouts with apply-closed-drive-master.ps1.",
+    "closed_sha256":  "da4ed1c36e0040b59456eb69c3f7f7451f315a1f26b5dfce7eaf735a67730671"
+}

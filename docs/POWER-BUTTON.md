@@ -4,8 +4,9 @@ The cabinet opens switched off with the rear-button close-up already visible to
 the right of the monitor, outside the cabinet. Two dashed leader lines run from
 its rounded upper-left corner and bottom frame edge to two separate points
 low on the monitor's right edge, marking the approximate rear casing section
-being enlarged. A soft edge lets the close-up's plastic blend into the
-background while the switch and recessed ring stay sharp. The cable-bay
+being enlarged. Fine dashed leaders match the close-up's subtle outline and
+end without dots. A narrow feather softens only the outer plastic edge, while
+the switch and recessed ring stay sharp. The cable-bay
 comparison retains its raised frame. The original POWER pill and icon below
 remain its only caption. Press the round beige button to switch on or
 off. The app stays open when off, with dark glass and all front LEDs off.
@@ -24,6 +25,15 @@ Powering on boots the PC again rather than resuming the previous CPU/RAM state.
 Release mouse capture with Ctrl+End before interacting with the cabinet.
 
 Right-click the inset to compare **Button close-up** and **Rear cable bay**.
+Hovering over the inset also reveals muted ellipsis dots at the bottom-right,
+beside the POWER caption, with a faint backing only on direct hover.
+Its **Change power view** tooltip identifies the control; clicking it
+opens the same two-view menu. The button disappears when the pointer leaves.
+The rear-bay photograph grows up to twice its original scale where the window
+has room; in narrower windows it uses the available strip beside the monitor.
+Its frame padding, border stroke and POWER caption retain the close-up's scale.
+Power transitions keep the previous frosted backing until the next capture, so
+the rear-bay frame and caption never show the popup's blue fallback.
 Both have the same on/off behavior; the view is saved as `power/view` in the
 VM's `amstrad.ini`. The inset stays visible while off, including after leaving
 it. While on, hover over the inset's on-screen position to the right of the monitor,

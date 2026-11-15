@@ -5,7 +5,9 @@ They are preserved unchanged. Both physical bays use the same pictures:
 
 - `drive-open-empty.png`: complete open, empty drive.
 - `drive-closed-mechanism.png`: complete closed mechanism.
-- `drive-closed-{black,yellow,green,blue,red}.png`: disk-only overlays.
+- `drive-closed-{black,yellow,green,blue,red,purple}.png`: disk-only overlays.
+  Purple (system disc 5) has no source photo: `scripts/make-purple-disk-material.ps1`
+  recolours the blue material.
 
 Draw the cabinet, the open face OR closed mechanism plus chosen disk, then
 the activity LEDs. All drive patches are 450 x 180 RGBA. Placement is left
