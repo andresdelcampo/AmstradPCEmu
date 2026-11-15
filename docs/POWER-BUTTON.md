@@ -4,8 +4,9 @@ The cabinet opens switched off with the rear-button close-up already visible to
 the right of the monitor, outside the cabinet. Two dashed leader lines run from
 its rounded upper-left corner and bottom frame edge to two separate points
 low on the monitor's right edge, marking the approximate rear casing section
-being enlarged. A softly raised, solid frame surrounds the image, with a brighter rim on
-button hover and a warm pressed rim. The original POWER pill and icon below
+being enlarged. A soft edge lets the close-up's plastic blend into the
+background while the switch and recessed ring stay sharp. The cable-bay
+comparison retains its raised frame. The original POWER pill and icon below
 remain its only caption. Press the round beige button to switch on or
 off. The app stays open when off, with dark glass and all front LEDs off.
 The close-up uses pronounced rounded corners while retaining its original

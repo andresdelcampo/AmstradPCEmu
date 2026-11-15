@@ -113,11 +113,11 @@ int main(int argc, char **argv)
             settle(1300);
             require(peek.isVisible(), "Off button hid after pointer leave");
             auto photo = [&] {
-                // Ignore the rounded corners where the interactive frame rim
-                // can show through; compare the photographed switch itself.
+                // Compare the sharp switch, excluding plastic edges that blend
+                // with the live frosted backdrop when power changes.
                 const auto r = peek.photoRect();
-                return peek.grab().toImage().copy(r.adjusted(r.width()*.1, r.height()*.1,
-                                                            -r.width()*.1, -r.height()*.1).toAlignedRect());
+                return peek.grab().toImage().copy(r.adjusted(r.width()*.2, r.height()*.2,
+                                                            -r.width()*.2, -r.height()*.2).toAlignedRect());
             };
             const QImage released = photo();
             const QPointF center(peek.buttonCenter());

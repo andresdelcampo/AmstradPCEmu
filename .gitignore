@@ -8,6 +8,8 @@ backups/
 local/
 roms/
 disks/
+# ...but the drawn system-disc artwork is a project asset.
+!assets/front/disks/
 vm/
 build/
 __pycache__/

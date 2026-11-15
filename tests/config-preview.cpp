@@ -36,12 +36,12 @@ int main(int argc, char **argv)
         QMenu menu(&host);
         amstrad::stylePopupMenu(&menu);
         amstrad::addCaption(&menu, "Machine configuration",
-            "Choose the computer and its drive layout. Hardware changes restart the PC.", 12);
+            "Choose the computer and its drive layout. Hardware changes restart the PC.", 16);
         auto *grid = amstrad::addGrid(&menu, true);
         grid->setHorizontalSpacing(24); grid->setVerticalSpacing(0);
         for (int m = 0; m < machines; ++m) {
             grid->addWidget(new amstrad::MenuCaption(m ? "PC1640" : "PC1512",
-                m ? "640K memory, EGA graphics" : "512K memory, CGA graphics", true, amstrad::ConfigChoice::Width, 12), 0, m);
+                m ? "640K memory, EGA graphics" : "512K memory, CGA graphics", true, amstrad::ConfigChoice::Width, 16), 0, m);
             for (int bay = 0; bay < amstrad::LeftBayCount; ++bay) {
                 amstrad::Front front; front.left = amstrad::LeftBay(bay); front.pc1640 = m;
                 QImage unit = amstrad::composeCabinet(art, fittings, front);

@@ -2099,7 +2099,7 @@ index f694a38..1376fcb 100644
          main_window->showMaximized();
      } else {
 diff --git a/src/qt/qt_mainwindow.cpp b/src/qt/qt_mainwindow.cpp
-index 8b91429..3d50f02 100644
+index 8b91429..c4ed3b4 100644
 --- a/src/qt/qt_mainwindow.cpp
 +++ b/src/qt/qt_mainwindow.cpp
 @@ -33,6 +33,8 @@
@@ -2569,7 +2569,7 @@ index 8b91429..3d50f02 100644
 +            { amstrad::BayHdd, QT_TR_NOOP("HD20"), QT_TR_NOOP("20 MB hard disk C: and one floppy drive, A:.") },
 +        };
 +        amstrad::addCaption(target, tr("Machine configuration"),
-+                            tr("Choose the computer and its drive layout. Hardware changes restart the PC."), 12);
++                            tr("Choose the computer and its drive layout. Hardware changes restart the PC."), 16);
 +        /* A column per machine, a row per fit: each shows the whole unit. */
 +        auto *grid = amstrad::addGrid(target, true);
 +        grid->setHorizontalSpacing(24);
@@ -2580,7 +2580,7 @@ index 8b91429..3d50f02 100644
 +                continue;
 +            grid->addWidget(new amstrad::MenuCaption(pc1640 ? "PC1640" : "PC1512",
 +                                pc1640 ? tr("640K memory, EGA graphics") : tr("512K memory, CGA graphics"),
-+                                true, amstrad::ConfigChoice::Width, 12), 0, column);
++                                true, amstrad::ConfigChoice::Width, 16), 0, column);
 +            int row = 1;
 +            for (const Choice &c : choices) {
 +                amstrad::Front preview = front;
@@ -3959,7 +3959,7 @@ diff --git a/src/qt/qt_amstradmenu.hpp b/src/qt/qt_amstradmenu.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradmenu.hpp
-@@ -0,0 +1,282 @@
+@@ -0,0 +1,270 @@
 +// Graphical cabinet controls. GPL-2.0-or-later, like 86Box.
 +#ifndef QT_AMSTRADMENU_HPP
 +#define QT_AMSTRADMENU_HPP
@@ -4108,8 +4108,8 @@ new file mode 100644
 +};
 +
 +// A machine configuration: the system unit itself, cut out of the cabinet
-+// artwork, beside its name. Marked like the monitor selector: an underline
-+// and "Fitted" for the current one, a hairline under the pointer or focus.
++// artwork, beside its name. Marked like the monitor selector: a box and a
++// tick for the current one, a fainter box under the pointer or focus.
 +class ConfigChoice : public MenuCard {
 +public:
 +    static constexpr int PictureWidth = 348, PictureHeight = 110, Width = 652, Height = 132;
@@ -4122,39 +4122,27 @@ new file mode 100644
 +    {
 +        QPainter p(this); p.setRenderHint(QPainter::Antialiasing); p.setRenderHint(QPainter::SmoothPixmapTransform);
 +        const bool lit = callback && (underMouse() || hasFocus());
-+        const QRect box(12,8,PictureWidth,PictureHeight);
++        drawChoiceBox(p,QRectF(rect()).adjusted(2,2,-2,-2),selected,lit,hasFocus());
++        const QRect box(16,(height()-PictureHeight)/2,PictureWidth,PictureHeight);
 +        if (!picture.isNull()) {
 +            QSizeF sz = QSizeF(picture.size())/picture.devicePixelRatio();
 +            sz.scale(box.size(), Qt::KeepAspectRatio);
-+            // Hardware stays opaque and sharp; it lifts slightly when pointed at.
-+            const QPointF at(box.center().x()-sz.width()/2+.5, box.bottom()+1-sz.height()-(lit && !selected ? 2 : 0));
++            // Hardware stays opaque and sharp above the frost and the box.
++            const QPointF at(box.center().x()-sz.width()/2+.5, box.bottom()+1-sz.height());
 +            p.drawPixmap(QRectF(at,sz),picture,picture.rect());
 +        }
-+        const int x = box.right()+24, tw = width()-x-24;
++        const int x = box.right()+24, tw = width()-x-20;
 +        QFont f = font(); f.setBold(true); f.setPointSizeF(f.pointSizeF()*1.1); p.setFont(f);
 +        // Centre the name and its wrapped description on the unit, at any font size.
 +        const QFontMetrics bold(f), plain(font());
 +        const int wrap = Qt::AlignLeft|Qt::AlignTop|Qt::TextWordWrap;
 +        const int th = bold.height()+4, bh = std::min(plain.boundingRect(QRect(0,0,tw,999),wrap,body).height(), 3*plain.lineSpacing());
 +        const int y = std::max(4, box.center().y()-(th+bh)/2);
-+        const int mark = selected ? plain.horizontalAdvance(tr("Fitted"))+12 : 0;
++        const int mark = selected ? 24 : 0;
 +        drawPopupText(p,QRect(x,y,tw-mark,th),Qt::AlignLeft|Qt::AlignVCenter,bold.elidedText(title,Qt::ElideRight,tw-mark));
 +        p.setFont(font());
 +        drawPopupText(p,QRect(x,y+th,tw,bh),wrap,body,PopupTheme::secondaryText());
-+        // The list is vertical, so the monitor selector's underline becomes a
-+        // bar at the right-hand edge of the row (a horizontal rule would read as
-+        // a divider between the stacked units).
-+        const int bar = width()-9, top = box.top()+8, bottom = box.bottom()-8;
-+        if (selected) {
-+            p.setRenderHint(QPainter::Antialiasing,false);
-+            p.fillRect(QRect(bar-1,top+1,4,bottom-top),PopupTheme::shadow());
-+            p.fillRect(QRect(bar-2,top,4,bottom-top),PopupTheme::text());
-+            drawPopupText(p,QRect(x,y,tw,th),Qt::AlignRight|Qt::AlignVCenter,tr("Fitted"));
-+        } else if (lit) {
-+            p.setRenderHint(QPainter::Antialiasing,false);
-+            p.setPen(QPen(QColor("#aaaaaa"),1,hasFocus() ? Qt::DashLine : Qt::SolidLine));
-+            p.drawLine(bar,top,bar,bottom);
-+        }
++        if (selected) drawChoiceTick(p,QPointF(x+tw-9,y+th/2.0));
 +    }
 +};
 +// Scale the cropped unit for a ConfigChoice and round off the sliver of lid
@@ -4246,7 +4234,7 @@ diff --git a/src/qt/qt_amstradmonitor.hpp b/src/qt/qt_amstradmonitor.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradmonitor.hpp
-@@ -0,0 +1,202 @@
+@@ -0,0 +1,194 @@
 +// Photographic monitor selector. GPL-2.0-or-later, like 86Box.
 +#ifndef QT_AMSTRADMONITOR_HPP
 +#define QT_AMSTRADMONITOR_HPP
@@ -4398,27 +4386,19 @@ new file mode 100644
 +    {
 +        QPainter p(this);
 +        p.setRenderHint(QPainter::SmoothPixmapTransform);
++        drawChoiceBox(p, QRectF(rect()), current, underMouse() || hasFocus(), hasFocus());
 +        // Keep the hardware opaque above the shared frosted backdrop.
-+        const QRect box(8, 8, width() - 16, height() - 72);
++        const QRect box(12, 12, width() - 24, height() - 76);
 +        QSize size = photo.size(); size.scale(box.size(), Qt::KeepAspectRatio);
 +        const QRect target(QPoint(box.center().x() - size.width()/2, box.bottom() - size.height()), size);
 +        p.drawImage(target, photo);
 +        QFont f = font(); f.setBold(true); p.setFont(f); p.setPen(QColor("#ffffff"));
-+        const int y = height() - 53;
-+        drawPopupText(p,QRect(12,y,width()-24,22), Qt::AlignLeft | Qt::AlignVCenter, mono ? "PC-MM" : "PC-CM");
++        const int y = height() - 57;
++        drawPopupText(p,QRect(18,y,width()-36,22), Qt::AlignLeft | Qt::AlignVCenter, mono ? "PC-MM" : "PC-CM");
 +        f.setBold(false); p.setFont(f); p.setPen(QColor("#aaaaaa"));
-+        drawPopupText(p,QRect(12,y+23,width()-24,20), Qt::AlignLeft | Qt::AlignVCenter,
++        drawPopupText(p,QRect(18,y+23,width()-36,20), Qt::AlignLeft | Qt::AlignVCenter,
 +                   mono ? tr("Monochrome") : tr("CGA colour"),PopupTheme::secondaryText());
-+        if (current) {
-+            p.setPen(QPen(PopupTheme::shadow(), 3));
-+            p.drawLine(12, height()-3, width()-12, height()-3);
-+            p.setPen(QPen(QColor("#ffffff"), 2));
-+            p.drawLine(12, height()-4, width()-12, height()-4);
-+            drawPopupText(p,QRect(width()-90,y,78,22), Qt::AlignRight | Qt::AlignVCenter, tr("Fitted"));
-+        } else if (underMouse() || hasFocus()) {
-+            p.setPen(QPen(QColor("#aaaaaa"), 1, hasFocus() ? Qt::DashLine : Qt::SolidLine));
-+            p.drawLine(12, height()-4, width()-12, height()-4);
-+        }
++        if (current) drawChoiceTick(p, QPointF(width()-27, y+11));
 +    }
 +    void enterEvent(QEvent *) override { update(); }
 +    void leaveEvent(QEvent *) override { update(); }
@@ -4453,7 +4433,7 @@ diff --git a/src/qt/qt_amstradpopup.hpp b/src/qt/qt_amstradpopup.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradpopup.hpp
-@@ -0,0 +1,283 @@
+@@ -0,0 +1,306 @@
 +// Shared cabinet popup appearance. GPL-2.0-or-later, like 86Box.
 +#ifndef QT_AMSTRADPOPUP_HPP
 +#define QT_AMSTRADPOPUP_HPP
@@ -4499,6 +4479,29 @@ new file mode 100644
 +    p.drawText(rect.translated(1,1),flags,text);
 +    p.setPen(colour);
 +    p.drawText(rect,flags,text);
++}
++
++// The shared mark for picture choices: a rounded box around the current one
++// with a tick, and a fainter box under the pointer or keyboard focus.
++inline void drawChoiceBox(QPainter &p, const QRectF &rect, bool selected, bool lit, bool focus)
++{
++    if (!selected && !lit) return;
++    p.save(); p.setRenderHint(QPainter::Antialiasing);
++    p.setPen(QPen(selected ? PopupTheme::text() : PopupTheme::border(), selected ? 2 : 1,
++                  focus && !selected ? Qt::DashLine : Qt::SolidLine));
++    p.setBrush(lit ? PopupTheme::hover() : QColor(255,255,255,16));
++    p.drawRoundedRect(rect.adjusted(1,1,-1,-1),10,10);
++    p.restore();
++}
++inline void drawChoiceTick(QPainter &p, const QPointF &c)
++{
++    p.save(); p.setRenderHint(QPainter::Antialiasing);
++    for (const bool shadow : { true, false }) {
++        const QPointF o = shadow ? QPointF(1,1) : QPointF();
++        p.setPen(QPen(shadow ? PopupTheme::shadow() : PopupTheme::text(),2.5,Qt::SolidLine,Qt::RoundCap));
++        p.drawLine(c+o+QPointF(-5,0),c+o+QPointF(-1,4)); p.drawLine(c+o+QPointF(-1,4),c+o+QPointF(7,-5));
++    }
++    p.restore();
 +}
 +
 +inline QImage blurPopupImage(const QImage &source, qreal radius)
@@ -4741,7 +4744,7 @@ diff --git a/src/qt/qt_amstradpower.hpp b/src/qt/qt_amstradpower.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradpower.hpp
-@@ -0,0 +1,352 @@
+@@ -0,0 +1,379 @@
 +// Rear monitor power-button close-up. GPL-2.0-or-later, like 86Box.
 +#ifndef QT_AMSTRADPOWER_HPP
 +#define QT_AMSTRADPOWER_HPP
@@ -4838,6 +4841,18 @@ new file mode 100644
 +    explicit AmstradPowerPeek(QWidget *parent, const QString &path, const QString &settingsPath)
 +        : QWidget(parent), atlas(path), bayAtlas(QFileInfo(path).dir().filePath("rear-bay-atlas.png")), settingsFile(settingsPath)
 +    {
++        for (int frame = 0; frame < 2; ++frame) {
++            if (!atlas.isNull()) {
++                const int side = atlas.width() / 2;
++                closePhoto[frame] = softenedPhoto(atlas.copy(frame * side, 0, side,
++                    qRound(atlas.height() * 204.0 / PhotoW)), 31, 30);
++            }
++            if (!bayAtlas.isNull()) {
++                const int half = bayAtlas.height() / 2;
++                bayPhoto[frame] = softenedPhoto(bayAtlas.copy(0, frame * half,
++                    bayAtlas.width(), half), 7, 8);
++            }
++        }
 +        cableView = QSettings(settingsFile, QSettings::IniFormat).value("power/view", "close").toString() == "bay";
 +        setObjectName("amstradRearPower");
 +        setAttribute(Qt::WA_TranslucentBackground);
@@ -4969,31 +4984,26 @@ new file mode 100644
 +        const qreal ph = photoHeight();
 +        p.scale(s, s);
 +        const QRectF card(1, 1, Units - 2, ph + 10);
-+        // A quiet raised frame around the photograph.
-+        p.setPen(Qt::NoPen);
-+        p.setBrush(QColor(0, 0, 0, 55));
-+        p.drawRoundedRect(card.translated(0, 2), frameRadius(), frameRadius());
-+        QPainterPath frostedFrame; frostedFrame.addRoundedRect(card,frameRadius(),frameRadius());
-+        p.save(); p.setClipPath(frostedFrame);
-+        backdrop.paint(p,QRectF(0,0,Units,height()/s));
-+        p.restore();
-+        p.setBrush(Qt::NoBrush);
 +        const QColor rim = pressed ? QColor(208, 187, 146) :
 +                           hovered ? amstrad::calloutInk() : QColor(185, 179, 167, 180);
-+        p.setPen(QPen(rim, hovered || pressed ? 1.6 : 1.0));
-+        p.drawRoundedRect(card, frameRadius(), frameRadius());
++        if (cableView) {
++            // The cable-bay photograph retains its frame and clear boundary.
++            p.setPen(Qt::NoPen);
++            p.setBrush(QColor(0, 0, 0, 55));
++            p.drawRoundedRect(card.translated(0, 2), frameRadius(), frameRadius());
++            QPainterPath frostedFrame; frostedFrame.addRoundedRect(card,frameRadius(),frameRadius());
++            p.save(); p.setClipPath(frostedFrame);
++            backdrop.paint(p,QRectF(0,0,Units,height()/s));
++            p.restore();
++            p.setBrush(Qt::NoBrush);
++            p.setPen(QPen(rim, hovered || pressed ? 1.6 : 1.0));
++            p.drawRoundedRect(card, frameRadius(), frameRadius());
++        }
 +        const QRectF photo(PhotoX, PhotoY, PhotoW, ph);
-+        QPainterPath clip; clip.addRoundedRect(photo, frameRadius() - 5, frameRadius() - 5);
-+        p.save(); p.setClipPath(clip);
-+        const QImage &art = cableView ? bayAtlas : atlas;
++        const int frame = (switchPending ? requestedPower : (powered || pressed)) ? 1 : 0;
++        const QImage &art = cableView ? bayPhoto[frame] : closePhoto[frame];
 +        if (!art.isNull()) {
-+            const int frame = (switchPending ? requestedPower : (powered || pressed)) ? 1 : 0;
-+            QRectF source = cableView ? QRectF(0, frame * art.height() / 2.0, art.width(), art.height() / 2.0)
-+                                     : QRectF(frame * art.width() / 2.0, 0, art.width() / 2.0, art.height());
-+            // Trim only a small strip of lower plastic, preserving the scale
-+            // and proportions of the photographed switch in both power states.
-+            if (!cableView) source.setHeight(source.height() * photoHeight() / PhotoW);
-+            p.drawImage(photo, art, source);
++            p.drawImage(photo, art);
 +        } else {
 +            // Keep the control usable if optional artwork is missing.
 +            p.fillRect(photo, QColor(218, 210, 195));
@@ -5001,10 +5011,6 @@ new file mode 100644
 +            const QPointF center = QPointF(buttonCenter()) / s;
 +            p.drawEllipse(center, 28, 28);
 +        }
-+        p.restore();
-+        // Recess the photograph into the frame with a fine inner keyline.
-+        p.setBrush(Qt::NoBrush);
-+        p.setPen(QPen(QColor(255, 249, 233, 100), .7)); p.drawPath(clip);
 +        // Preserve the original POWER pill and icon below the photograph.
 +        QFont font = p.font(); font.setPixelSize(11); font.setBold(true);
 +        font.setLetterSpacing(QFont::AbsoluteSpacing, 1.6); p.setFont(font);
@@ -5059,6 +5065,28 @@ new file mode 100644
 +    }
 +
 +private:
++    // Feather only the outer plastic into the same frosted surface as the
++    // frame. Keep the switch and its recessed ring at their original sharpness.
++    static QImage softenedPhoto(QImage image, qreal corner, qreal feather = 17)
++    {
++        image = image.convertToFormat(QImage::Format_ARGB32);
++        const qreal w = image.width();
++        for (int y = 0; y < image.height(); ++y) {
++            auto *line = reinterpret_cast<QRgb *>(image.scanLine(y));
++            for (int x = 0; x < image.width(); ++x) {
++                const qreal px = (x + .5) * PhotoW / w;
++                const qreal py = (y + .5) * PhotoW / w;
++                const qreal qx = std::abs(px - PhotoW/2) - (PhotoW/2 - corner);
++                const qreal qy = std::abs(py - image.height()*PhotoW/w/2) - (image.height()*PhotoW/w/2 - corner);
++                const qreal outside = std::hypot(std::max(qx, qreal(0)), std::max(qy, qreal(0)));
++                const qreal distance = corner - outside - std::min(std::max(qx, qy), qreal(0));
++                const qreal t = std::clamp(distance / feather, qreal(0), qreal(1));
++                const int alpha = qRound(255 * t * t * (3 - 2*t));
++                line[x] = (line[x] & 0x00ffffff) | (quint32(alpha) << 24);
++            }
++        }
++        return image;
++    }
 +    void activateSwitch() {
 +        if (switchPending || !toggle) return;
 +        // Keep the latched target image from mouse-up until the core acknowledges
@@ -5080,6 +5108,8 @@ new file mode 100644
 +    QPainterPath travelArea;
 +    QImage atlas;
 +    QImage bayAtlas;
++    QImage closePhoto[2];
++    QImage bayPhoto[2];
 +    QString settingsFile;
 +    bool cableView = false;
 +    bool menuOpen = false;
