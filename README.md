@@ -50,3 +50,19 @@ Verification boots a separate disposable VM offscreen, issues scancode keyboard 
 The floppy sound check records the dedicated FDD stream during independent reads of A: and B:, checks that it returns to silence between reads, and verifies profile persistence. [Floppy sound verification](docs/FLOPPY-SOUNDS.md).
 
 86Box source: `978030cd0dc626bab794e74c8ddaa512c1a9fcc9` (7.0 development). Installed comparison: 6.0 build 9001. See `upstream/86Box/COPYING` and [artwork provenance](docs/front-artwork.md). No claim of hardware-exact fidelity.
+
+## License
+
+Original code, scripts and documentation in this repository are licensed under
+the [GNU GPL, version 3 or later](LICENSE).
+
+Third-party and derived parts keep their own terms:
+
+- `patches/86box-pc1512.patch` modifies [86Box](https://github.com/86Box/86Box)
+  (GPL-2.0; see `upstream/86Box/COPYING`) and remains subject to 86Box's licensing for the files it touches.
+- `assets/shaders/` contains a port of IBMulator's CRT shader (GPL-3.0-or-later);
+  see `assets/shaders/NOTICE-IBMulator.md`.
+- Front-panel artwork is not covered by the licence above; see
+  [artwork provenance](docs/front-artwork.md).
+- Amstrad and PC1512/PC1640 are trademarks of their respective owners. ROMs and
+  software are not included and remain the user's own.
