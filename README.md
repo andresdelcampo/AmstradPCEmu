@@ -51,6 +51,16 @@ The floppy sound check records the dedicated FDD stream during independent reads
 
 86Box source: `978030cd0dc626bab794e74c8ddaa512c1a9fcc9` (7.0 development). Installed comparison: 6.0 build 9001. See `upstream/86Box/COPYING` and [artwork provenance](docs/front-artwork.md). No claim of hardware-exact fidelity.
 
+## Working with git
+
+Read [UPSTREAM.md](UPSTREAM.md) first. `upstream/` (86Box, IBMulator) is not tracked, and 86Box is edited in place, so git only protects those edits through `patches/86box-pc1512.patch`.
+
+- **Before every commit that follows changes under `upstream/86Box`, run `python scripts/export-patch.py` and commit the updated patch.**
+- Do not commit ignored areas: `upstream/`, `local/` (ROMs, disks, VM state), `backups/`, `assets/reference/`, `assets/front/backups/`, built `*.exe`. Review any new large binary first.
+- Do not change the pinned upstream commits in `UPSTREAM.md` without a reason; if they change, update the table and re-export the patch.
+- Pushing needs `git config http.sslBackend schannel` (already set in this clone; antivirus HTTPS scanning breaks git's default certificate bundle).
+- New files that go into 86Box carry a GPL-2.0-or-later header, like 86Box. Do not add GPL-2.0-only or GPL-incompatible code to the build.
+
 ## License
 
 Original code, scripts and documentation in this repository are licensed under
