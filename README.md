@@ -63,19 +63,26 @@ Read [UPSTREAM.md](UPSTREAM.md) first. `upstream/` (86Box, IBMulator) is not tra
 
 ## License
 
-Original code, scripts and documentation in this repository are licensed under
-the [GNU GPL, version 3 or later](LICENSE).
+The **combined program** (patched 86Box, IBMulator CRT shader, launcher) is distributed under the
+[GNU GPL, version 3 or later](LICENSE). 86Box is GPL-2.0-or-later, which allows this; IBMulator's shader is
+GPL-3.0-or-later. Original code, scripts and documentation in this repository are under the same terms.
 
-Third-party and derived parts keep their own terms:
+Components keep their own notices:
 
-- `patches/86box-pc1512.patch` modifies [86Box](https://github.com/86Box/86Box)
-  (GPL-2.0; see `upstream/86Box/COPYING`) and remains subject to 86Box's licensing for the files it touches.
-  The PCE-derived `cassette.c`/`cassette.h` (GPL-2.0-only, unused by any Amstrad machine) are replaced by an
-  independent no-op stub, so the compiled Amstrad build contains no GPL-2.0-only code. Remaining mix is
-  GPL-2.0-or-later (86Box), LGPL-3.0-or-later (`src/floppy/lzw`), GPL-3.0-or-later (IBMulator CRT) and permissive libraries.
+- `patches/86box-pc1512.patch` modifies [86Box](https://github.com/86Box/86Box) (GPL-2.0-or-later; see
+  `upstream/86Box/COPYING`). The PCE-derived `cassette.c`/`cassette.h` (GPL-2.0-only, unused by any Amstrad
+  machine) are replaced by an independent no-op stub, so the compiled build contains no GPL-2.0-only code.
+  See [CHANGES.md](CHANGES.md).
 - `assets/shaders/` contains a port of IBMulator's CRT shader (GPL-3.0-or-later);
-  see `assets/shaders/NOTICE-IBMulator.md`.
-- Front-panel artwork is not covered by the licence above; see
-  [artwork provenance](docs/front-artwork.md).
-- Amstrad and PC1512/PC1640 are trademarks of their respective owners. ROMs and
-  software are not included and remain the user's own.
+  see `assets/shaders/NOTICE-IBMulator.md` and `assets/shaders/COPYING-IBMulator`.
+- Runtime DLLs and other bundled components are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+- Floppy-drive sounds were recorded by the project author. Front-panel artwork was created by the author with AI
+  image tools ([provenance](docs/front-artwork.md)); no third-party artwork is reproduced.
+- Amstrad and PC1512/PC1640 are trademarks of their respective owners. ROMs and software are not included and
+  remain the user's own.
+
+## Distributing a build
+
+Run `scripts/build.ps1`, commit, then `scripts/make-release.ps1`. It creates `local/release/AmstradPCEmu-<version>/`
+(binaries, licence texts, notices) plus a `-source.zip` containing the complete corresponding source (project files and
+the patched 86Box tree). Ship both together. No ROMs, disks or VM state are included.
