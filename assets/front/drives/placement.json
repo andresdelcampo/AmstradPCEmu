@@ -1,0 +1,61 @@
+{
+    "version":  2,
+    "front":  "../pc1512-front.png",
+    "front_sha256":  "57629faa0eaaf647991ebc9f08ba93e4f880218e1165cfe868567ff2078a8f23",
+    "canvas":  {
+                   "width":  1254,
+                   "height":  1254,
+                   "origin":  "top-left",
+                   "units":  "pixels"
+               },
+    "draw_order":  [
+                       "cabinet",
+                       "one drive state per drive",
+                       "LED state patches"
+                   ],
+    "alpha":  "straight-alpha source-over; restore cabinet before selecting a different state",
+    "disk_color":  "black",
+    "drives":  [
+                   {
+                       "id":  "drive-a",
+                       "x":  174,
+                       "y":  1006,
+                       "width":  450,
+                       "height":  180,
+                       "open_empty":  "drive-a-open-empty.png",
+                       "closed_black":  "drive-a-closed-black.png",
+                       "disk_color_mask":  "drive-a-disk-color-mask.png",
+                       "closed_variants":  {
+                                               "black":  "drive-a-closed-black.png",
+                                               "yellow":  "drive-a-closed-yellow.png",
+                                               "green":  "drive-a-closed-green.png",
+                                               "blue":  "drive-a-closed-blue.png",
+                                               "red":  "drive-a-closed-red.png"
+                                           }
+                   },
+                   {
+                       "id":  "drive-b",
+                       "x":  632,
+                       "y":  1006,
+                       "width":  450,
+                       "height":  180,
+                       "open_empty":  "drive-b-open-empty.png",
+                       "closed_black":  "drive-b-closed-black.png",
+                       "disk_color_mask":  "drive-b-disk-color-mask.png",
+                       "closed_variants":  {
+                                               "black":  "drive-b-closed-black.png",
+                                               "yellow":  "drive-b-closed-yellow.png",
+                                               "green":  "drive-b-closed-green.png",
+                                               "blue":  "drive-b-closed-blue.png",
+                                               "red":  "drive-b-closed-red.png"
+                                           }
+                   }
+               ],
+    "disk_colors":  [
+                        "black",
+                        "yellow",
+                        "green",
+                        "blue",
+                        "red"
+                    ]
+}

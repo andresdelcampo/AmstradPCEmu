@@ -1,0 +1,36 @@
+{
+  "source_disk_sha256": "a151f5c35958341955374c3c5fdb790d7ecaa247dbd65c3d25ac944f5bde9f2f",
+  "files": {
+    "IMAGES/PC1512.IMG": {
+      "width": 400,
+      "height": 160,
+      "planes": 4,
+      "pixel_width": 169,
+      "pixel_height": 372,
+      "source_sha256": "cba4660d4339cecb448731151a6009c23796dd8b02368875e79d8a14b0415d5d",
+      "png_sha256": "1eea8b770a0fec89123d7c3b985f2bb6b79c76689de343c2103f200ad8053f89",
+      "output": "gem-pc1512-original.png"
+    },
+    "IMAGES/TIGER.IMG": {
+      "width": 384,
+      "height": 152,
+      "planes": 1,
+      "pixel_width": 169,
+      "pixel_height": 372,
+      "source_sha256": "d8a3ef91b717db3ed1cb6b12e2d59813866f11bb21456c42b57e05884ce459b4",
+      "png_sha256": "13642029f34f1cd16565f16210a97e6f712be8279cb2509195b2658980bfba4b",
+      "output": "gem-tiger-original.png"
+    },
+    "A5:IMAGES/HOUSE.IMG": {
+      "width": 480,
+      "height": 159,
+      "planes": 4,
+      "pixel_width": 169,
+      "pixel_height": 372,
+      "source_sha256": "a1c49bcd2c85f750ff6f89d565f0840d44c54d5b5a208c22aed868b318aa3747",
+      "png_sha256": "da11d9acebb72d1531bbf98e9683851408a269c921e909357adf0f1cc1f9fb9c",
+      "output": "gem-house-original.png"
+    }
+  },
+  "house_disk_sha256": "3cb75c892bd0d743a3ff45cf5dfa5c67714e23c6fc54941184a07c136fafc226"
+}

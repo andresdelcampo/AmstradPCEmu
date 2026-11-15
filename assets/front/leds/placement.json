@@ -1,0 +1,51 @@
+﻿{
+    "version":  1,
+    "front":  "../pc1512-front.png",
+    "front_sha256":  "57629faa0eaaf647991ebc9f08ba93e4f880218e1165cfe868567ff2078a8f23",
+    "canvas":  {
+                   "width":  1254,
+                   "height":  1254,
+                   "origin":  "top-left",
+                   "units":  "pixels"
+               },
+    "compositing":  "straight-alpha source-over; draw front first, then exactly one state per indicator at x,y; scale with the cabinet",
+    "indicators":  [
+                       {
+                           "id":  "power",
+                           "x":  208,
+                           "y":  960,
+                           "width":  48,
+                           "height":  48,
+                           "off":  "power-off.png",
+                           "on":  "power-on.png"
+                       },
+                       {
+                           "id":  "drive-a",
+                           "x":  522,
+                           "y":  1015,
+                           "width":  48,
+                           "height":  48,
+                           "off":  "drive-a-off.png",
+                           "on":  "drive-a-on.png"
+                       },
+                       {
+                           "id":  "drive-b",
+                           "x":  980,
+                           "y":  1015,
+                           "width":  48,
+                           "height":  48,
+                           "off":  "drive-b-off.png",
+                           "on":  "drive-b-on.png"
+                       },
+                       {
+                           "id":  "hdd",
+                           "y":  1056,
+                           "on":  "hdd-on.png",
+                           "width":  48,
+                           "off":  "hdd-off.png",
+                           "height":  40,
+                           "x":  276,
+                           "requires":  "left HDD module"
+                       }
+                   ]
+}

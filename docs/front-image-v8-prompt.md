@@ -1,0 +1,9 @@
+# Front artwork v8 prompt
+
+Built-in image_gen edit of v7, 2026-11-14. Made the broad short upper cylinder wall visible with diffuse illumination. Saved as assets/front/pc1512-front-v8.png. Prior versions and original backup retained. Launcher still uses v2.
+
+Use case: precise-object-edit. Edit this existing 1254x1254 Amstrad PC1512 artwork ONLY in the small stand area immediately below monitor. The current broad upper support is too dark to see. Reveal its short STRAIGHT CYLINDRICAL SIDE WALL using soft dim diffuse fill illumination.
+The upper cylinder must visibly descend DIRECTLY from monitor underside: width about 88% of the bottom circular foot, height about 14 pixels (only a little taller than bottom rim). Show its two short vertical outer side edges and a discernible beige-grey straight wall, with subtle round-cylinder shading across its width. Wall should be noticeably lighter than the black background shadow beside it, so the viewer can clearly identify a short broad cylinder below the screen. Its upper edge touches monitor underside directly. The underside/contact edge may disappear into a narrow dark shadow at the join to the single lower dome. Do NOT black out the entire upper cylinder.
+Keep the lower matte flattened dome and bottom cylinder as they are. EXACTLY one dome, the existing lower dome. No additional rounded lip, rolled rim, saucer, flare or domed tier beneath monitor. Upper cylinder is a plain short straight-walled drum, no bright trim ring. Do not make upper cylinder taller, move monitor or change pedestal overall dimensions. This is primarily a LOCAL LIGHTING / VISIBILITY correction of the upper cylinder wall, with clearly straight edges.
+Preserve all other pixels as closely as possible: CRT, cabinet, drives, levers, red-band logos, all lettering including lowered System Unit, vents, base, background, framing. Same 1254x1254 square composition.
+

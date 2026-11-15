@@ -1,0 +1,5 @@
+Built-in image_gen edit, 2026-11-14; transparent_background=true.
+Edit target: assets/front/pc1512-front.png.
+Output copied to assets/front/pc1512-icon-cutout.png; the cabinet source is unchanged.
+
+Use case: background-extraction. Edit target: the supplied pc1512-front.png. Asset type: Windows application icon cutout. Remove only the dark charcoal background OUTSIDE the outer silhouette of the complete Amstrad monitor and double-drive computer base, leaving actual alpha transparency there, including below/between the feet outside the cabinet. Preserve the supplied machine's exact front view, proportions, shape, two drive latches and bays, labels, neutral cream and gray colors, screen reflections and dark interior glass. Do not make the screen or any internal dark surface transparent. Clean antialiased silhouette with no dark halo, no background or cast shadow outside the machine. Keep the whole computer with feet visible and centered on a square transparent canvas. No redesign or additional objects.

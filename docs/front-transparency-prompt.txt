@@ -1,0 +1,16 @@
+Built-in image_gen edit, 2026-11-14, transparent_background=true.
+Edit target: assets/front/backups/pc1512-front-before-transparency.png
+Generated reference: local/artwork/transparency/generated-cutout.png
+The generated cutout had fringe/noise. Final exterior alpha was refined against
+the original dark background with scripts/make-front-transparent.ps1. Original
+interior RGB pixels and 1254x1254 geometry are retained; the antialiased outer
+rim is unmatted. The icon was not changed.
+The feet use a lower local background threshold to retain their shaded sides
+and rounded bottoms; the scene check covers both feet explicitly.
+
+Exact prompt:
+Use case: background-extraction
+Asset type: existing emulator front cabinet PNG, exact-position overlay master.
+Edit target: input image 1 only.
+Primary request: Remove ONLY the dark studio background OUTSIDE the complete computer and make it truly transparent. Keep the entire monitor, stand, system unit, and both feet. Remove cast shadow outside the hardware. Clean precise antialiased silhouette edges, no dark/white fringe.
+Critical invariants: preserve the original 1254x1254 canvas, exact original pixel coordinates and scale of every part, monitor outline, pedestal, case and feet. Do not crop, resize, shift, relight, redraw or redesign the computer. Preserve all original hardware details, screen, badges/text, drives and lighting. The screen and all dark hardware details INSIDE the computer must remain fully opaque. Only the exterior background alpha changes. Output genuine RGBA transparency.

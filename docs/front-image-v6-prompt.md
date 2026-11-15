@@ -1,0 +1,9 @@
+# Front artwork v6 prompt
+
+Built-in image_gen edit of v5, 2026-11-14. Saved as assets/front/pc1512-front-v6.png. Prior versions and original backup retained. Launcher still uses v2.
+
+Use case: precise-object-edit. Image 1 is the EDIT TARGET (1254x1254 square Amstrad PC1512 front artwork v5). Image 2 is the real hardware pedestal reference. Change ONLY two pedestal details, keep every other part and all framing unchanged.
+1. The broad UPPER cylinder currently has a very tall exposed front wall (about 35-40 pixels). SHORTEN its visible side wall to about 12-14 pixels, only a little taller than the bottom cylinder's existing 10-11 pixel wall. Keep its broad width, around 85-90% of bottom cylinder width. Its top stays tucked under the monitor in deep shadow, so MOVE ITS LOWER ELLIPTICAL EDGE UPWARDS about 22 pixels to achieve the short wall, exposing more of the shallow domed surface below. Do not lower the monitor or move the bottom foot. This is a short broad shallow puck above a shallow dome, NOT a tall drum, NOT a skinny neck. The hidden joint is irrelevant. Use hardware reference to match the short upper support in shadow.
+2. Remove the shiny bright white front band/specular highlight from the DOME surface. It is MATTE rough beige moulded plastic with soft diffuse illumination and modest shadow, no gloss or reflection, matching the real reference. Preserve a gentle shallow convex curvature and its full diameter join immediately above the bottom cylinder. The dome should read as a very flattened spherical cap, no bell or trumpet shape.
+KEEP THE BOTTOM CYLINDER EXACTLY AS IT IS: diameter, height, front wall and location are approved. Keep drive faces, bent levers, red-band logos, lowered System Unit text, all other badges and typography, CRT, lighting outside the pedestal, background and cabinet geometry unchanged. Same exact square composition, 1254x1254.
+

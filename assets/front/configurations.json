@@ -1,0 +1,78 @@
+{
+    "version":  1,
+    "front":  "pc1512-front.png",
+    "front_sha256":  "57629faa0eaaf647991ebc9f08ba93e4f880218e1165cfe868567ff2078a8f23",
+    "canvas":  {
+                   "origin":  "top-left",
+                   "width":  1254,
+                   "height":  1254
+               },
+    "bays":  {
+                 "left":  {
+                              "hdd":  "drives/bay-left-hdd.png",
+                              "blank":  "drives/bay-left-blank.png",
+                              "width":  450,
+                              "blank_sticker":  "drives/bay-left-blank-sticker.png",
+                              "y":  1006,
+                              "x":  174,
+                              "height":  180
+                          },
+                 "right":  {
+                               "blank":  "drives/bay-right-blank.png",
+                               "width":  450,
+                               "blank_sticker":  "drives/bay-right-blank-sticker.png",
+                               "y":  1006,
+                               "x":  632,
+                               "height":  180
+                           }
+             },
+    "badge":  {
+                  "dd":  "badges/model-dd.png",
+                  "width":  216,
+                  "y":  1164,
+                  "hd20":  "badges/model-hd20.png",
+                  "x":  870,
+                  "sd":  "badges/model-sd.png",
+                  "height":  76
+              },
+    "monitor_badge":  {
+                          "mm":  "badges/monitor-mm.png",
+                          "width":  140,
+                          "cm":  "badges/monitor-cm.png",
+                          "y":  743,
+                          "x":  923,
+                          "height":  60
+                      },
+    "hdd_led":  {
+                    "requires":  "left HDD module",
+                    "on":  "leds/hdd-on.png",
+                    "width":  48,
+                    "y":  1056,
+                    "off":  "leds/hdd-off.png",
+                    "x":  276,
+                    "height":  40
+                },
+    "configurations":  {
+                           "sd":  {
+                                      "left":  "blank or blank_sticker",
+                                      "right":  "floppy A",
+                                      "badge":  "sd"
+                                  },
+                           "hd20":  {
+                                        "left":  "hdd",
+                                        "right":  "floppy A",
+                                        "badge":  "hd20"
+                                    },
+                           "dd":  {
+                                      "left":  "floppy A",
+                                      "right":  "floppy B",
+                                      "badge":  "dd"
+                                  }
+                       },
+    "draw_order":  [
+                       "cabinet",
+                       "selected bay modules or floppy state patches",
+                       "model badge",
+                       "power LED and activity LEDs belonging to installed devices"
+                   ]
+}

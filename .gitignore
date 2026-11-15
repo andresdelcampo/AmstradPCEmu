@@ -1,0 +1,19 @@
+# Local research photographs: review references, not distribution assets.
+assets/reference/
+# Old manual snapshots of the front-panel art (git replaces these).
+assets/front/backups/
+# Manual snapshots of the project; git history supersedes them.
+backups/
+# User-owned firmware, media and mutable emulator state.
+local/
+roms/
+disks/
+vm/
+build/
+__pycache__/
+*.pyc
+# Third-party source trees; pinned in UPSTREAM.md, our changes live in patches/.
+upstream/
+# Built launcher and shortcut (rebuild with scripts/build-launcher.ps1).
+*.exe
+*.lnk

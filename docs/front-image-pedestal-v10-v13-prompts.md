@@ -1,0 +1,32 @@
+# Pedestal close-up revisions, 2026-11-14
+
+Built-in image_gen edits. v10 introduced the narrower matte domed foot; user approved the bottom cylinder and dome. Intermediate generated close-ups are retained in local/artwork/v10, v11, v12 and v13. v13 flattens the dark upper cylinder lower boundary to almost parallel with monitor underside, retaining direct contact and an overlap in front of the lower dome.
+
+Final assets: assets/front/pc1512-front-v13.png (1254x1254) and assets/front/pc1512-pedestal-v13-detail.png (768x256). Assembly: scripts/assemble-pedestal-v10.ps1 -Version 13 -InputVersion 10 -UpperOnly. Only the upper support and immediate contact shadow are blended onto v10; its lower foot remains intact. All pixels outside the pedestal rectangle are verified identical to v9. Launcher still uses v2; all existing versions and original backup retained.
+
+## v10 prompt
+
+Precise local object edit. Image 1 is the close-up EDIT TARGET, 768x256. Images 2, 3 and 4 are real hardware references of the SAME monitor stand. Reconstruct ONLY the stand in image 1 to closely match those photographs, especially image 4's front view. Study the photographs rather than retaining the incorrect stacked-disc stand in image 1.
+
+The real stand has a narrower circular footprint (about 40% of full monitor width), one thin but straight cylindrical bottom wall and a softly rounded VERY SHALLOW convex top which flows seamlessly from its full outer rim. Its front outline reads as a gently convex circular foot with a modest straight vertical edge, NOT a flat plate stacked under another plate. It is matte textured beige plastic, softly diffuse, no shiny white front band. A short broad straight cylindrical support projects DIRECTLY down from the monitor underside, about 88% of foot diameter and only slightly taller than the bottom foot wall. Reveal a dim straight vertical side wall just under the monitor, with no gap at monitor contact. Its lower joint recedes into soft deep shadow behind the domed foot as in reference 4: no bright outlined elliptical seam, no second dome, no flared upper lip. Preserve discernible short vertical sides of this upper support in the shadow.
+
+In this close-up, narrow foot from its current approximately 510 pixels width to about 400 pixels wide, centered at x384; maintain its front bottom edge near y162, and the monitor bottom near y93. Bottom cylinder vertical wall about 9 pixels high. Keep the existing top panel and monitor exactly positioned. The dome is a single smooth flattened spherical cap, shown in perspective and mostly overlapped at its rear by the upper support in shadow. Replicate the real reference's subdued shape and shadow pattern. Clean target beige finish, no dirt or Schneider logo.
+Keep everything outside stand unchanged, including top panel seams, monitor bezel and partial labels, front edge of base and partial power label. Output the same 768x256 crop composition so it can be placed back exactly.
+
+## Upper support overlap revision (v11 close-up)
+
+Edit ONLY the upper cylindrical support in Image 1. Images 2-4 are the real object: match their overlap and separation. Keep the approved bottom cylinder and its shallow matte dome unchanged.
+
+Image 1 incorrectly blends/melts the vertical upper cylinder into the dome. The upper cylinder must be a SEPARATE SOLID OBJECT IN FRONT OF the dome. It comes straight down from the monitor underside and OCCLUDES the dome behind it, like the photos. Show its short straight wall and a distinct lower front silhouette following a shallow elliptical arc, with a fine dark contact shadow below that edge. The dome disappears BEHIND this upper cylinder where they overlap; it does not rise up or wrap around the cylinder wall. Do not blend their surfaces together. The support is a short broad straight-sided cylinder, 88% of bottom foot diameter, height only slightly greater than bottom rim, directly touching monitor underside without any gap. No rounded upper lip, no second dome, no flare, no smooth fillet at the cylinder/dome boundary. A clean mechanical overlap, naturally shaded, exactly as the photographs. Enough diffuse light on the upper cylinder to see it, shadow beneath its lower edge, matte beige plastic.
+Do not change the lower dome shape, bottom cylinder, surrounding casing, text, lighting elsewhere or camera. Maintain Image 1's same wide crop framing and aspect ratio.
+
+## Shadow revision (v12)
+
+LOCAL LIGHTING EDIT ONLY. In Image 1, darken ONLY THE TOP CYLINDER that descends directly from the monitor underside. Keep its existing geometry, direct contact with monitor, and clean overlap IN FRONT OF the lower dome. Put that upper cylinder in deep natural cast shadow from the monitor, nearly black warm brown-grey with a faint diffuse hint of its straight side wall. It should be partially hidden by darkness like the upper support in reference Image 2. Its lower contact edge may be mostly lost in that dark shadow. It must no longer be a bright beige illuminated drum.
+Keep the BOTTOM CYLINDER AND THE SINGLE LOWER DOME as they are: same geometry, illumination, matte material and position. Only allow the natural shadow of the upper cylinder onto the immediately adjacent rear part of dome. Do not add a second dome or fillet. Keep everything else unchanged, including monitor, all text, panel, background and crop framing. Same wide aspect ratio.
+
+## Nearly parallel edge revision (v13)
+
+Edit ONLY the TOP CYLINDER in Image 1 to match the upper support silhouette in reference Image 2. Its lower visible boundary must be ALMOST A STRAIGHT HORIZONTAL LINE PARALLEL TO THE MONITOR BOTTOM, only the slightest shallow curve. The current edge is a strongly bowed ellipse, making the middle of cylinder much taller. Raise and flatten the middle of that lower edge: exposed cylinder wall should be a short narrow band of almost constant height beneath the monitor, only a tiny 2-3-pixel sag across its entire width when scaled to 768-pixel crop width. Its top touches monitor underside with no air gap. Keep it broad, dark, matte and mostly lost in shadow as currently. It remains IN FRONT OF the dome, mechanically separate, no smooth blending into dome. No extra disc, rim, flare or upper dome. Reference Image 2 shows precisely the nearly parallel upper cylinder edge: replicate that.
+The BOTTOM CYLINDER AND SINGLE LOWER DOME ARE APPROVED: preserve their shape, width, location, diffuse illumination and matte finish. Keep all surrounding casing, text and camera unchanged. Same wide framing.
+
