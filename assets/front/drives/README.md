@@ -1,74 +1,35 @@
-﻿# Drive state patches
+# Shared drive artwork
 
-All runtime-ready assets are in this directory. Created 2026-11-14 for
-`../pc1512-front.png` (1254 x 1254). The software renderer loads them from
-`drives/` beside `AMSTRAD_CABINET` (override with `AMSTRAD_DRIVES`) and picks
-each drive's state from 86Box's inserted-media state: open/empty when the drive
-is empty, otherwise closed with a disk coloured by `amstrad::diskColour()` in
-`qt_amstradscene.hpp`, which guesses from the image file name only â€” MS-DOS /
-Disc 1 red, GEM / Disc 2 blue, GEM2 / GEM Desktop / BASIC 2 / Disc 3 green,
-DOS Plus / Disc 4 yellow, anything else black. Animations are not connected.
+`masters/opened.png` and `masters/closed.png` are the user-owned originals.
+They are preserved unchanged. Both physical bays use the same pictures:
 
-Additional HDD and blank bay modules are saved here as `bay-left-hdd.png`,
-`bay-left-blank.png`, `bay-left-blank-sticker.png`, `bay-right-blank.png` and
-`bay-right-blank-sticker.png`. See [configuration assets](../CONFIGURATIONS.md)
-for SD/HD20 badges, HDD LEDs and logical drive-letter mapping.
+- `drive-open-empty.png`: complete open, empty drive.
+- `drive-closed-mechanism.png`: complete closed mechanism.
+- `drive-closed-{black,yellow,green,blue,red}.png`: disk-only overlays.
 
-Each drive has six **450 x 180 RGBA PNG** states:
+Draw the cabinet, the open face OR closed mechanism plus chosen disk, then
+the activity LEDs. All drive patches are 450 x 180 RGBA. Placement is left
+(174,1006), right (632,1006); see `placement.json`. Separate bay positions
+and disk states remain independent even though their images are shared.
 
-| State | Drive A (left) | Drive B (right) |
-| --- | --- | --- |
-| Open, empty | `drive-a-open-empty.png` | `drive-b-open-empty.png` |
-| Closed, black disk | `drive-a-closed-black.png` | `drive-b-closed-black.png` |
-| Closed, yellow disk | `drive-a-closed-yellow.png` | `drive-b-closed-yellow.png` |
-| Closed, green disk | `drive-a-closed-green.png` | `drive-b-closed-green.png` |
-| Closed, blue disk | `drive-a-closed-blue.png` | `drive-b-closed-blue.png` |
-| Closed, red disk | `drive-a-closed-red.png` | `drive-b-closed-red.png` |
+`archive/disk-materials/disk-*.png` retains one source per disk colour.
+Assembly registers the entire master face, excluding its white margins,
+and copies the material into the slot as one straight, constant-height
+strip (rows 57-62), interrupted only by the latch and the slanted slot ends.
+Cuts are whole columns, so every drawn column is the full six rows.
+The materials are complete strips with a soft lever shadow at x 95-110;
+`scripts/repair-disk-materials.ps1` rebuilds them from the pristine copies
+in `archive/before-shared-masters-2026-11-15/masters/disk-materials/`.
+No image generation or master retouching is needed.
 
-Draw the cabinet first, then exactly one drive state per drive, then the
-independent LED patches. The selected states can differ between A and B.
-Use top-left coordinates **A: (174, 1006), B: (632, 1006)**. Apply the same
-scale/translation as the cabinet. Keep the transparent padding; do not trim
-without changing placement. PNG alpha is straight, for source-over blending.
-Restore the cabinet each frame before drawing a different state.
+Rebuild with `rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts/apply-drive-masters.ps1`.
+The old `apply-closed-drive-master.ps1` command forwards to this script.
+Master hashes are verified unchanged after assembly.
 
-`placement.json` supplies canvas size, front SHA-256, placement, draw order
-and `closed_variants` mapping keyed by `black`, `yellow`, `green`, `blue`, `red`.
-The initial 450 x 150 crops were padded to 450 x 180 to remove the full old
-latch shadow. The patch origin and the drive geometry are unchanged.
+`all-states-preview.png` shows the shared six-state set;
+`configurations-preview.png` shows DD, SD, sticker and HD20 combinations.
+The existing HDD and blank modules remain distinct because they differ visually.
 
-In open state the latch points right, matching the user's empty-drive photo.
-Both drives use the same left-drive lever master at the same local coordinates;
-the independently generated right-drive lever is discarded.
-The original lower drive surface and straight bottom border are reconstructed
-from clean neighbouring columns at the same row, preventing the earlier
-generated-fill colour mismatch and shifted border. Only the latch/upper
-recess and empty slit use the edited source directly.
-
-In closed states the original cabinet supplies the exact unchanged lowered
-latch and beige face. The PNG overlays **only the visible inserted disk edge**.
-Every colour variant uses the same alpha/occlusion as its black counterpart.
-`drive-a-disk-color-mask.png` and `drive-b-disk-color-mask.png` are opaque
-grayscale masks for future edits: white is disk material, black is protected.
-They are editing aids and must not be drawn as visible layers.
-
-The coloured edge materials were generated with the built-in image_gen tool
-using the supplied Amstrad system disk photograph as the colour reference,
-then isolated through the existing disk masks. No labels or protruding disk
-faces are shown. The later v19/v20 master repairs the false finger-well rails
-and softens the over-bright case bevel. Disk overlay PNGs are unchanged.
-
-`preview.png` shows open/empty and closed/black in cabinet context.
-`all-states-preview.png` compares all six states, with drive LEDs idle.
-
-Exact prompts: [mechanical states](../../../docs/front-drive-state-prompts.md)
-and [colours](../../../docs/front-drive-colour-prompts.md). Generated originals,
-user-supplied reference copies and full-front composites are under
-`local/artwork/drive-states/`.
-
-Rebuild from the project root (requires the retained generated sources):
-
-```powershell
-rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts/assemble-drive-assets.ps1
-rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts/assemble-drive-color-assets.ps1
-```
+Superseded A/B patches, masks, duplicate materials and previews are retained
+under `archive/before-shared-masters-2026-11-15/`. Earlier historical images
+remain in `archive/`. Historical assembly scripts are not current rebuild paths.

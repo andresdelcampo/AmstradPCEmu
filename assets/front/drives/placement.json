@@ -1,7 +1,7 @@
-{
-    "version":  2,
+﻿{
+    "version":  5,
     "front":  "../pc1512-front.png",
-    "front_sha256":  "57629faa0eaaf647991ebc9f08ba93e4f880218e1165cfe868567ff2078a8f23",
+    "front_sha256":  "26b419f4e02314566810644336fd17db87f82ef7bb2ca20f2ed92c40584e9845",
     "canvas":  {
                    "width":  1254,
                    "height":  1254,
@@ -22,16 +22,16 @@
                        "y":  1006,
                        "width":  450,
                        "height":  180,
-                       "open_empty":  "drive-a-open-empty.png",
-                       "closed_black":  "drive-a-closed-black.png",
-                       "disk_color_mask":  "drive-a-disk-color-mask.png",
+                       "open_empty":  "drive-open-empty.png",
+                       "closed_black":  "drive-closed-black.png",
                        "closed_variants":  {
-                                               "black":  "drive-a-closed-black.png",
-                                               "yellow":  "drive-a-closed-yellow.png",
-                                               "green":  "drive-a-closed-green.png",
-                                               "blue":  "drive-a-closed-blue.png",
-                                               "red":  "drive-a-closed-red.png"
-                                           }
+                                               "black":  "drive-closed-black.png",
+                                               "yellow":  "drive-closed-yellow.png",
+                                               "green":  "drive-closed-green.png",
+                                               "blue":  "drive-closed-blue.png",
+                                               "red":  "drive-closed-red.png"
+                                           },
+                       "closed_mechanism":  "drive-closed-mechanism.png"
                    },
                    {
                        "id":  "drive-b",
@@ -39,16 +39,16 @@
                        "y":  1006,
                        "width":  450,
                        "height":  180,
-                       "open_empty":  "drive-b-open-empty.png",
-                       "closed_black":  "drive-b-closed-black.png",
-                       "disk_color_mask":  "drive-b-disk-color-mask.png",
+                       "open_empty":  "drive-open-empty.png",
+                       "closed_black":  "drive-closed-black.png",
                        "closed_variants":  {
-                                               "black":  "drive-b-closed-black.png",
-                                               "yellow":  "drive-b-closed-yellow.png",
-                                               "green":  "drive-b-closed-green.png",
-                                               "blue":  "drive-b-closed-blue.png",
-                                               "red":  "drive-b-closed-red.png"
-                                           }
+                                               "black":  "drive-closed-black.png",
+                                               "yellow":  "drive-closed-yellow.png",
+                                               "green":  "drive-closed-green.png",
+                                               "blue":  "drive-closed-blue.png",
+                                               "red":  "drive-closed-red.png"
+                                           },
+                       "closed_mechanism":  "drive-closed-mechanism.png"
                    }
                ],
     "disk_colors":  [
@@ -57,5 +57,12 @@
                         "green",
                         "blue",
                         "red"
-                    ]
+                    ],
+    "geometry_revision":  5,
+    "mechanism_reference":  "Complete user masters, shared between both bays.",
+    "closed_master_sha256":  "c0061387b1c80b831dd9177f406b4e07ff106da8dd1fe5332d4c3eda7f9858c7",
+    "closed_master":  "masters/closed.png",
+    "open_master":  "masters/opened.png",
+    "closed_layers":  "cabinet, shared closed_mechanism, disk-only closed_variants, LEDs",
+    "open_master_sha256":  "022481042dcae7f096f6fbb77cc1d1e82c56188b5122e634d5c868af91b72130"
 }

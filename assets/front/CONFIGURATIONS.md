@@ -45,6 +45,18 @@ case bevel above the drives, preserving the original pixels' geometry and
 texture. Ten inserted-disk overlay PNGs remain byte-identical to before the
 aperture repair. Earlier masters remain available.
 
+The lower system-unit edge has two separate grille banks. Left to right, the
+left bank has 8 open slots, 2 molded closed positions, and 9 open slots; the
+right bank mirrors it with 9 open, 2 closed, and 8 open. The openings reach
+nearly to the lower lip, above small low feet. The straight front lip
+overhangs the narrower grille base, with a solid band above the openings.
+This follows the supplied
+HomeComputerMuseum / Dylan van Voorthuijsen front photograph. The 1254 x 1254
+canvas and all component
+coordinates are unchanged. `scripts/replace-front-bottom.ps1` assembles the
+new lower strip from the original and generated source images in `backups/`,
+updates the front hashes, and refreshes the cutout PNG and Windows icon.
+
 Built-in image_gen supplied the new module, sticker, suffix glyphs, lit lens
 and lighting reference. Sticker print is a visual AI reconstruction of the
 supplied photograph, not a verified verbatim transcription. Prompts are in

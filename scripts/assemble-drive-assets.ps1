@@ -1,5 +1,6 @@
 param([switch]$OpenOnly)
 $ErrorActionPreference = 'Stop'
+if ((Get-Content (Join-Path $PSScriptRoot '../assets/front/drives/placement.json') -Raw | ConvertFrom-Json).geometry_revision -ge 2) { throw 'Use apply-closed-drive-master.ps1 for current masters; this legacy assembler would restore old geometry.' }
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent $PSScriptRoot
 $work = Join-Path $root 'local/artwork/drive-states'

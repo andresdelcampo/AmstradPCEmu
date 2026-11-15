@@ -1,7 +1,7 @@
 {
     "version":  1,
     "front":  "pc1512-front.png",
-    "front_sha256":  "57629faa0eaaf647991ebc9f08ba93e4f880218e1165cfe868567ff2078a8f23",
+    "front_sha256":  "26b419f4e02314566810644336fd17db87f82ef7bb2ca20f2ed92c40584e9845",
     "canvas":  {
                    "origin":  "top-left",
                    "width":  1254,

@@ -1,0 +1,6 @@
+# Rim highlight correction
+
+Built-in image_gen, 2026-11-15. Saved to `assets/front/drives/masters/closed.png`.
+Previous master: `archive/closed-before-rim-highlight-fix.png`. Derivatives refreshed.
+
+Prompt: Localized photographic retouch ONLY. Remove the conspicuous WHITE HAIRLINE running horizontally immediately above the black disk slot from x505 to x1049 at y285, and its curved UPWARD TURN at x1053 from y285 to y234. These coordinates refer to this 2170x725 image. This L-shaped edge is far too bright. Recolour that entire thin white line and curved right tip to DARK muted brown-grey matching the adjacent shadowed recess (approximately RGB 90,78,60), with NO white, cream, luminous or specular trace remaining on this L-shaped edge. This is specifically the hairline, not the broad beige face above or the whole dark band. It should be barely distinguishable from the shadow above it, still distinguishable from the black slot below. Preserve the two-section right-angle molded geometry, internal crease and every other pixel/feature as faithfully as possible. Do not alter lever, slot, LED, cabinet, broad upper face, overall lighting, framing, resolution or proportions. No red markup. The user has twice rejected insufficient darkening: remove the pale highlight fully this time.

@@ -1,4 +1,5 @@
 $ErrorActionPreference='Stop'
+if ((Get-Content (Join-Path $PSScriptRoot '../assets/front/drives/placement.json') -Raw | ConvertFrom-Json).geometry_revision -ge 2) { throw 'Use apply-closed-drive-master.ps1 to retain current geometry and disk-only layers.' }
 Add-Type -AssemblyName System.Drawing
 $root=Split-Path -Parent $PSScriptRoot
 $out=Join-Path $root 'assets/front/drives'

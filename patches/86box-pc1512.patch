@@ -970,7 +970,7 @@ index 669a347..68fcdaa 100644
  
  /* Set the "drive type" switches for the IBM Xebec controller. */
 diff --git a/src/floppy/fdd_audio.c b/src/floppy/fdd_audio.c
-index 5d919b2..ca76225 100644
+index 5d919b2..bfbd1f7 100644
 --- a/src/floppy/fdd_audio.c
 +++ b/src/floppy/fdd_audio.c
 @@ -32,6 +32,7 @@
@@ -981,7 +981,7 @@ index 5d919b2..ca76225 100644
  
  #ifndef DISABLE_FDD_AUDIO
  
-@@ -666,11 +667,139 @@ fdd_audio_get_seek_time(void *priv, int track_count, int is_seek_down)
+@@ -666,11 +667,156 @@ fdd_audio_get_seek_time(void *priv, int track_count, int is_seek_down)
      return 0;
  }
  
@@ -1111,6 +1111,23 @@ index 5d919b2..ca76225 100644
 +    }
 +}
 +
++/* Audio thread, while emulation is paused: true if an insert/eject sound is
++   requested or playing. */
++int
++fdd_audio_media_active(void)
++{
++    return media_active();
++}
++
++/* Audio thread, while emulation is paused: fills the buffer with only the
++   insert/eject sounds. */
++void
++fdd_audio_media_callback(int16_t *buffer, int length)
++{
++    memset(buffer, 0, length * sizeof(int16_t));
++    media_mix(buffer, length / 2);
++}
++
  void
  fdd_audio_init(void)
  {
@@ -1121,7 +1138,7 @@ index 5d919b2..ca76225 100644
      /* Load audio profiles configuration */
      fdd_audio_load_profiles();
  
-@@ -716,6 +845,14 @@ fdd_audio_close(void)
+@@ -716,6 +862,14 @@ fdd_audio_close(void)
  {
      fdd_log("FDD Audio: Shutting down audio system\n");
  
@@ -1136,7 +1153,7 @@ index 5d919b2..ca76225 100644
      /* Free loaded profile samples */
      for (int profile_id = 0; profile_id < audio_profile_count; profile_id++) {
          drive_audio_samples_t *samples = &profile_samples[profile_id];
-@@ -987,8 +1124,12 @@ fdd_audio_callback(int16_t *buffer, const int length)
+@@ -987,8 +1141,12 @@ fdd_audio_callback(int16_t *buffer, const int length)
              break;
      }
  
@@ -1150,7 +1167,7 @@ index 5d919b2..ca76225 100644
  
      float   *float_buffer      = (float *) buffer;
      int16_t *int16_buffer      = (int16_t *) buffer;
-@@ -1221,6 +1362,9 @@ fdd_audio_callback(int16_t *buffer, const int length)
+@@ -1221,6 +1379,9 @@ fdd_audio_callback(int16_t *buffer, const int length)
              }
          }
      }
@@ -1160,7 +1177,7 @@ index 5d919b2..ca76225 100644
  }
  #else
  
-@@ -1281,5 +1425,19 @@ fdd_audio_callback(int16_t *buffer, int length)
+@@ -1281,5 +1442,29 @@ fdd_audio_callback(int16_t *buffer, int length)
  {
      memset(buffer, 0, length * sizeof(int16_t));
  }
@@ -1177,6 +1194,16 @@ index 5d919b2..ca76225 100644
 +fdd_audio_media_ejecting(int drive)
 +{
 +    return 0;
++}
++int
++fdd_audio_media_active(void)
++{
++    return 0;
++}
++void
++fdd_audio_media_callback(int16_t *buffer, int length)
++{
++    memset(buffer, 0, length * sizeof(int16_t));
 +}
  
  #endif /* DISABLE_FDD_AUDIO */
@@ -1388,10 +1415,10 @@ index 82aebee..86c62f3 100644
 -#endif /*PCE_IBMPC_CASSETTE_H*/
 +#endif /*EMU_CASSETTE_H*/
 diff --git a/src/include/86box/fdd_audio.h b/src/include/86box/fdd_audio.h
-index 4f480da..98f45a0 100644
+index 4f480da..0292f70 100644
 --- a/src/include/86box/fdd_audio.h
 +++ b/src/include/86box/fdd_audio.h
-@@ -134,6 +134,13 @@ extern void fdd_audio_play_multi_track_seek(void *priv, int from_track, int to_t
+@@ -134,6 +134,16 @@ extern void fdd_audio_play_multi_track_seek(void *priv, int from_track, int to_t
  /* Audio callback function */
  extern void fdd_audio_callback(int16_t *buffer, int length);
  
@@ -1401,6 +1428,9 @@ index 4f480da..98f45a0 100644
 +extern int fdd_audio_media_inserting(int drive);
 +/* True until a requested eject sound is a quarter through. */
 +extern int fdd_audio_media_ejecting(int drive);
++/* For the audio thread while emulation is paused: only the media sounds. */
++extern int  fdd_audio_media_active(void);
++extern void fdd_audio_media_callback(int16_t *buffer, int length);
 +
  #ifdef __cplusplus
  }
@@ -2069,7 +2099,7 @@ index f694a38..1376fcb 100644
          main_window->showMaximized();
      } else {
 diff --git a/src/qt/qt_mainwindow.cpp b/src/qt/qt_mainwindow.cpp
-index 8b91429..0dffe7b 100644
+index 8b91429..3d50f02 100644
 --- a/src/qt/qt_mainwindow.cpp
 +++ b/src/qt/qt_mainwindow.cpp
 @@ -33,6 +33,8 @@
@@ -2367,7 +2397,7 @@ index 8b91429..0dffe7b 100644
      if (acpi_enabled) {
          acpi_pwrbut_press();
          return;
-@@ -2950,3 +3090,394 @@ MainWindow::on_actionCGA_composite_settings_triggered()
+@@ -2950,3 +3090,401 @@ MainWindow::on_actionCGA_composite_settings_triggered()
      isNonPause = false;
      config_save();
  }
@@ -2465,7 +2495,6 @@ index 8b91429..0dffe7b 100644
 +    /* Pictures are crops of the cabinet as each option would look, in master pixels. */
 +    const qreal  ratio = devicePixelRatioF();
 +    const QSize  box(amstrad::MenuCard::PictureBox, 103);
-+    const QRectF lowerFront(150, 990, 956, 256); /* both bays and the model badge */
 +    auto bayCrop = [](int bay) { return amstrad::masterBay(bay).adjusted(-6, -6, 6, -30); };
 +    auto picture = [&](const amstrad::Front &f, const QRectF &rect, int leftFace = -1, int rightFace = -1) {
 +        return amstrad::menuPicture(sw->frontPreview(f, rect, leftFace, rightFace), box, ratio);
@@ -2540,23 +2569,31 @@ index 8b91429..0dffe7b 100644
 +            { amstrad::BayHdd, QT_TR_NOOP("HD20"), QT_TR_NOOP("20 MB hard disk C: and one floppy drive, A:.") },
 +        };
 +        amstrad::addCaption(target, tr("Machine configuration"),
-+                            tr("Choose the computer and its drive layout. Hardware changes restart the PC."));
++                            tr("Choose the computer and its drive layout. Hardware changes restart the PC."), 12);
++        /* A column per machine, a row per fit: each shows the whole unit. */
++        auto *grid = amstrad::addGrid(target, true);
++        grid->setHorizontalSpacing(24);
++        grid->setVerticalSpacing(0);
++        int column = 0;
 +        for (const bool pc1640 : { false, true }) {
 +            if (pc1640 && !amstrad::pc1640Enabled())
 +                continue;
-+            amstrad::addCaption(target, pc1640 ? tr("PC1640 Â· 640K memory, EGA graphics")
-+                                               : tr("PC1512 Â· 512K memory, CGA graphics"));
-+            auto *grid = amstrad::addGrid(target);
++            grid->addWidget(new amstrad::MenuCaption(pc1640 ? "PC1640" : "PC1512",
++                                pc1640 ? tr("640K memory, EGA graphics") : tr("512K memory, CGA graphics"),
++                                true, amstrad::ConfigChoice::Width, 12), 0, column);
++            int row = 1;
 +            for (const Choice &c : choices) {
 +                amstrad::Front preview = front;
 +                preview.pc1640         = pc1640;
 +                preview.left           = c.bay;
 +                const int bay          = c.bay;
-+                amstrad::addTile(grid, picture(preview, lowerFront),
-+                                 QString(pc1640 ? "PC1640 " : "PC1512 ") + tr(c.suffix), tr(c.text),
-+                                 front.pc1640 == pc1640 && front.left == c.bay,
-+                                 [this, pc1640, bay] { setAmstradModel(pc1640, bay); }, amstrad::LeftBayCount);
++                grid->addWidget(new amstrad::ConfigChoice(
++                    amstrad::unitPicture(sw->frontPreview(preview, amstrad::ConfigChoice::masterCrop()), ratio),
++                    QString(pc1640 ? "PC1640 " : "PC1512 ") + tr(c.suffix), tr(c.text),
++                    front.pc1640 == pc1640 && front.left == c.bay,
++                    [this, pc1640, bay] { setAmstradModel(pc1640, bay); }), row++, column);
 +            }
++            ++column;
 +        }
 +    };
 +
@@ -2803,10 +2840,19 @@ index e085af5..48b05c9 100644
  
  #endif // QT_MAINWINDOW_HPP
 diff --git a/src/qt/qt_mediamenu.cpp b/src/qt/qt_mediamenu.cpp
-index 26d8e9f..d8c6e06 100644
+index 26d8e9f..7e95f46 100644
 --- a/src/qt/qt_mediamenu.cpp
 +++ b/src/qt/qt_mediamenu.cpp
-@@ -54,6 +54,7 @@ extern "C" {
+@@ -27,6 +27,8 @@
+ #include <QApplication>
+ #include <QStyle>
+ #include <QDirIterator>
++#include <QFileInfo>
++#include <QSettings>
+ #include <QTextStream>
+ 
+ extern "C" {
+@@ -54,6 +56,7 @@ extern "C" {
  #include <86box/cartridge.h>
  #include <86box/fdd.h>
  #include <86box/fdd_86f.h>
@@ -2814,7 +2860,39 @@ index 26d8e9f..d8c6e06 100644
  #include <86box/cdrom.h>
  #include <86box/scsi_device.h>
  #include <86box/rdisk.h>
-@@ -640,6 +641,7 @@ MediaMenu::floppyMount(int i, const QString &filename, bool wp)
+@@ -443,8 +446,10 @@ MediaMenu::cassetteSelectImage(bool wp)
+                                                  getMediaOpenDirectory(),
+                                                  tr("Cassette images") % util::DlgFilter({ "pcm", "raw", "wav", "cas" }) % tr("All files") % util::DlgFilter({ "*" }, true));
+ 
+-    if (!filename.isEmpty())
++    if (!filename.isEmpty()) {
++        rememberMediaOpenDirectory(filename);
+         cassetteMount(filename, wp);
++    }
+ }
+ 
+ void
+@@ -555,6 +560,7 @@ MediaMenu::cartridgeSelectImage(int i)
+     if (filename.isEmpty()) {
+         return;
+     }
++    rememberMediaOpenDirectory(filename);
+     cartridgeMount(i, filename);
+ }
+ 
+@@ -630,8 +636,10 @@ MediaMenu::floppySelectImage(int i, bool wp)
+         tr("All files") %
+         util::DlgFilter({ "*" }, true));
+ 
+-    if (!filename.isEmpty())
++    if (!filename.isEmpty()) {
++        rememberMediaOpenDirectory(filename);
+         floppyMount(i, filename, wp);
++    }
+ }
+ 
+ void
+@@ -640,6 +648,7 @@ MediaMenu::floppyMount(int i, const QString &filename, bool wp)
      fdd_drive_t *drv = &drives[i];
  
      auto previous_image = QFileInfo(drv->image_path);
@@ -2822,7 +2900,7 @@ index 26d8e9f..d8c6e06 100644
      fdd_close(&drives[i]);
      drv->read_only = wp ? 1 : 0;
      if (!filename.isEmpty()) {
-@@ -654,6 +656,7 @@ MediaMenu::floppyMount(int i, const QString &filename, bool wp)
+@@ -654,6 +663,7 @@ MediaMenu::floppyMount(int i, const QString &filename, bool wp)
          mhm.addImageToHistory(i, ui::MediaType::Floppy, previous_image.filePath(), QString(filenameBytes));
      } else
          mhm.addImageToHistory(i, ui::MediaType::Floppy, previous_image.filePath(), filename);
@@ -2830,7 +2908,7 @@ index 26d8e9f..d8c6e06 100644
      ui_sb_update_icon_state(SB_FLOPPY | i, drv->empty);
      ui_sb_update_icon_wp(SB_FLOPPY | i, drv->writeprot);
      floppyUpdateMenu(i);
-@@ -667,6 +670,7 @@ MediaMenu::floppyEject(int i)
+@@ -667,6 +677,7 @@ MediaMenu::floppyEject(int i)
      fdd_drive_t *drv = &drives[i];
  
      mhm.addImageToHistory(i, ui::MediaType::Floppy, drv->image_path, QString());
@@ -2838,8 +2916,88 @@ index 26d8e9f..d8c6e06 100644
      fdd_close(&drives[i]);
      ui_sb_update_icon_state(SB_FLOPPY | i, 1);
      floppyUpdateMenu(i);
+@@ -797,6 +808,8 @@ MediaMenu::cdromMount(int i, int dir, const QString &arg)
+     if (filename.isEmpty())
+         return;
+ 
++    if (dir <= 1)
++        rememberMediaOpenDirectory(filename, dir == 1);
+     cdromMount(i, filename);
+ }
+ 
+@@ -1405,8 +1418,10 @@ MediaMenu::moSelectImage(int i, bool wp)
+                                                                                                 },
+                                                                                                 true));
+ 
+-    if (!filename.isEmpty())
++    if (!filename.isEmpty()) {
++        rememberMediaOpenDirectory(filename);
+         moMount(i, filename, wp);
++    }
+ }
+ 
+ void
+@@ -1514,8 +1529,10 @@ MediaMenu::tapeSelectImage(int i, bool wp)
+         getMediaOpenDirectory(),
+         tr("Tape images") % util::DlgFilter({ "tap" }) % tr("All files") % util::DlgFilter({ "*" }, true));
+ 
+-    if (!filename.isEmpty())
++    if (!filename.isEmpty()) {
++        rememberMediaOpenDirectory(filename);
+         tapeMount(i, filename, wp);
++    }
+ }
+ 
+ void
+@@ -1989,8 +2006,18 @@ MediaMenu::usbPortSelectImage(const QString &label, bool wp)
+                                                     tr("Flash drive images") % util::DlgFilter({ "img", "ima", "bin", "raw" }) %
+                                                     tr("All files") % util::DlgFilter({ "*" }, true));
+ 
+-    if (!fn.isEmpty())
++    if (!fn.isEmpty()) {
++        rememberMediaOpenDirectory(fn);
+         usbPortPlug(label, fn, wp);
++    }
++}
++
++/* The folder an image was last picked from is kept in amstrad.ini, so the
++   next file dialog starts there, also after the emulator is restarted. */
++static QString
++mediaOpenDirectorySettings()
++{
++    return QDir(QString::fromUtf8(usr_path)).filePath("amstrad.ini");
+ }
+ 
+ QString
+@@ -2002,11 +2029,26 @@ MediaMenu::getMediaOpenDirectory()
+     if (open_dir_usr_path > 0 && firstCall) {
+         openDirectory = QString::fromUtf8(usr_path);
+         firstCall     = false;
++    } else if (open_dir_usr_path <= 0) {
++        const QString saved = QSettings(mediaOpenDirectorySettings(), QSettings::IniFormat)
++                                  .value("media/open_dir").toString();
++        if (!saved.isEmpty() && QDir(saved).exists())
++            openDirectory = saved;
+     }
+ 
+     return openDirectory;
+ }
+ 
++void
++MediaMenu::rememberMediaOpenDirectory(const QString &filename, bool isDirectory)
++{
++    const QString directory = isDirectory ? QDir(filename).absolutePath()
++                                          : QFileInfo(filename).absolutePath();
++
++    if (!directory.isEmpty())
++        QSettings(mediaOpenDirectorySettings(), QSettings::IniFormat).setValue("media/open_dir", directory);
++}
++
+ // callbacks from 86box C code
+ extern "C" {
+ void
 diff --git a/src/qt/qt_mediamenu.hpp b/src/qt/qt_mediamenu.hpp
-index e1228f7..16eeaac 100644
+index e1228f7..e8b0173 100644
 --- a/src/qt/qt_mediamenu.hpp
 +++ b/src/qt/qt_mediamenu.hpp
 @@ -41,6 +41,23 @@ public:
@@ -2866,6 +3024,14 @@ index e1228f7..16eeaac 100644
  
      void cdromMute(int i);
      void cdromMount(int i, int dir, const QString &arg);
+@@ -115,6 +132,7 @@ private:
+     QAction           *usbPortsBefore = nullptr; /* the port submenus go before it */
+ 
+     QString                 getMediaOpenDirectory();
++    void                    rememberMediaOpenDirectory(const QString &filename, bool isDirectory = false);
+     ui::MediaHistoryManager mhm;
+ 
+     const QByteArray driveLetters = QByteArrayLiteral("ABCDEFGHIJKLMNOPQRSTUVWXYZ      ");
 diff --git a/src/qt/qt_rendererstack.cpp b/src/qt/qt_rendererstack.cpp
 index 7d89002..8748167 100644
 --- a/src/qt/qt_rendererstack.cpp
@@ -3077,7 +3243,7 @@ index 4703b31..3cf8300 100644
      QBoxLayout *boxLayout = nullptr;
  
 diff --git a/src/qt/qt_softwarerenderer.cpp b/src/qt/qt_softwarerenderer.cpp
-index 5fd1599..bb99894 100644
+index 5fd1599..613532e 100644
 --- a/src/qt/qt_softwarerenderer.cpp
 +++ b/src/qt/qt_softwarerenderer.cpp
 @@ -17,12 +17,20 @@
@@ -3190,7 +3356,7 @@ index 5fd1599..bb99894 100644
      images[0] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
      images[1] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
  
-@@ -47,6 +130,13 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
+@@ -47,6 +130,24 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
      buf_usage[0].clear();
      buf_usage[1].clear();
      this->setMouseTracking(true);
@@ -3201,10 +3367,21 @@ index 5fd1599..bb99894 100644
 +        power_led = !(runctl_pause_reasons() & RUN_PAUSE_POWER);
 +        power_peek->changed(power_led.load());
 +    }
++    /* Switched off, no frames arrive to redraw the front, yet disks can still
++       be swapped: follow the drive faces (and the insert/eject sounds that
++       time them) from here instead. */
++    if (!cabinet.isNull() && drive_faces_valid) {
++        auto *faces = new QTimer(this);
++        connect(faces, &QTimer::timeout, this, [this] {
++            if (!power_led.load() && unpoweredState() != unpowered_shown)
++                update();
++        });
++        faces->start(40);
++    }
      /* Every paint covers the whole update region, so skip Qt's background erase. */
      this->setAttribute(Qt::WA_OpaquePaintEvent);
  
-@@ -88,10 +178,28 @@ SoftwareRenderer::Worker::stop()
+@@ -88,10 +189,28 @@ SoftwareRenderer::Worker::stop()
      thread.reset();
  }
  
@@ -3234,7 +3411,7 @@ index 5fd1599..bb99894 100644
      qt_osd_shutdown();
  }
  
-@@ -131,11 +239,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
+@@ -131,11 +250,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
  void
  SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
  {
@@ -3249,7 +3426,7 @@ index 5fd1599..bb99894 100644
  
      /* Only repaint the rows that changed since the last frame, which the other
         buffer still holds until it is released below. Every frame is blitted
-@@ -171,7 +282,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
+@@ -171,7 +293,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
          bottom      = std::min(bottom + 1, h);
          int dtop    = dest.y() + ((top * dest.height()) / h) - 1;
          int dbottom = dest.y() + (((bottom * dest.height()) + h - 1) / h) + 1;
@@ -3263,7 +3440,7 @@ index 5fd1599..bb99894 100644
      }
  
      if (monitors[r_monitor_index].mon_screenshots || monitors[r_monitor_index].mon_screenshots_clipboard || monitors[r_monitor_index].mon_screenshots_raw_clipboard)
-@@ -192,8 +308,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
+@@ -192,8 +319,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
      const bool relayout = (l.gen != w_layout_gen);
      w_layout_gen        = l.gen;
  
@@ -3284,7 +3461,7 @@ index 5fd1599..bb99894 100644
      presentBuffer(back, painted);
  
      const QRect r     = painted.boundingRect();
-@@ -212,11 +338,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -212,11 +349,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
          img      = QImage(l.size, QImage::Format_RGB32);
          relayout = true;
      }
@@ -3307,7 +3484,7 @@ index 5fd1599..bb99894 100644
          painted               = (changed | stale[back]) & all;
      }
  
-@@ -225,9 +361,27 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -225,9 +372,27 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
      if (!painted.isEmpty()) {
          QPainter painter(&img);
          painter.setClipRegion(painted);
@@ -3338,7 +3515,7 @@ index 5fd1599..bb99894 100644
              painter.setRenderHint(QPainter::SmoothPixmapTransform, video_filter_method > 0);
              /* The frame's alpha bytes are not set; adding it onto black ignores them
                 and leaves the result opaque, so the GUI thread can copy it as is. */
-@@ -248,6 +402,152 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
+@@ -248,6 +413,152 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
      stale[back ^ 1] |= painted;
  }
  
@@ -3491,7 +3668,7 @@ index 5fd1599..bb99894 100644
  SoftwareRenderer::Layout
  SoftwareRenderer::currentLayout()
  {
-@@ -335,6 +635,8 @@ SoftwareRenderer::publishLayout()
+@@ -335,6 +646,8 @@ SoftwareRenderer::publishLayout()
      std::scoped_lock lk(layout_mutex);
      layout.dest  = destination;
      layout.size  = QSize(qRound(width() * pixelRatio), qRound(height() * pixelRatio));
@@ -3500,7 +3677,7 @@ index 5fd1599..bb99894 100644
      layout.ratio = pixelRatio;
      layout.gen++;
  }
-@@ -343,12 +645,29 @@ void
+@@ -343,12 +656,29 @@ void
  SoftwareRenderer::resizeEvent(QResizeEvent *event)
  {
      layoutPicture();
@@ -3530,7 +3707,7 @@ index 5fd1599..bb99894 100644
      bool res = false;
      if (!eventDelegate(event, res))
          return QWidget::event(event);
-@@ -362,12 +681,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -362,12 +692,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
      const int  shown = frontBuffer();
      /* Repaint when the OSD is up, or once more right after it closes so a
       * lingering overlay is cleared even while the machine is paused. */
@@ -3549,7 +3726,7 @@ index 5fd1599..bb99894 100644
  
      if (osd) {
          painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-@@ -385,6 +707,31 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -385,6 +718,48 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
          QTimer::singleShot(16, this, [this] { update(); });
  }
  
@@ -3567,22 +3744,39 @@ index 5fd1599..bb99894 100644
 +{
 +    const auto scene = amstrad::sceneLayout(size());
 +    const auto front = machineFront();
-+    auto face = [](int drive) {
-+        return drives[drive].image_path[0] ? amstrad::diskColour(QString::fromUtf8(drives[drive].image_path)) : amstrad::DriveOpen;
-+    };
++    unpowered_shown  = unpoweredState();
 +    const QImage art = fittings_valid ? amstrad::composeCabinet(cabinet, fittings, front) : cabinet;
 +    painter.fillRect(rect(), amstrad::backgroundColor());
 +    amstrad::paintCabinet(painter, art, scene);
 +    amstrad::paintPanel(painter, art, leds_valid ? &leds : nullptr,
 +                        drive_faces_valid ? &drive_faces : nullptr, fittings_valid ? &fittings : nullptr,
-+                        front, scene, amstrad::panelState(0, face(0), face(front.rightDrive())));
++                        front, scene, unpowered_shown);
++}
++
++/* GUI thread: the front-panel state of a machine that is switched off. LEDs
++   are dark; the drive faces follow the insert/eject sounds as in ledState(). */
++unsigned
++SoftwareRenderer::unpoweredState()
++{
++    auto face = [this](int i) {
++        amstrad::DriveFace &shown = unpowered_face[i];
++        if ((shown != amstrad::DriveOpen) && fdd_audio_media_ejecting(i))
++            return shown; /* the latch has not moved yet */
++        if (!drives[i].image_path[0] || fdd_audio_media_inserting(i))
++            shown = amstrad::DriveOpen;
++        else
++            shown = amstrad::diskColour(QString::fromUtf8(drives[i].image_path));
++        return shown;
++    };
++    /* As machineFront(): with a drive B: fitted it is the right bay, else A: is. */
++    return amstrad::panelState(0, face(0), face(fdd_get_type(&drives[1]) != 0 ? 1 : 0));
 +}
 +
  bool
  SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
  {
 diff --git a/src/qt/qt_softwarerenderer.hpp b/src/qt/qt_softwarerenderer.hpp
-index 265bb45..64b047c 100644
+index 265bb45..83a268d 100644
 --- a/src/qt/qt_softwarerenderer.hpp
 +++ b/src/qt/qt_softwarerenderer.hpp
 @@ -7,14 +7,18 @@
@@ -3612,7 +3806,7 @@ index 265bb45..64b047c 100644
      void finalize() override final;
  
      void paintEvent(QPaintEvent *event) override;
-@@ -59,6 +64,65 @@ protected:
+@@ -59,6 +64,69 @@ protected:
      QScopedPointer<QBackingStore> m_backingStore;
  
  private:
@@ -3670,6 +3864,10 @@ index 265bb45..64b047c 100644
 +    bool power_edge_press = false;
 +    std::atomic<bool> awaiting_power_frame{false};
 +    void paintUnpowered(QPainter &painter);
++    // Front-panel state while switched off, and what was last painted. GUI thread.
++    unsigned unpoweredState();
++    unsigned unpowered_shown = ~0u;
++    amstrad::DriveFace unpowered_face[2] = {amstrad::DriveOpen, amstrad::DriveOpen};
 +    // Surface lifetime stays on the GUI thread; filter GL objects stay on worker.
 +    std::unique_ptr<QOffscreenSurface> crt_surface;
 +    std::unique_ptr<IBMulatorCRT> crt_filter;
@@ -3678,7 +3876,7 @@ index 265bb45..64b047c 100644
      /* A thread with an event loop and an object living on it, to deliver work to.
         Stopping it waits for the work in progress to finish. */
      class Worker {
-@@ -84,6 +148,9 @@ private:
+@@ -84,6 +152,9 @@ private:
          QSize size;
          qreal ratio = 1.0;
          int   gen   = 0;
@@ -3688,7 +3886,7 @@ index 265bb45..64b047c 100644
      };
  
      /* Worker thread: scale the current frame into the back buffer, where dirty
-@@ -102,6 +169,7 @@ private:
+@@ -102,6 +173,7 @@ private:
      int   cur_image = -1;
      QRect wsource { 0, 0, 0, 0 };
      int   w_layout_gen = -1;
@@ -3728,11 +3926,40 @@ index a2af112..730f65c 100644
          <file>qt/icons/bdrom.ico</file>
          <file>qt/icons/bdrom_unmute.ico</file>
          <file>qt/icons/bdrom_image.ico</file>
+diff --git a/src/sound/sound.c b/src/sound/sound.c
+index c12a7d1..4b86579 100644
+--- a/src/sound/sound.c
++++ b/src/sound/sound.c
+@@ -1303,7 +1303,11 @@ sound_fdd_thread(UNUSED(void *param))
+     uint64_t frames_rendered = 0;
+ 
+     while (fddaudioon) {
+-        if (dopause) {
++        /* Disks can be swapped while the machine is paused or switched off:
++           the insert/eject sounds (and the front's latch, which follows
++           them) keep running then; motor and seek sounds do not. */
++        const int paused = dopause;
++        if (paused && !fdd_audio_media_active()) {
+             thread_wait_event(sound_fdd_event, 50);
+             thread_reset_event(sound_fdd_event);
+             start_time      = plat_get_ticks();
+@@ -1313,7 +1317,10 @@ sound_fdd_thread(UNUSED(void *param))
+ 
+         static float fdd_float_buffer[SOUNDBUFLEN * 2];
+         memset(fdd_float_buffer, 0, sizeof(fdd_float_buffer));
+-        fdd_audio_callback((int16_t *) fdd_float_buffer, SOUNDBUFLEN * 2);
++        if (paused)
++            fdd_audio_media_callback((int16_t *) fdd_float_buffer, SOUNDBUFLEN * 2);
++        else
++            fdd_audio_callback((int16_t *) fdd_float_buffer, SOUNDBUFLEN * 2);
+         givealbuffer_fdd(fdd_float_buffer, SOUNDBUFLEN * 2);
+ 
+         frames_rendered += SOUNDBUFLEN;
 diff --git a/src/qt/qt_amstradmenu.hpp b/src/qt/qt_amstradmenu.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradmenu.hpp
-@@ -0,0 +1,196 @@
+@@ -0,0 +1,282 @@
 +// Graphical cabinet controls. GPL-2.0-or-later, like 86Box.
 +#ifndef QT_AMSTRADMENU_HPP
 +#define QT_AMSTRADMENU_HPP
@@ -3867,25 +4094,101 @@ new file mode 100644
 +            int r,c,rs,cs; g->getItemPosition(g->indexOf(this),&r,&c,&rs,&cs);
 +            r += e->key()==Qt::Key_Down ? 1 : e->key()==Qt::Key_Up ? -1 : 0;
 +            c += e->key()==Qt::Key_Right ? 1 : e->key()==Qt::Key_Left ? -1 : 0;
-+            if (auto *item = g->itemAtPosition(r,c); item && item->widget()->isEnabled()) item->widget()->setFocus();
++            if (auto *item = g->itemAtPosition(r,c); item && item->widget()->isEnabled() &&
++                item->widget()->focusPolicy() != Qt::NoFocus) item->widget()->setFocus();
 +            e->accept();
 +        } else QAbstractButton::keyPressEvent(e);
 +    }
-+private:
++protected:
 +    QPixmap picture;
 +    QString title,body;
 +    bool selected;
 +    std::function<void()> callback;
 +    bool tile;
 +};
++
++// A machine configuration: the system unit itself, cut out of the cabinet
++// artwork, beside its name. Marked like the monitor selector: an underline
++// and "Fitted" for the current one, a hairline under the pointer or focus.
++class ConfigChoice : public MenuCard {
++public:
++    static constexpr int PictureWidth = 348, PictureHeight = 110, Width = 652, Height = 132;
++    // The unit's front face in master pixels, below the lid and monitor foot.
++    static QRectF masterCrop() { return QRectF(100,922,1054,332); }
++    using MenuCard::MenuCard;
++    QSize sizeHint() const override { return QSize(Width,Height); }
++protected:
++    void paintEvent(QPaintEvent *) override
++    {
++        QPainter p(this); p.setRenderHint(QPainter::Antialiasing); p.setRenderHint(QPainter::SmoothPixmapTransform);
++        const bool lit = callback && (underMouse() || hasFocus());
++        const QRect box(12,8,PictureWidth,PictureHeight);
++        if (!picture.isNull()) {
++            QSizeF sz = QSizeF(picture.size())/picture.devicePixelRatio();
++            sz.scale(box.size(), Qt::KeepAspectRatio);
++            // Hardware stays opaque and sharp; it lifts slightly when pointed at.
++            const QPointF at(box.center().x()-sz.width()/2+.5, box.bottom()+1-sz.height()-(lit && !selected ? 2 : 0));
++            p.drawPixmap(QRectF(at,sz),picture,picture.rect());
++        }
++        const int x = box.right()+24, tw = width()-x-24;
++        QFont f = font(); f.setBold(true); f.setPointSizeF(f.pointSizeF()*1.1); p.setFont(f);
++        // Centre the name and its wrapped description on the unit, at any font size.
++        const QFontMetrics bold(f), plain(font());
++        const int wrap = Qt::AlignLeft|Qt::AlignTop|Qt::TextWordWrap;
++        const int th = bold.height()+4, bh = std::min(plain.boundingRect(QRect(0,0,tw,999),wrap,body).height(), 3*plain.lineSpacing());
++        const int y = std::max(4, box.center().y()-(th+bh)/2);
++        const int mark = selected ? plain.horizontalAdvance(tr("Fitted"))+12 : 0;
++        drawPopupText(p,QRect(x,y,tw-mark,th),Qt::AlignLeft|Qt::AlignVCenter,bold.elidedText(title,Qt::ElideRight,tw-mark));
++        p.setFont(font());
++        drawPopupText(p,QRect(x,y+th,tw,bh),wrap,body,PopupTheme::secondaryText());
++        // The list is vertical, so the monitor selector's underline becomes a
++        // bar at the right-hand edge of the row (a horizontal rule would read as
++        // a divider between the stacked units).
++        const int bar = width()-9, top = box.top()+8, bottom = box.bottom()-8;
++        if (selected) {
++            p.setRenderHint(QPainter::Antialiasing,false);
++            p.fillRect(QRect(bar-1,top+1,4,bottom-top),PopupTheme::shadow());
++            p.fillRect(QRect(bar-2,top,4,bottom-top),PopupTheme::text());
++            drawPopupText(p,QRect(x,y,tw,th),Qt::AlignRight|Qt::AlignVCenter,tr("Fitted"));
++        } else if (lit) {
++            p.setRenderHint(QPainter::Antialiasing,false);
++            p.setPen(QPen(QColor("#aaaaaa"),1,hasFocus() ? Qt::DashLine : Qt::SolidLine));
++            p.drawLine(bar,top,bar,bottom);
++        }
++    }
++};
++// Scale the cropped unit for a ConfigChoice and round off the sliver of lid
++// left outside the moulded top corners.
++inline QPixmap unitPicture(const QImage &image, qreal ratio)
++{
++    if (image.isNull()) return {};
++    QImage scaled = image.scaled(QSize(ConfigChoice::PictureWidth,ConfigChoice::PictureHeight)*ratio,
++                                 Qt::KeepAspectRatio, Qt::SmoothTransformation).convertToFormat(QImage::Format_ARGB32_Premultiplied);
++    const qreal r = 14.0*scaled.width()/ConfigChoice::masterCrop().width();
++    QPainter p(&scaled); p.setRenderHint(QPainter::Antialiasing);
++    p.setCompositionMode(QPainter::CompositionMode_DestinationIn); p.setPen(Qt::NoPen); p.setBrush(Qt::black);
++    p.drawRoundedRect(QRectF(0,0,scaled.width(),scaled.height()+2*r),r,r); p.end();
++    QPixmap pixmap = QPixmap::fromImage(scaled); pixmap.setDevicePixelRatio(ratio); return pixmap;
++}
 +inline void addCard(QMenu *menu,const QPixmap &picture,const QString &title,const QString &text,
 +                    bool checked=false,std::function<void()> handler={})
 +{
 +    auto *a=new QWidgetAction(menu); a->setDefaultWidget(new MenuCard(picture,title,text,checked,std::move(handler))); menu->addAction(a);
 +}
-+inline QGridLayout *addGrid(QMenu *menu)
++// With rules, a hairline separates each column from the next (one machine
++// family per column in the configuration panel).
++inline QGridLayout *addGrid(QMenu *menu,bool rules=false)
 +{
-+    auto *w=new QWidget; auto *g=new QGridLayout(w); g->setContentsMargins(0,0,0,0); g->setSpacing(8);
++    struct Ruled : QWidget {
++        void paintEvent(QPaintEvent *) override {
++            auto *g=static_cast<QGridLayout *>(layout()); QPainter p(this); p.setPen(PopupTheme::border());
++            for (int c=1; c<g->columnCount(); ++c) {
++                const int x=(g->cellRect(0,c-1).right()+g->cellRect(0,c).left())/2;
++                p.drawLine(x,8,x,height()-8);
++            }
++        }
++    };
++    auto *w=rules ? new Ruled : new QWidget; auto *g=new QGridLayout(w); g->setContentsMargins(0,0,0,0); g->setSpacing(8);
 +    auto *a=new QWidgetAction(menu); a->setDefaultWidget(w); menu->addAction(a); return g;
 +}
 +inline MenuCard *addTile(QGridLayout *g,const QPixmap &picture,const QString &title,const QString &text,
@@ -3894,23 +4197,33 @@ new file mode 100644
 +    auto *card=new MenuCard(picture,title,text,checked,std::move(handler),true);
 +    const int i=g->count(); g->addWidget(card,i/columns,i%columns); return card;
 +}
-+inline void addCaption(QMenu *menu,const QString &title,const QString &subtitle={})
++// A heading; the subtitle goes beneath, or beside the title when inlined.
++class MenuCaption : public QWidget {
++public:
++    MenuCaption(QString title,QString subtitle={},bool inlined=false,int width=MenuCard::Width,int left=8)
++        : title(std::move(title)), subtitle(std::move(subtitle)), inlined(inlined), hint(width), left(left) {}
++    QSize sizeHint() const override
++    { return QSize(hint,QFontMetrics(font()).height()*(subtitle.isEmpty() || inlined ? 1 : 2)+20); }
++protected:
++    void paintEvent(QPaintEvent *) override {
++        QPainter p(this); QFont f=font(); f.setBold(true); p.setFont(f);
++        const int line=QFontMetrics(f).height();
++        drawPopupText(p,QRect(left,8,width()-2*left,line),Qt::AlignLeft|Qt::AlignVCenter,title);
++        if (subtitle.isEmpty()) return;
++        const int shift=inlined ? QFontMetrics(f).horizontalAdvance(title)+12 : 0;
++        p.setFont(font());
++        drawPopupText(p,QRect(left+shift,inlined ? 8 : 10+line,width()-2*left-shift,line),
++                      Qt::AlignLeft|Qt::AlignVCenter,subtitle,PopupTheme::secondaryText());
++    }
++private:
++    QString title,subtitle;
++    bool inlined;
++    int hint,left;
++};
++inline void addCaption(QMenu *menu,const QString &title,const QString &subtitle={},int left=8)
 +{
-+    struct Caption : QWidget {
-+        QString title,subtitle;
-+        QSize sizeHint() const override { return QSize(MenuCard::Width,QFontMetrics(font()).height()*(subtitle.isEmpty()?1:2)+20); }
-+        void paintEvent(QPaintEvent *) override {
-+            QPainter p(this); QFont f=font(); f.setBold(true); p.setFont(f);
-+            const int line=QFontMetrics(f).height();
-+            drawPopupText(p,QRect(8,8,width()-16,line),Qt::AlignLeft|Qt::AlignVCenter,title);
-+            if (!subtitle.isEmpty()) {
-+                p.setFont(font());
-+                drawPopupText(p,QRect(8,10+line,width()-16,line),Qt::AlignLeft|Qt::AlignVCenter,subtitle,PopupTheme::secondaryText());
-+            }
-+        }
-+    };
-+    auto *w=new Caption; w->title=title; w->subtitle=subtitle;
-+    auto *a=new QWidgetAction(menu); a->setDefaultWidget(w); a->setEnabled(false); menu->addAction(a);
++    auto *a=new QWidgetAction(menu);
++    a->setDefaultWidget(new MenuCaption(title,subtitle,false,MenuCard::Width,left)); a->setEnabled(false); menu->addAction(a);
 +}
 +// A 5.25-inch disk drawn as UI, with a readable paper label at any DPI.
 +inline QPixmap diskPicture(const QString &label,const QColor &colour,qreal ratio)

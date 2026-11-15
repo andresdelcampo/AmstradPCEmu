@@ -122,7 +122,7 @@ $sheet=[Drawing.Bitmap]::new(1050,1260);$sg=[Drawing.Graphics]::FromImage($sheet
 $index=0
 foreach($config in @(@('SD - PLAIN BLANK COVER','blank','sd','off'),@('SD - FACTORY STICKER','blank-sticker','sd','off'),@('HD20 - HDD IDLE','hdd','hd20','off'),@('HD20 - HDD ACTIVE','hdd','hd20','on'))) {
     $b=$front.Clone();$g=[Drawing.Graphics]::FromImage($b)
-    $draws=@(@(('drives/bay-left-'+$config[1]+'.png'),174,1006),@('drives/drive-b-closed-black.png',632,1006),@(('badges/model-'+$config[2]+'.png'),870,1164),@('leds/power-on.png',208,960),@('leds/drive-b-off.png',980,1015))
+    $draws=@(@(('drives/bay-left-'+$config[1]+'.png'),174,1006),@('drives/drive-closed-mechanism.png',632,1006),@('drives/drive-closed-black.png',632,1006),@(('badges/model-'+$config[2]+'.png'),870,1164),@('leds/power-on.png',208,960),@('leds/drive-b-off.png',969,1014))
     if($config[1] -eq 'hdd'){$draws+=,@(('leds/hdd-'+$config[3]+'.png'),276,1056)}
     foreach($draw in $draws){$p=[Drawing.Bitmap]::FromFile((Join-Path $assets $draw[0]));$g.DrawImageUnscaled($p,$draw[1],$draw[2]);$p.Dispose()}
     $g.Dispose();$b.Save((Join-Path $work ('front-config-'+$index+'.png')),[Drawing.Imaging.ImageFormat]::Png)

@@ -2,6 +2,7 @@
 #include "qt_amstradscene.hpp"
 #include <QCoreApplication>
 #include <QDir>
+#include <QFileInfo>
 #include <cmath>
 #include <cstdio>
 
@@ -11,6 +12,26 @@ int main(int argc, char **argv)
     if (argc != 3) return 2;
     const QImage original(argv[1]);
     if (original.size() != QSize(1254, 1254)) return 3;
+    const QString drivesDir = QFileInfo(argv[1]).absolutePath() + "/drives";
+    const auto drives = amstrad::loadDrives(drivesDir);
+    if (!drives.valid()) return 20;
+    for (int d = 0; d < 2; ++d) {
+        const QString prefix = drivesDir + "/drive-";
+        const QImage mechanism(prefix + "closed-mechanism.png");
+        const QImage disk(prefix + "closed-red.png");
+        if (mechanism.isNull() || disk.isNull() ||
+            qAlpha(disk.pixel(115, 30)) != 0 || qAlpha(disk.pixel(100, 60)) != 0) return 21;
+        // The loader must retain the shared lever for every disk colour,
+        // while disk-only files contain no repainted mechanism.
+        for (int f = amstrad::DiskBlack; f < amstrad::DriveFaceCount; ++f)
+            if (drives.face[d][f].pixel(115, 30) != mechanism.pixel(115, 30)) return 22;
+        if (drives.face[d][amstrad::DiskRed].pixel(150, 60) ==
+            drives.face[d][amstrad::DiskBlue].pixel(150, 60)) return 23;
+        for (int y = 0; y < disk.height(); ++y)
+            if (y < 57 || y > 64)
+                for (int x = 0; x < disk.width(); ++x)
+                    if (qAlpha(disk.pixel(x, y))) return 24;
+    }
     if (qAlpha(original.pixel(0, 0)) != 0 || qAlpha(original.pixel(1253, 1253)) != 0 ||
         qAlpha(original.pixel(600, 400)) != 255) return 13;
     // Keep the dark outer sides and rounded bottoms of both feet. A cutoff
