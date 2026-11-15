@@ -70,6 +70,9 @@ Third-party and derived parts keep their own terms:
 
 - `patches/86box-pc1512.patch` modifies [86Box](https://github.com/86Box/86Box)
   (GPL-2.0; see `upstream/86Box/COPYING`) and remains subject to 86Box's licensing for the files it touches.
+  The PCE-derived `cassette.c`/`cassette.h` (GPL-2.0-only, unused by any Amstrad machine) are replaced by an
+  independent no-op stub, so the compiled Amstrad build contains no GPL-2.0-only code. Remaining mix is
+  GPL-2.0-or-later (86Box), LGPL-3.0-or-later (`src/floppy/lzw`), GPL-3.0-or-later (IBMulator CRT) and permissive libraries.
 - `assets/shaders/` contains a port of IBMulator's CRT shader (GPL-3.0-or-later);
   see `assets/shaders/NOTICE-IBMulator.md`.
 - Front-panel artwork is not covered by the licence above; see
