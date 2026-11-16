@@ -74,12 +74,3 @@ public static class FrontCutout {
 }
 '@
 [FrontCutout]::Save($source, $target)
-$sha = [Security.Cryptography.SHA256]::Create()
-try { $hash = [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($target))).Replace('-', '').ToLowerInvariant() }
-finally { $sha.Dispose() }
-foreach ($relative in @('assets/front/configurations.json', 'assets/front/drives/placement.json', 'assets/front/leds/placement.json')) {
-    $path = Join-Path $root $relative
-    $text = [IO.File]::ReadAllText($path)
-    $text = [regex]::Replace($text, '("front_sha256"\s*:\s*")[a-f0-9]+(")', '${1}' + $hash + '${2}')
-    [IO.File]::WriteAllText($path, $text, [Text.UTF8Encoding]::new($false))
-}

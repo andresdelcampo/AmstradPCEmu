@@ -96,7 +96,7 @@ foreach ($item in $items) {
     $entries += [ordered]@{ id=$item.id; x=$item.x; y=$item.y; width=450; height=180; open_empty=($item.id+'-open-empty.png'); closed_black=($item.id+'-closed-black.png'); disk_color_mask=($item.id+'-disk-color-mask.png') }
 }
 $metadata = [ordered]@{
-    version=1; front='../pc1512-front.png'; front_sha256=$hashBefore
+    version=1; front='../pc1512-front.png'
     canvas=[ordered]@{width=1254; height=1254; origin='top-left'; units='pixels'}
     draw_order=@('cabinet','one drive state per drive','LED state patches')
     alpha='straight-alpha source-over; restore cabinet before selecting a different state'

@@ -52,10 +52,4 @@ $result.Save($frontPath, [Drawing.Imaging.ImageFormat]::Png)
 $result.Dispose()
 
 $hash = FileHash $frontPath
-foreach ($metadata in @('assets/front/configurations.json', 'assets/front/drives/placement.json', 'assets/front/leds/placement.json')) {
-    $path = Join-Path $root $metadata
-    $content = [IO.File]::ReadAllText($path)
-    $content = [regex]::Replace($content, '("front_sha256"\s*:\s*")[a-fA-F0-9]{64}(")', ('${1}' + $hash + '${2}'), 1)
-    [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($true))
-}
 Write-Output "Applied fascia lighting; front SHA-256: $hash"

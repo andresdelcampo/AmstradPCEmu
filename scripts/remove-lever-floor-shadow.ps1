@@ -38,15 +38,4 @@ foreach($bay in 0,458){
     }
 }
 $b.Save($frontPath,[Drawing.Imaging.ImageFormat]::Png);$b.Dispose()
-$sha=[Security.Cryptography.SHA256]::Create()
-$hash=[BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($frontPath))).Replace('-','').ToLowerInvariant();$sha.Dispose()
-# Byte-preserving rewrite of the recorded cabinet hash.
-$latin=[Text.Encoding]::GetEncoding(28591)
-foreach($rel in 'assets/front/configurations.json','assets/front/drives/placement.json','assets/front/leds/placement.json','assets/front/badges/system-models.json'){
-    $p=Join-Path $root $rel
-    if(-not (Test-Path $p)){continue}
-    $text=[IO.File]::ReadAllText($p,$latin)
-    $new=[regex]::Replace($text,'("front_sha256"\s*:\s*")[a-fA-F0-9]+(")','${1}'+$hash+'${2}')
-    if($new -ne $text){[IO.File]::WriteAllText($p,$new,$latin)}
-}
-Write-Output "Removed lever shadow under both bays; cabinet sha256 $hash"
+Write-Output 'Removed lever shadow under both bays.'

@@ -151,18 +151,9 @@ try {
     Copy-Item -LiteralPath $tempPath -Destination $frontPath -Force
     Remove-Item -LiteralPath $tempPath
 
-    $sha = [Security.Cryptography.SHA256]::Create()
-    try { $hash = [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($frontPath))).Replace('-', '').ToLowerInvariant() }
-    finally { $sha.Dispose() }
-    foreach ($relative in @('assets/front/configurations.json', 'assets/front/drives/placement.json', 'assets/front/leds/placement.json')) {
-        $path = Join-Path $root $relative
-        $json = [IO.File]::ReadAllText($path)
-        $json = [regex]::Replace($json, '("front_sha256"\s*:\s*")[a-f0-9]+(")', '${1}' + $hash + '${2}')
-        [IO.File]::WriteAllText($path, $json, [Text.UTF8Encoding]::new($false))
-    }
     & rtk proxy magick $frontPath -define icon:auto-resize=256,128,96,64,48,32,24,16 (Join-Path $root 'assets/front/pc1512-front.ico')
     if ($LASTEXITCODE -ne 0) { throw 'Could not regenerate the front icon.' }
-    Write-Output "Updated lower apron only; front SHA-256: $hash"
+    Write-Output 'Updated lower apron and front icon.'
 } finally {
     $result.Dispose()
 }

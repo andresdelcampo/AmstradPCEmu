@@ -69,7 +69,7 @@ if ($existing) {
     $manifestItems += @($existing.indicators | Where-Object { $_.id -notin $items.id })
 }
 $manifest = [ordered]@{
-    version=1; front='../pc1512-front.png'; front_sha256=$frontHash
+    version=1; front='../pc1512-front.png'
     canvas=[ordered]@{ width=1254; height=1254; origin='top-left'; units='pixels' }
     compositing='straight-alpha source-over; draw front first, then exactly one state per indicator at x,y; scale with the cabinet'
     indicators=$manifestItems

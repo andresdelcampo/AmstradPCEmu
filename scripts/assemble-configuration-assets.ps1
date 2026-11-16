@@ -102,10 +102,8 @@ foreach($type in @('cm','mm')) {
     $patch.Save((Join-Path $assets ('badges/monitor-'+$type+'.png')),[Drawing.Imaging.ImageFormat]::Png);$patch.Dispose()
 }
 $mm.Dispose()
-$sha=[Security.Cryptography.SHA256]::Create()
-$hash=[BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($frontPath))).Replace('-','').ToLowerInvariant();$sha.Dispose()
 $manifest=[ordered]@{
-    version=1;front='pc1512-front.png';front_sha256=$hash;canvas=@{width=1254;height=1254;origin='top-left'}
+    version=1;front='pc1512-front.png';canvas=@{width=1254;height=1254;origin='top-left'}
     bays=@{left=@{x=174;y=1011;width=450;height=180;hdd='drives/bay-left-hdd.png';blank='drives/bay-left-blank.png';blank_sticker='drives/bay-left-blank-sticker.png'};right=@{x=632;y=1011;width=450;height=180;blank='drives/bay-right-blank.png';blank_sticker='drives/bay-right-blank-sticker.png'}}
     badge=@{x=870;y=1164;width=216;height=76;dd='badges/model-dd.png';sd='badges/model-sd.png';hd20='badges/model-hd20.png'}
     monitor_badge=@{x=923;y=743;width=140;height=60;cm='badges/monitor-cm.png';mm='badges/monitor-mm.png'}
@@ -115,7 +113,6 @@ $manifest=[ordered]@{
 }
 $manifest|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $assets 'configurations.json') -Encoding UTF8
 $ledPath=Join-Path $assets 'leds/placement.json';$ledMeta=Get-Content -LiteralPath $ledPath -Raw|ConvertFrom-Json
-$ledMeta.front_sha256=$hash
 $ledMeta.indicators=@($ledMeta.indicators|Where-Object {$_.id -ne 'hdd'})+@(@{id='hdd';x=276;y=1061;width=48;height=40;off='hdd-off.png';on='hdd-on.png';requires='left HDD module'})
 $ledMeta|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $ledPath -Encoding UTF8
 $sheet=[Drawing.Bitmap]::new(1050,1260);$sg=[Drawing.Graphics]::FromImage($sheet);$sg.Clear([Drawing.Color]::FromArgb(28,29,32));$font=[Drawing.Font]::new('Segoe UI',14)
