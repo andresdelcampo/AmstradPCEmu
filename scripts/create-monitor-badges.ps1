@@ -8,12 +8,13 @@ $front = [Drawing.Bitmap]::FromFile($frontPath)
 $scale = 4
 
 foreach ($entry in @(
-    @{ suffix = 'MD'; file = 'monitor-md.png'; left = 75; width = 43 },
-    @{ suffix = 'CD'; file = 'monitor-cd.png'; left = 75; width = 43 },
-    @{ suffix = 'ECD'; file = 'monitor-ecd.png'; left = 73; width = 48 }
+    @{ suffix = 'CM'; file = 'monitor-cm.png'; left = 77; width = 42 },
+    @{ suffix = 'MM'; file = 'monitor-mm.png'; left = 77; width = 42 },
+    @{ suffix = 'MD'; file = 'monitor-md.png'; left = 77; width = 42 },
+    @{ suffix = 'CD'; file = 'monitor-cd.png'; left = 77; width = 42 },
+    @{ suffix = 'ECD'; file = 'monitor-ecd.png'; left = 75; width = 45 }
 )) {
-    # Draw the lettering at four times native resolution, then reduce it to
-    # match the soft photographed type on the existing PC-CM badge.
+    # Fit the current front's 21-pixel-high, narrower lettering.
     $hi = [Drawing.Bitmap]::new(140 * $scale, 60 * $scale, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
     $graphics = [Drawing.Graphics]::FromImage($hi)
     $graphics.SmoothingMode = [Drawing.Drawing2D.SmoothingMode]::AntiAlias
@@ -24,8 +25,8 @@ foreach ($entry in @(
     $bounds = $path.GetBounds()
     $transform = [Drawing.Drawing2D.Matrix]::new()
     $transform.Translate(-$bounds.X, -$bounds.Y)
-    $transform.Scale(($entry.width * $scale) / $bounds.Width, (20 * $scale) / $bounds.Height, [Drawing.Drawing2D.MatrixOrder]::Append)
-    $transform.Translate($entry.left * $scale, 18 * $scale, [Drawing.Drawing2D.MatrixOrder]::Append)
+    $transform.Scale(($entry.width * $scale) / $bounds.Width, (21 * $scale) / $bounds.Height, [Drawing.Drawing2D.MatrixOrder]::Append)
+    $transform.Translate($entry.left * $scale, 16 * $scale, [Drawing.Drawing2D.MatrixOrder]::Append)
     $path.Transform($transform)
     $graphics.FillPath([Drawing.Brushes]::White, $path)
     $transform.Dispose(); $path.Dispose(); $family.Dispose(); $graphics.Dispose()
@@ -38,21 +39,14 @@ foreach ($entry in @(
 
     $patch = [Drawing.Bitmap]::new(140, 60, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
     for ($y = 15; $y -le 41; $y++) {
-        $left = $front.GetPixel(923 + 73, 743 + $y)
-        $right = $front.GetPixel(923 + 121, 743 + $y)
-        for ($x = 74; $x -le 120; $x++) {
-            $fraction = ($x - 73) / 48.0
-            $coverage = 0
-            for ($dy = -1; $dy -le 1; $dy++) {
-                for ($dx = -1; $dx -le 1; $dx++) {
-                    $weight = (2 - [Math]::Abs($dx)) * (2 - [Math]::Abs($dy))
-                    $coverage += $weight * $mask.GetPixel($x + $dx, $y + $dy).A
-                }
-            }
-            $ink = $coverage / (16.0 * 255.0)
-            $r = [int][Math]::Round(($left.R * (1 - $fraction) + $right.R * $fraction) * (1 - $ink) + 175 * $ink)
-            $g = [int][Math]::Round(($left.G * (1 - $fraction) + $right.G * $fraction) * (1 - $ink) + 175 * $ink)
-            $b = [int][Math]::Round(($left.B * (1 - $fraction) + $right.B * $fraction) * (1 - $ink) + 184 * $ink)
+        $left = $front.GetPixel(923 + 74, 743 + $y)
+        $right = $front.GetPixel(923 + 123, 743 + $y)
+        for ($x = 75; $x -le 121; $x++) {
+            $fraction = ($x - 74) / 49.0
+            $ink = $mask.GetPixel($x, $y).A / 255.0
+            $r = [int][Math]::Round(($left.R * (1 - $fraction) + $right.R * $fraction) * (1 - $ink) + 195 * $ink)
+            $g = [int][Math]::Round(($left.G * (1 - $fraction) + $right.G * $fraction) * (1 - $ink) + 194 * $ink)
+            $b = [int][Math]::Round(($left.B * (1 - $fraction) + $right.B * $fraction) * (1 - $ink) + 199 * $ink)
             $patch.SetPixel($x, $y, [Drawing.Color]::FromArgb(255, $r, $g, $b))
         }
     }

@@ -71,5 +71,6 @@ after rebuilding the existing drive states. It refreshes HDD LED metadata.
 and HD20 idle/active. `badges/monitor-preview.png` compares CM/MM.
 `case-highlight-comparison.png` shows the final brightness correction.
 `badges/monitor-options-preview.png` compares all five monitor badges.
-Rebuild the three new monitor badges and preview with
-`scripts/create-monitor-badges.ps1`.
+After changing the front artwork, rebuild the sharper, narrower system and
+suffix badges with `scripts/refresh-front-badges.ps1` and all five monitor
+badges with `scripts/create-monitor-badges.ps1`.

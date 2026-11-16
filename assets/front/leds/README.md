@@ -10,16 +10,14 @@ cabinet (1254 x 1254). Created 2026-11-14. Red power and green floppy
 activity indicators each have an on and an off state. Each drive has its own
 patches to preserve its slightly different lens size and surrounding recess.
 
-The photographic power revision replaces **both red power states** with the
-same translucent ruby epoxy lens, retaining reflections and visible internal
-detail. OFF uses `power-off-v3.png`; the brighter ON uses `power-on-v4.png`.
-Both use the same lens mask, without the previous broad glow.
-The 2026-11-16 geometry revision makes both power lenses approximately 25%
-smaller and slightly taller than wide, shifting their centers a little left
-and down to match the supplied photograph relative to the drive face.
-Within the unchanged power patch, center is (17, 27), radii (7.2, 7.8).
-The master now includes the smaller OFF lens and the moved, smaller POWER
-lettering. Old lens and lettering footprints are restored to grey panel.
+The current power states follow the improved lens in the front master. Its
+center is (232, 986), or (24, 26) inside the unchanged 48 x 48 patch at
+(208, 960). Both states keep that lens's circular outline, dark seating
+shadow, pale lower rim and surrounding POWER lettering. `power-off-master.png`
+supplies a deep ruby interior; `power-on-master.png` supplies a restrained
+warm luminous core. The overlay affects only the lens interior, leaving the
+front master's mounting details intact. These two compact source crops are
+tracked here so the power patches can be rebuilt with `-PowerOnly`.
 Green drive and HDD patches and all runtime placement coordinates are unchanged.
 
 | Indicator | Off | On | Top-left x, y |
@@ -43,23 +41,23 @@ The drive states are independent. No screen, cabinet or badge pixels need
 to be replaced. The runtime (`src/qt/qt_amstradscene.hpp`, `paintLeds`)
 loads these patches from this folder; the coordinates are duplicated there.
 
-`placement.json` contains the coordinates, filenames, canvas dimensions and
-SHA-256 of the exact front used. Recheck alignment if the front changes.
+`placement.json` contains the coordinates, filenames and canvas dimensions.
+Recheck alignment if the front changes.
 `preview.png` shows all off above all on, with enlarged lens details.
 `power-states-preview.png` compares just the current red power states.
 
-The lenses were edited with the built-in image_gen tool using enlarged crops
-of this cabinet, then resampled and masked into the original lens geometry.
-The power patches draw the smaller lens with feathered edges over the updated
-master, preserving the repositioned POWER lettering in both electrical states.
-These are photographic-style AI edits, not newly
-sourced photographs. Later v19/v20 front corrections affect only floppy
-finger-well rails and the case bevel; LED placement is unchanged.
+The current power source crops were edited with the built-in image_gen tool
+using the improved lens from the front master, then resampled and feathered
+into its original interior geometry. These are photographic-style AI edits,
+not newly sourced photographs. Earlier power geometry is documented in
+`front-power-led-geometry-v5.md`; the current front image takes precedence.
 
-Current geometry and backplate prompt: [front-power-led-geometry-v5.md](../../../docs/front-power-led-geometry-v5.md).
-Power lens prompts: [front-power-led-v3-prompts.md](../../../docs/front-power-led-v3-prompts.md).
+Earlier geometry and backplate prompt: [front-power-led-geometry-v5.md](../../../docs/front-power-led-geometry-v5.md).
+Earlier power lens prompts: [front-power-led-v3-prompts.md](../../../docs/front-power-led-v3-prompts.md).
 Earlier and drive prompts: [front-led-prompts.md](../../../docs/front-led-prompts.md).
-Generated source images and full-front composites are preserved under
-`local/artwork/led-states/`. Rebuild the patches with
+Full-size generated source images and full-front composites are preserved under
+`local/artwork/led-states/`. Rebuild the power patches with
+`rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts/assemble-led-assets.ps1 -PowerOnly`.
+Rebuild all patches with
 `rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts/assemble-led-assets.ps1`
-from the project root; this requires those local generated source images.
+from the project root; the full rebuild requires local generated drive sources.

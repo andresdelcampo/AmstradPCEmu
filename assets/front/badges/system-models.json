@@ -4,7 +4,7 @@
   "canvas": { "width": 1254, "height": 1254, "origin": "top-left" },
   "placement": { "x": 870, "y": 1164, "width": 216, "height": 76 },
   "models": { "pc1512": "system-1512.png", "pc1640": "system-1640.png" },
-  "opaque_region": { "x": 50, "y": 24, "width": 69, "height": 28 },
+  "opaque_region": { "x": 53, "y": 23, "width": 66, "height": 26 },
   "draw_order": "After cabinet; independent of existing model-dd/model-sd/model-hd20 suffix patches.",
   "runtime_status": "Drawn when the emulated machine is pc1640; chosen with the drive layout from the model badge menu."
 }

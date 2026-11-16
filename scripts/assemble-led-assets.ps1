@@ -14,7 +14,9 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 # Coordinates are in the unchanged cabinet image. Each drive keeps its own
 # recess and rim pixels; only the generated lens is transferred between them.
 $items = @(
-    @{ id='power'; x=208; y=960; cx=17.0; cy=27.0; rx=7.2; ry=7.8; source='power'; sx=615; sy=616; sr=267 },
+    # The current front master supplies the power lens's position and outer rim.
+    # The generated states contribute only the lens interior at that position.
+    @{ id='power'; x=208; y=960; cx=24.0; cy=26.0; rx=9.5; ry=9.5; source='power' },
     @{ id='drive-a'; x=522; y=1015; cx=23.5; cy=24.5; rx=8.0; ry=8.4; source='drive'; sx=616; sy=632; sr=221 },
     @{ id='drive-b'; x=980; y=1015; cx=23.0; cy=24.5; rx=7.5; ry=8.4; source='drive'; sx=616; sy=632; sr=221 }
 )
@@ -30,27 +32,46 @@ foreach ($item in $items) {
     foreach ($state in @('off','on')) {
         if ($PowerOnly -and $item.id -ne 'power') { continue }
         $sourceName = if ($item.id -eq 'power') {
-            if ($state -eq 'on') { 'power-on-v4' } else { 'power-off-v3' }
+            if ($state -eq 'on') { 'power-on-master' } else { 'power-off-master' }
         } else { $item.source+'-'+$state }
-        $gen = [Drawing.Bitmap]::FromFile((Join-Path $work ('generated/'+$sourceName+'.png')))
+        $sourcePath = if ($item.id -eq 'power') {
+            Join-Path $out ($sourceName+'.png')
+        } else {
+            Join-Path $work ('generated/'+$sourceName+'.png')
+        }
+        $gen = [Drawing.Bitmap]::FromFile($sourcePath)
         $patch = [Drawing.Bitmap]::new(48,48,[Drawing.Imaging.PixelFormat]::Format32bppArgb)
         # Resample just the lens with the same fixed geometry for both states.
         $sample = [Drawing.Bitmap]::new(48,48,[Drawing.Imaging.PixelFormat]::Format32bppArgb)
         $g = [Drawing.Graphics]::FromImage($sample)
         $g.InterpolationMode = [Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-        $sx = $item.sx * $gen.Width / 1254.0
-        $sy = $item.sy * $gen.Height / 1254.0
-        $scaleX = $item.sr * $gen.Width / 1254.0 / $item.rx
-        $scaleY = $item.sr * $gen.Height / 1254.0 / $item.ry
+        if ($item.id -eq 'power') {
+            if ($gen.Width -ne 256 -or $gen.Height -ne 256) { throw 'Power master must be 256 x 256.' }
+            $sx = 128.0; $sy = 128.0
+            $scaleX = (300.0*256.0/700.0) / $item.rx
+            $scaleY = (300.0*256.0/700.0) / $item.ry
+        } else {
+            $sx = $item.sx * $gen.Width / 1254.0
+            $sy = $item.sy * $gen.Height / 1254.0
+            $scaleX = $item.sr * $gen.Width / 1254.0 / $item.rx
+            $scaleY = $item.sr * $gen.Height / 1254.0 / $item.ry
+        }
         $sourceRect = [Drawing.RectangleF]::new(($sx-($item.cx+0.5)*$scaleX),($sy-($item.cy+0.5)*$scaleY),(48*$scaleX),(48*$scaleY))
         $g.DrawImage($gen,[Drawing.RectangleF]::new(0,0,48,48),$sourceRect,[Drawing.GraphicsUnit]::Pixel)
         $g.Dispose()
         for ($y=0; $y -lt 48; $y++) {
             for ($x=0; $x -lt 48; $x++) {
                 $distance = [Math]::Sqrt([Math]::Pow(($x-$item.cx)/$item.rx,2)+[Math]::Pow(($y-$item.cy)/$item.ry,2))
-                $alpha = [Math]::Max(0.0,[Math]::Min(1.0,(1.30-$distance)/0.15))
+                $alpha = if ($item.id -eq 'power') {
+                    # Retain the master image's dark seating shadow and pale rim.
+                    [Math]::Max(0.0,[Math]::Min(1.0,(10.0-$distance*$item.rx)/1.5))
+                } else {
+                    [Math]::Max(0.0,[Math]::Min(1.0,(1.30-$distance)/0.15))
+                }
                 if ($alpha -le 0) { continue }
-                $blend = [Math]::Max(0.0,[Math]::Min(1.0,(1.14-$distance)/0.24))
+                $blend = if ($item.id -eq 'power') { 1.0 } else {
+                    [Math]::Max(0.0,[Math]::Min(1.0,(1.14-$distance)/0.24))
+                }
                 $old = $front.GetPixel(($item.x+$x),($item.y+$y))
                 $new = $sample.GetPixel($x,$y)
                 $r = [int][Math]::Round($old.R*(1-$blend)+$new.R*$blend)

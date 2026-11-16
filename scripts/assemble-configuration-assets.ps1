@@ -115,6 +115,8 @@ $manifest|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $assets 'c
 $ledPath=Join-Path $assets 'leds/placement.json';$ledMeta=Get-Content -LiteralPath $ledPath -Raw|ConvertFrom-Json
 $ledMeta.indicators=@($ledMeta.indicators|Where-Object {$_.id -ne 'hdd'})+@(@{id='hdd';x=276;y=1061;width=48;height=40;off='hdd-off.png';on='hdd-on.png';requires='left HDD module'})
 $ledMeta|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $ledPath -Encoding UTF8
+& (Join-Path $PSScriptRoot 'refresh-front-badges.ps1')
+& (Join-Path $PSScriptRoot 'create-monitor-badges.ps1')
 $sheet=[Drawing.Bitmap]::new(1050,1260);$sg=[Drawing.Graphics]::FromImage($sheet);$sg.Clear([Drawing.Color]::FromArgb(28,29,32));$font=[Drawing.Font]::new('Segoe UI',14)
 $index=0
 foreach($config in @(@('SD - PLAIN BLANK COVER','blank','sd','off'),@('SD - FACTORY STICKER','blank-sticker','sd','off'),@('HD20 - HDD IDLE','hdd','hd20','off'),@('HD20 - HDD ACTIVE','hdd','hd20','on'))) {
