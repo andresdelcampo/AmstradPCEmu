@@ -53,7 +53,7 @@ $m.disk_colors=$colors
 $m | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $out 'placement.json') -Encoding UTF8
 $ledPath=Join-Path $root 'assets/front/leds/placement.json'
 $leds=Get-Content $ledPath -Raw | ConvertFrom-Json
-foreach($led in $leds.indicators){if($led.id -eq 'drive-a'){$led.x=511;$led.y=1014};if($led.id -eq 'drive-b'){$led.x=969;$led.y=1014}}
+foreach($led in $leds.indicators){if($led.id -eq 'drive-a'){$led.x=511;$led.y=1019};if($led.id -eq 'drive-b'){$led.x=969;$led.y=1019}}
 $leds | ConvertTo-Json -Depth 8 | Set-Content $ledPath -Encoding UTF8
 $font=[Drawing.Font]::new('Segoe UI',12)
 $sheet=[Drawing.Bitmap]::new(460,(160*($colors.Count+1)));$sg=[Drawing.Graphics]::FromImage($sheet);$sg.Clear([Drawing.Color]::FromArgb(28,29,32));$row=0
@@ -70,9 +70,9 @@ foreach($config in $configs){
     $comp=$front.Clone();$g=[Drawing.Graphics]::FromImage($comp)
     for($bay=0;$bay -lt 2;$bay++){
         $x=174+458*$bay;$state=$config[$bay+1]
-        if($state.StartsWith('closed-')){$g.DrawImageUnscaled($closed,$x,1006)}
+        if($state.StartsWith('closed-')){$g.DrawImageUnscaled($closed,$x,1011)}
         $name=if($state -in @('blank','blank-sticker','hdd')){"bay-left-$state.png"}else{"drive-$state.png"}
-        $p=[Drawing.Bitmap]::FromFile((Join-Path $out $name));$g.DrawImageUnscaled($p,$x,1006);$p.Dispose()
+        $p=[Drawing.Bitmap]::FromFile((Join-Path $out $name));$g.DrawImageUnscaled($p,$x,1011);$p.Dispose()
     }
     $p=[Drawing.Bitmap]::FromFile((Join-Path $root ('assets/front/badges/model-'+$config[3]+'.png')));$g.DrawImageUnscaled($p,870,1164);$p.Dispose();$g.Dispose()
     $sg.DrawString($config[0],$font,[Drawing.Brushes]::White,12,($row*315+4))

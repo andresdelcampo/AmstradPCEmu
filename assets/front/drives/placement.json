@@ -19,7 +19,7 @@
                    {
                        "id":  "drive-a",
                        "x":  174,
-                       "y":  1006,
+                       "y":  1011,
                        "width":  450,
                        "height":  180,
                        "open_empty":  "drive-open-empty.png",
@@ -37,7 +37,7 @@
                    {
                        "id":  "drive-b",
                        "x":  632,
-                       "y":  1006,
+                       "y":  1011,
                        "width":  450,
                        "height":  180,
                        "open_empty":  "drive-open-empty.png",

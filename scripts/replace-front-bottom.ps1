@@ -151,23 +151,6 @@ try {
     Copy-Item -LiteralPath $tempPath -Destination $frontPath -Force
     Remove-Item -LiteralPath $tempPath
 
-    $iconPath = Join-Path $root 'assets/front/pc1512-icon-cutout.png'
-    $icon = [Drawing.Bitmap]::FromFile($iconPath)
-    $iconResult = [Drawing.Bitmap]::new(1254, 1254, [Drawing.Imaging.PixelFormat]::Format32bppArgb)
-    try {
-        Copy-Pixels $icon $iconResult
-        $iconGraphics = [Drawing.Graphics]::FromImage($iconResult)
-        try {
-            $iconGraphics.CompositingMode = [Drawing.Drawing2D.CompositingMode]::SourceCopy
-            $strip = [Drawing.Rectangle]::new(0, 1218, 1254, 36)
-            $iconGraphics.DrawImage($result, $strip, $strip, [Drawing.GraphicsUnit]::Pixel)
-        } finally { $iconGraphics.Dispose() }
-        $icon.Dispose()
-        $iconTempPath = Join-Path $root 'assets/front/pc1512-icon-bottom-new.png'
-        $iconResult.Save($iconTempPath, [Drawing.Imaging.ImageFormat]::Png)
-        Copy-Item -LiteralPath $iconTempPath -Destination $iconPath -Force
-        Remove-Item -LiteralPath $iconTempPath
-    } finally { $iconResult.Dispose() }
     $sha = [Security.Cryptography.SHA256]::Create()
     try { $hash = [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($frontPath))).Replace('-', '').ToLowerInvariant() }
     finally { $sha.Dispose() }
@@ -177,7 +160,7 @@ try {
         $json = [regex]::Replace($json, '("front_sha256"\s*:\s*")[a-f0-9]+(")', '${1}' + $hash + '${2}')
         [IO.File]::WriteAllText($path, $json, [Text.UTF8Encoding]::new($false))
     }
-    & rtk proxy magick $iconPath -define icon:auto-resize=256,128,96,64,48,32,24,16 (Join-Path $root 'assets/front/pc1512-front.ico')
+    & rtk proxy magick $frontPath -define icon:auto-resize=256,128,96,64,48,32,24,16 (Join-Path $root 'assets/front/pc1512-front.ico')
     if ($LASTEXITCODE -ne 0) { throw 'Could not regenerate the front icon.' }
     Write-Output "Updated lower apron only; front SHA-256: $hash"
 } finally {

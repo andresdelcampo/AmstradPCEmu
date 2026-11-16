@@ -1,7 +1,7 @@
-{
+﻿{
     "version":  1,
     "front":  "pc1512-front.png",
-    "front_sha256":  "26b419f4e02314566810644336fd17db87f82ef7bb2ca20f2ed92c40584e9845",
+    "front_sha256":  "70e4360f77b104b4fcfb9d643b1e566875117462efdc611400253f30c6e403e0",
     "canvas":  {
                    "origin":  "top-left",
                    "width":  1254,
@@ -13,7 +13,7 @@
                               "blank":  "drives/bay-left-blank.png",
                               "width":  450,
                               "blank_sticker":  "drives/bay-left-blank-sticker.png",
-                              "y":  1006,
+                              "y":  1011,
                               "x":  174,
                               "height":  180
                           },
@@ -21,7 +21,7 @@
                                "blank":  "drives/bay-right-blank.png",
                                "width":  450,
                                "blank_sticker":  "drives/bay-right-blank-sticker.png",
-                               "y":  1006,
+                               "y":  1011,
                                "x":  632,
                                "height":  180
                            }
@@ -47,7 +47,7 @@
                     "requires":  "left HDD module",
                     "on":  "leds/hdd-on.png",
                     "width":  48,
-                    "y":  1056,
+                    "y":  1061,
                     "off":  "leds/hdd-off.png",
                     "x":  276,
                     "height":  40

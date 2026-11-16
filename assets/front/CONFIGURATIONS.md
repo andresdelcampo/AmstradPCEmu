@@ -6,12 +6,12 @@ This asset task does not wire the new SD/HD20/MM selections into the emulator.
 
 | Component | Files | Top-left | PNG size |
 | --- | --- | --- | --- |
-| HDD, left bay | `drives/bay-left-hdd.png` | 174, 1006 | 450 x 180 |
-| Blank, plain/sticker, left | `drives/bay-left-blank.png`, `bay-left-blank-sticker.png` | 174, 1006 | 450 x 180 |
-| Blank, plain/sticker, right | `drives/bay-right-blank.png`, `bay-right-blank-sticker.png` | 632, 1006 | 450 x 180 |
+| HDD, left bay | `drives/bay-left-hdd.png` | 174, 1011 | 450 x 180 |
+| Blank, plain/sticker, left | `drives/bay-left-blank.png`, `bay-left-blank-sticker.png` | 174, 1011 | 450 x 180 |
+| Blank, plain/sticker, right | `drives/bay-right-blank.png`, `bay-right-blank-sticker.png` | 632, 1011 | 450 x 180 |
 | Model suffix DD/SD/HD20 | `badges/model-dd.png`, `model-sd.png`, `model-hd20.png` | 870, 1164 | 216 x 76 |
 | Monitor CM/MM | `badges/monitor-cm.png`, `monitor-mm.png` | 923, 743 | 140 x 60 |
-| HDD activity OFF/ON | `leds/hdd-off.png`, `hdd-on.png` | 276, 1056 | 48 x 40 |
+| HDD activity OFF/ON | `leds/hdd-off.png`, `hdd-on.png` | 276, 1061 | 48 x 40 |
 
 All files are straight-alpha RGBA. Keep transparent padding. Draw the cabinet,
 selected bay/floppy patches, selected badges, then installed devices' LEDs.

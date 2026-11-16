@@ -14,10 +14,17 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 # Coordinates are in the unchanged cabinet image. Each drive keeps its own
 # recess and rim pixels; only the generated lens is transferred between them.
 $items = @(
-    @{ id='power'; x=208; y=960; cx=24.0; cy=23.5; rx=9.6; ry=10.0; source='power'; sx=615; sy=616; sr=267 },
+    @{ id='power'; x=208; y=960; cx=17.0; cy=27.0; rx=7.2; ry=7.8; source='power'; sx=615; sy=616; sr=267 },
     @{ id='drive-a'; x=522; y=1015; cx=23.5; cy=24.5; rx=8.0; ry=8.4; source='drive'; sx=616; sy=632; sr=221 },
     @{ id='drive-b'; x=980; y=1015; cx=23.0; cy=24.5; rx=7.5; ry=8.4; source='drive'; sx=616; sy=632; sr=221 }
 )
+# Drive geometry revisions can relocate indicators independently of this script.
+$manifestPath = Join-Path $out 'placement.json'
+$existing = if (Test-Path $manifestPath) { Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json }
+foreach ($item in $items) {
+    $position = @($existing.indicators | Where-Object { $_.id -eq $item.id })
+    if ($position.Count -eq 1) { $item.x = $position[0].x; $item.y = $position[0].y }
+}
 $manifestItems = @()
 foreach ($item in $items) {
     foreach ($state in @('off','on')) {
@@ -58,9 +65,7 @@ foreach ($item in $items) {
     $manifestItems += [ordered]@{ id=$item.id; x=$item.x; y=$item.y; width=48; height=48; off=($item.id+'-off.png'); on=($item.id+'-on.png') }
 }
 # Configuration assembly also registers the HD20 LED; retain its placement.
-$manifestPath = Join-Path $out 'placement.json'
-if (Test-Path $manifestPath) {
-    $existing = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+if ($existing) {
     $manifestItems += @($existing.indicators | Where-Object { $_.id -notin $items.id })
 }
 $manifest = [ordered]@{
@@ -79,6 +84,19 @@ for ($i=0; $i -lt 2; $i++) {
     $state = @('off','on')[$i]
     $composite = $front.Clone()
     $cg = [Drawing.Graphics]::FromImage($composite)
+    # Preview the current runtime drive faces before LEDs, just as paintPanel does.
+    $driveDir = Join-Path $root 'assets/front/drives'
+    $driveManifest = Get-Content -LiteralPath (Join-Path $driveDir 'placement.json') -Raw | ConvertFrom-Json
+    foreach ($drive in $driveManifest.drives) {
+        if ($drive.closed_mechanism) {
+            $mechanism = [Drawing.Bitmap]::FromFile((Join-Path $driveDir $drive.closed_mechanism))
+            $cg.DrawImageUnscaled($mechanism,$drive.x,$drive.y)
+            $mechanism.Dispose()
+        }
+        $face = [Drawing.Bitmap]::FromFile((Join-Path $driveDir $drive.closed_black))
+        $cg.DrawImageUnscaled($face,$drive.x,$drive.y)
+        $face.Dispose()
+    }
     foreach ($item in $items) {
         $patch = [Drawing.Bitmap]::FromFile((Join-Path $out ($item.id+'-'+$state+'.png')))
         $cg.DrawImageUnscaled($patch,$item.x,$item.y)
@@ -93,7 +111,7 @@ for ($i=0; $i -lt 2; $i++) {
     foreach ($n in 0..2) {
         $item=$items[$n]
         $dest=[Drawing.Rectangle]::new((185+$n*300),($top+320),144,144)
-        $src=[Drawing.Rectangle]::new(($item.x+12),($item.y+12),24,24)
+        $src=[Drawing.Rectangle]::new([int]($item.x+$item.cx-12),[int]($item.y+$item.cy-12),24,24)
         $sg.DrawImage($composite,$dest,$src,[Drawing.GraphicsUnit]::Pixel)
     }
     $composite.Dispose()

@@ -8,7 +8,8 @@ project modifies **86Box** (https://github.com/86Box/86Box, pinned commit in
 each release). In summary:
 
 - **Cabinet user interface**: new Qt files `qt_amstradscene.hpp`, `qt_amstradmenu.hpp`,
-  `qt_amstradpopup.hpp`, `qt_amstradpower.hpp`, `qt_amstradmonitor.hpp` and changes to
+  `qt_amstradpopup.hpp`, `qt_amstradpower.hpp`, `qt_amstradmonitor.hpp`,
+  `qt_amstraddiskbox.hpp`, `qt_amstradhints.hpp` and changes to
   `qt_mainwindow`, `qt_mediamenu`, `qt_rendererstack` and `qt_softwarerenderer`
   to draw the Amstrad PC1512 front panel, drive and power controls.
 - **CRT filter**: `qt_ibmulatorcrt.hpp` and `assets/shaders/ibmulator-crt.frag`, a

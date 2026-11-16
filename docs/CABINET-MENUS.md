@@ -22,6 +22,16 @@ Write protection is the disk's own notch: a gold tab over it means protected. Cl
 
 The PC1640 row is disabled for now and appears only with `AMSTRAD_PC1640=1` ([details](PC1640.md)). When enabled, the model badge opens **Machine configuration**: a vertical list of DD, SD, SD with factory sticker and HD20 for the **PC1512** (512K, CGA), with the same list as a second column for the **PC1640** (640K, EGA). Each entry shows the system unit's front cut out of the cabinet artwork (no picture well) beside its name, and the fitted one is marked like the monitor selector, with a rounded box and a tick (`drawChoiceBox` in `qt_amstradpopup.hpp`); a hairline separates the machine columns (`ConfigChoice` in `qt_amstradmenu.hpp`; `scripts/preview-config.ps1` renders both forms to `local/config-preview/`). One choice sets both the computer and its drive layout, with a single restart confirmation; disks, drives and the hard disk image carry over, and the badge numerals follow the machine. The left bay also links to that panel. See [PC1640](PC1640.md). A disk collection box beside the computer remains an exploratory future idea.
 
+## Finding the controls
+
+Nothing on the cabinet says its parts are live. A small, muted **?** mark sits in the bottom-right corner of the scene. While the pointer rests on it, every live part is boxed like a hovered choice in the menus (thin light border, translucent lift; a soft dark edge keeps it readable on the cream casing) and tagged with its name and a few words on what it opens (**DRIVE A** / **DRIVE B** Insert or eject a disk, **MACHINE** Choose the drives fitted, **MONITOR** Colour or mono). Drive tags follow the fit: with two drives A is left and B right; with one, the right bay is **DRIVE A** and the left reads **HARD DISK** or **DRIVE BAY**. The rear power close-up comes into view too, boxed the same way and tagged "Switch on or off" above its own POWER caption. The overlay is static: nothing moves or plays unasked. It lingers 0.6 s after the pointer leaves, then fades.
+
+The mark scales with the cabinet, takes no clicks, and is hidden while the guest has the mouse. `AMSTRAD_HINTS=0` removes it; automated (`AMSTRAD_HEADLESS=1`) runs have it off unless `AMSTRAD_HINTS=1`.
+
+An earlier trial, timed highlights passing over each unused part, was dropped on 2026-11-16: several areas asking for attention at once for a second each was too much to take in.
+
+`qt_amstradhints.hpp` holds the mark (`AmstradHints`), the input-transparent overlay (`AmstradHintAreas`) and the tag geometry (`hintAreas`). `scripts/test-hints.ps1` saves the scene at rest and with the parts shown to `local/hints-test/` and checks hover, linger, fade and the captured-mouse case.
+
 ## Code
 
 All source paths below are under `upstream/86Box/src/qt/`.
@@ -30,6 +40,7 @@ All source paths below are under `upstream/86Box/src/qt/`.
 | --- | --- |
 | Hover timer, click dispatch, guest capture guard | `qt_rendererstack.cpp` / `.hpp` |
 | Part geometry in master-image pixels | `qt_amstradscene.hpp`: `hotspot()` |
+| Corner mark and the overlay naming each live part | `qt_amstradhints.hpp`: `AmstradHints`, `paintHintAreas` |
 | Menu contents and applying configuration | `qt_mainwindow.cpp`: `showAmstradMenu`, `setAmstradModel`, `setAmstradMonochrome` |
 | Shared popup theme, backdrop capture/blur, native menus and text shadows | qt_amstradpopup.hpp |
 | Popup placement/dismissal, cards, grids, disk drawing | `qt_amstradmenu.hpp` |

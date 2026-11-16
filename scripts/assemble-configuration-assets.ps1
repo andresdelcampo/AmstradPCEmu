@@ -36,7 +36,7 @@ foreach($mode in @('blank','blank-sticker','hdd')) {
             } else {
                 # Remove the original downward latch shadow using native row
                 # colours; keep the original straight border/grey fascia.
-                $l=$front.GetPixel(($ox+55),(1006+$y));$r=$front.GetPixel(($ox+155),(1006+$y))
+                $l=$front.GetPixel(($ox+55),(1011+$y));$r=$front.GetPixel(($ox+155),(1011+$y))
                 $t=[Math]::Max(0.0,[Math]::Min(1.0,($x-55)/100.0))
                 $new=[Drawing.Color]::FromArgb([int][Math]::Round($l.R*(1-$t)+$r.R*$t),[int][Math]::Round($l.G*(1-$t)+$r.G*$t),[int][Math]::Round($l.B*(1-$t)+$r.B*$t))
             }
@@ -68,14 +68,14 @@ foreach($model in @('dd','sd','hd20')) {
 # Off is sampled from the exact assembled HDD master, ensuring identical fit.
 $hddFront=$front.Clone();$g=[Drawing.Graphics]::FromImage($hddFront)
 $module=[Drawing.Bitmap]::FromFile((Join-Path $assets 'drives/bay-left-hdd.png'))
-$g.DrawImageUnscaled($module,174,1006);$g.Dispose();$module.Dispose()
+$g.DrawImageUnscaled($module,174,1011);$g.Dispose();$module.Dispose()
 $lit=Scaled 'hdd-led-on' 48 40
 foreach($state in @('off','on')) {
     $patch=[Drawing.Bitmap]::new(48,40,[Drawing.Imaging.PixelFormat]::Format32bppArgb)
     for($y=0;$y -lt 40;$y++){for($x=0;$x -lt 48;$x++){
         $a=[Math]::Max(0.0,[Math]::Min(1.0,[Math]::Min([Math]::Min(($x-11)/1.2,(36-$x)/1.2),[Math]::Min(($y-13)/1.2,(27-$y)/1.2))))
         if($a -le 0){continue}
-        $c=if($state -eq 'off'){$hddFront.GetPixel((276+$x),(1056+$y))}else{$lit.GetPixel($x,$y)}
+        $c=if($state -eq 'off'){$hddFront.GetPixel((276+$x),(1061+$y))}else{$lit.GetPixel($x,$y)}
         $patch.SetPixel($x,$y,[Drawing.Color]::FromArgb([int][Math]::Round(255*$a),$c.R,$c.G,$c.B))
     }}
     $patch.Save((Join-Path $assets ('leds/hdd-'+$state+'.png')),[Drawing.Imaging.ImageFormat]::Png);$patch.Dispose()
@@ -106,24 +106,24 @@ $sha=[Security.Cryptography.SHA256]::Create()
 $hash=[BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($frontPath))).Replace('-','').ToLowerInvariant();$sha.Dispose()
 $manifest=[ordered]@{
     version=1;front='pc1512-front.png';front_sha256=$hash;canvas=@{width=1254;height=1254;origin='top-left'}
-    bays=@{left=@{x=174;y=1006;width=450;height=180;hdd='drives/bay-left-hdd.png';blank='drives/bay-left-blank.png';blank_sticker='drives/bay-left-blank-sticker.png'};right=@{x=632;y=1006;width=450;height=180;blank='drives/bay-right-blank.png';blank_sticker='drives/bay-right-blank-sticker.png'}}
+    bays=@{left=@{x=174;y=1011;width=450;height=180;hdd='drives/bay-left-hdd.png';blank='drives/bay-left-blank.png';blank_sticker='drives/bay-left-blank-sticker.png'};right=@{x=632;y=1011;width=450;height=180;blank='drives/bay-right-blank.png';blank_sticker='drives/bay-right-blank-sticker.png'}}
     badge=@{x=870;y=1164;width=216;height=76;dd='badges/model-dd.png';sd='badges/model-sd.png';hd20='badges/model-hd20.png'}
     monitor_badge=@{x=923;y=743;width=140;height=60;cm='badges/monitor-cm.png';mm='badges/monitor-mm.png'}
-    hdd_led=@{x=276;y=1056;width=48;height=40;off='leds/hdd-off.png';on='leds/hdd-on.png';requires='left HDD module'}
+    hdd_led=@{x=276;y=1061;width=48;height=40;off='leds/hdd-off.png';on='leds/hdd-on.png';requires='left HDD module'}
     configurations=@{dd=@{left='floppy A';right='floppy B';badge='dd'};sd=@{left='blank or blank_sticker';right='floppy A';badge='sd'};hd20=@{left='hdd';right='floppy A';badge='hd20'}}
     draw_order=@('cabinet','selected bay modules or floppy state patches','model badge','power LED and activity LEDs belonging to installed devices')
 }
 $manifest|ConvertTo-Json -Depth 8|Set-Content -LiteralPath (Join-Path $assets 'configurations.json') -Encoding UTF8
 $ledPath=Join-Path $assets 'leds/placement.json';$ledMeta=Get-Content -LiteralPath $ledPath -Raw|ConvertFrom-Json
 $ledMeta.front_sha256=$hash
-$ledMeta.indicators=@($ledMeta.indicators|Where-Object {$_.id -ne 'hdd'})+@(@{id='hdd';x=276;y=1056;width=48;height=40;off='hdd-off.png';on='hdd-on.png';requires='left HDD module'})
+$ledMeta.indicators=@($ledMeta.indicators|Where-Object {$_.id -ne 'hdd'})+@(@{id='hdd';x=276;y=1061;width=48;height=40;off='hdd-off.png';on='hdd-on.png';requires='left HDD module'})
 $ledMeta|ConvertTo-Json -Depth 8|Set-Content -LiteralPath $ledPath -Encoding UTF8
 $sheet=[Drawing.Bitmap]::new(1050,1260);$sg=[Drawing.Graphics]::FromImage($sheet);$sg.Clear([Drawing.Color]::FromArgb(28,29,32));$font=[Drawing.Font]::new('Segoe UI',14)
 $index=0
 foreach($config in @(@('SD - PLAIN BLANK COVER','blank','sd','off'),@('SD - FACTORY STICKER','blank-sticker','sd','off'),@('HD20 - HDD IDLE','hdd','hd20','off'),@('HD20 - HDD ACTIVE','hdd','hd20','on'))) {
     $b=$front.Clone();$g=[Drawing.Graphics]::FromImage($b)
-    $draws=@(@(('drives/bay-left-'+$config[1]+'.png'),174,1006),@('drives/drive-closed-mechanism.png',632,1006),@('drives/drive-closed-black.png',632,1006),@(('badges/model-'+$config[2]+'.png'),870,1164),@('leds/power-on.png',208,960),@('leds/drive-b-off.png',969,1014))
-    if($config[1] -eq 'hdd'){$draws+=,@(('leds/hdd-'+$config[3]+'.png'),276,1056)}
+    $draws=@(@(('drives/bay-left-'+$config[1]+'.png'),174,1011),@('drives/drive-closed-mechanism.png',632,1011),@('drives/drive-closed-black.png',632,1011),@(('badges/model-'+$config[2]+'.png'),870,1164),@('leds/power-on.png',208,960),@('leds/drive-b-off.png',969,1019))
+    if($config[1] -eq 'hdd'){$draws+=,@(('leds/hdd-'+$config[3]+'.png'),276,1061)}
     foreach($draw in $draws){$p=[Drawing.Bitmap]::FromFile((Join-Path $assets $draw[0]));$g.DrawImageUnscaled($p,$draw[1],$draw[2]);$p.Dispose()}
     $g.Dispose();$b.Save((Join-Path $work ('front-config-'+$index+'.png')),[Drawing.Imaging.ImageFormat]::Png)
     $sg.DrawString($config[0],$font,[Drawing.Brushes]::White,12,($index*315+4))

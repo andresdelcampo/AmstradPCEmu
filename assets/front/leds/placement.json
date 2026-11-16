@@ -1,7 +1,7 @@
 ﻿{
     "version":  1,
     "front":  "../pc1512-front.png",
-    "front_sha256":  "26b419f4e02314566810644336fd17db87f82ef7bb2ca20f2ed92c40584e9845",
+    "front_sha256":  "70e4360f77b104b4fcfb9d643b1e566875117462efdc611400253f30c6e403e0",
     "canvas":  {
                    "width":  1254,
                    "height":  1254,
@@ -22,7 +22,7 @@
                        {
                            "id":  "drive-a",
                            "x":  511,
-                           "y":  1014,
+                           "y":  1019,
                            "width":  48,
                            "height":  48,
                            "off":  "drive-a-off.png",
@@ -31,7 +31,7 @@
                        {
                            "id":  "drive-b",
                            "x":  969,
-                           "y":  1014,
+                           "y":  1019,
                            "width":  48,
                            "height":  48,
                            "off":  "drive-b-off.png",
@@ -39,7 +39,7 @@
                        },
                        {
                            "id":  "hdd",
-                           "y":  1056,
+                           "y":  1061,
                            "on":  "hdd-on.png",
                            "width":  48,
                            "off":  "hdd-off.png",

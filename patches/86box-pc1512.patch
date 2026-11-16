@@ -3290,15 +3290,16 @@ index 4703b31..3cf8300 100644
      QBoxLayout *boxLayout = nullptr;
  
 diff --git a/src/qt/qt_softwarerenderer.cpp b/src/qt/qt_softwarerenderer.cpp
-index 5fd1599..f888f11 100644
+index 5fd1599..bbb3236 100644
 --- a/src/qt/qt_softwarerenderer.cpp
 +++ b/src/qt/qt_softwarerenderer.cpp
-@@ -17,12 +17,20 @@
+@@ -17,12 +17,21 @@
   *          Copyright 2021-2022 Teemu Korhonen
   */
  #include "qt_softwarerenderer.hpp"
 +#include "qt_amstradscene.hpp"
 +#include "qt_amstradpower.hpp"
++#include "qt_amstradhints.hpp"
 +#include "qt_ibmulatorcrt.hpp"
  #include <QApplication>
  #include <QPainter>
@@ -3314,9 +3315,11 @@ index 5fd1599..f888f11 100644
  #include <algorithm>
  #include <cstring>
  #include "qt_util.hpp"
-@@ -33,6 +41,21 @@ extern "C" {
+@@ -32,7 +41,23 @@ extern "C" {
+ #include <86box/86box.h>
  #include <86box/path.h>
  #include <86box/plat.h>
++#include <86box/mouse.h>
  #include <86box/video.h>
 +#include <86box/hdd.h>
 +#include <86box/timer.h>
@@ -3336,7 +3339,7 @@ index 5fd1599..f888f11 100644
  }
  
  SoftwareRenderer::SoftwareRenderer(QWidget *parent)
-@@ -40,6 +63,66 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
+@@ -40,6 +65,66 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
  {
      RendererCommon::parentWidget = parent;
  
@@ -3403,11 +3406,22 @@ index 5fd1599..f888f11 100644
      images[0] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
      images[1] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
  
-@@ -47,6 +130,24 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
+@@ -47,6 +132,35 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
      buf_usage[0].clear();
      buf_usage[1].clear();
      this->setMouseTracking(true);
 +    if (!cabinet.isNull()) {
++        /* Created first, so that it lies beneath the power close-up. */
++        hints = new AmstradHints(this);
++        hints->blocked = [] { return mouse_capture || mouse_input_mode >= 1; };
++        hints->front   = [] { return machineFront(); };
++        /* The rear power close-up is one of the controls: show it too. */
++        hints->powerArea = [this] { return power_peek ? power_peek->revealArea() : QRectF(); };
++        hints->showing = [this](bool on) {
++            if (!power_peek) return;
++            if (on) power_peek->reveal();
++            else power_peek->dismissLater();
++        };
 +        power_peek = new AmstradPowerPeek(this, QFileInfo(cabinetPath).dir().filePath("power/rear-button-atlas.png"),
 +                                         QDir(QString::fromUtf8(usr_path)).filePath("amstrad.ini"));
 +        power_peek->toggle = [this] { emit amstradPowerToggleRequested(); };
@@ -3428,7 +3442,7 @@ index 5fd1599..f888f11 100644
      /* Every paint covers the whole update region, so skip Qt's background erase. */
      this->setAttribute(Qt::WA_OpaquePaintEvent);
  
-@@ -88,10 +189,28 @@ SoftwareRenderer::Worker::stop()
+@@ -88,10 +202,28 @@ SoftwareRenderer::Worker::stop()
      thread.reset();
  }
  
@@ -3458,7 +3472,7 @@ index 5fd1599..f888f11 100644
      qt_osd_shutdown();
  }
  
-@@ -131,11 +250,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
+@@ -131,11 +263,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
  void
  SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
  {
@@ -3473,7 +3487,7 @@ index 5fd1599..f888f11 100644
  
      /* Only repaint the rows that changed since the last frame, which the other
         buffer still holds until it is released below. Every frame is blitted
-@@ -171,7 +293,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
+@@ -171,7 +306,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
          bottom      = std::min(bottom + 1, h);
          int dtop    = dest.y() + ((top * dest.height()) / h) - 1;
          int dbottom = dest.y() + (((bottom * dest.height()) + h - 1) / h) + 1;
@@ -3487,7 +3501,7 @@ index 5fd1599..f888f11 100644
      }
  
      if (monitors[r_monitor_index].mon_screenshots || monitors[r_monitor_index].mon_screenshots_clipboard || monitors[r_monitor_index].mon_screenshots_raw_clipboard)
-@@ -192,8 +319,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
+@@ -192,8 +332,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
      const bool relayout = (l.gen != w_layout_gen);
      w_layout_gen        = l.gen;
  
@@ -3508,7 +3522,7 @@ index 5fd1599..f888f11 100644
      presentBuffer(back, painted);
  
      const QRect r     = painted.boundingRect();
-@@ -212,11 +349,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -212,11 +362,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
          img      = QImage(l.size, QImage::Format_RGB32);
          relayout = true;
      }
@@ -3531,7 +3545,7 @@ index 5fd1599..f888f11 100644
          painted               = (changed | stale[back]) & all;
      }
  
-@@ -225,9 +372,27 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -225,9 +385,27 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
      if (!painted.isEmpty()) {
          QPainter painter(&img);
          painter.setClipRegion(painted);
@@ -3562,7 +3576,7 @@ index 5fd1599..f888f11 100644
              painter.setRenderHint(QPainter::SmoothPixmapTransform, video_filter_method > 0);
              /* The frame's alpha bytes are not set; adding it onto black ignores them
                 and leaves the result opaque, so the GUI thread can copy it as is. */
-@@ -248,6 +413,154 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
+@@ -248,6 +426,154 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
      stale[back ^ 1] |= painted;
  }
  
@@ -3717,7 +3731,7 @@ index 5fd1599..f888f11 100644
  SoftwareRenderer::Layout
  SoftwareRenderer::currentLayout()
  {
-@@ -335,6 +648,8 @@ SoftwareRenderer::publishLayout()
+@@ -335,6 +661,8 @@ SoftwareRenderer::publishLayout()
      std::scoped_lock lk(layout_mutex);
      layout.dest  = destination;
      layout.size  = QSize(qRound(width() * pixelRatio), qRound(height() * pixelRatio));
@@ -3726,11 +3740,12 @@ index 5fd1599..f888f11 100644
      layout.ratio = pixelRatio;
      layout.gen++;
  }
-@@ -343,12 +658,29 @@ void
+@@ -343,12 +671,30 @@ void
  SoftwareRenderer::resizeEvent(QResizeEvent *event)
  {
      layoutPicture();
 +    if (power_peek) power_peek->place();
++    if (hints) hints->place();
 +    if (!power_led.load()) update();
      QWidget::resizeEvent(event);
  }
@@ -3756,7 +3771,7 @@ index 5fd1599..f888f11 100644
      bool res = false;
      if (!eventDelegate(event, res))
          return QWidget::event(event);
-@@ -362,12 +694,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -362,12 +708,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
      const int  shown = frontBuffer();
      /* Repaint when the OSD is up, or once more right after it closes so a
       * lingering overlay is cleared even while the machine is paused. */
@@ -3775,7 +3790,7 @@ index 5fd1599..f888f11 100644
  
      if (osd) {
          painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-@@ -385,6 +720,69 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -385,6 +734,69 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
          QTimer::singleShot(16, this, [this] { update(); });
  }
  
@@ -3846,10 +3861,10 @@ index 5fd1599..f888f11 100644
  SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
  {
 diff --git a/src/qt/qt_softwarerenderer.hpp b/src/qt/qt_softwarerenderer.hpp
-index 265bb45..d95efef 100644
+index 265bb45..2b9ac2a 100644
 --- a/src/qt/qt_softwarerenderer.hpp
 +++ b/src/qt/qt_softwarerenderer.hpp
-@@ -7,14 +7,18 @@
+@@ -7,14 +7,19 @@
  #include <QRegion>
  #include <QScopedPointer>
  #include <QBackingStore>
@@ -3865,10 +3880,11 @@ index 265bb45..d95efef 100644
  class QThread;
 +class IBMulatorCRT;
 +class AmstradPowerPeek;
++class AmstradHints;
  
  class SoftwareRenderer :
      public QWidget,
-@@ -22,6 +26,7 @@ class SoftwareRenderer :
+@@ -22,6 +27,7 @@ class SoftwareRenderer :
      Q_OBJECT
  public:
      explicit SoftwareRenderer(QWidget *parent = nullptr);
@@ -3876,7 +3892,7 @@ index 265bb45..d95efef 100644
      void finalize() override final;
  
      void paintEvent(QPaintEvent *event) override;
-@@ -59,6 +64,73 @@ protected:
+@@ -59,6 +65,74 @@ protected:
      QScopedPointer<QBackingStore> m_backingStore;
  
  private:
@@ -3932,6 +3948,7 @@ index 265bb45..d95efef 100644
 +                        int leftFace = -1, int rightFace = -1) const;
 +private:
 +    AmstradPowerPeek *power_peek = nullptr;
++    AmstradHints *hints = nullptr;
 +    bool power_edge_press = false;
 +    std::atomic<bool> awaiting_power_frame{false};
 +    void paintUnpowered(QPainter &painter);
@@ -3950,7 +3967,7 @@ index 265bb45..d95efef 100644
      /* A thread with an event loop and an object living on it, to deliver work to.
         Stopping it waits for the work in progress to finish. */
      class Worker {
-@@ -84,6 +156,9 @@ private:
+@@ -84,6 +158,9 @@ private:
          QSize size;
          qreal ratio = 1.0;
          int   gen   = 0;
@@ -3960,7 +3977,7 @@ index 265bb45..d95efef 100644
      };
  
      /* Worker thread: scale the current frame into the back buffer, where dirty
-@@ -102,6 +177,7 @@ private:
+@@ -102,6 +179,7 @@ private:
      int   cur_image = -1;
      QRect wsource { 0, 0, 0, 0 };
      int   w_layout_gen = -1;
@@ -4188,6 +4205,312 @@ new file mode 100644
 +};
 +
 +}
++#endif
+diff --git a/src/qt/qt_amstradhints.hpp b/src/qt/qt_amstradhints.hpp
+new file mode 100644
+--- /dev/null
++++ b/src/qt/qt_amstradhints.hpp
+@@ -0,0 +1,301 @@
++// Where the cabinet's controls are. GPL-2.0-or-later, like 86Box.
++//
++// Nothing on the cabinet says that the drive bays and badges open controls.
++// A small, muted mark in the bottom-right corner of the scene answers that on
++// request: while the pointer rests on it, every live part is outlined and
++// named, and the rear power close-up comes into view. Nothing moves or asks
++// for attention otherwise.
++#ifndef QT_AMSTRADHINTS_HPP
++#define QT_AMSTRADHINTS_HPP
++
++#include "qt_amstradscene.hpp"
++#include "qt_amstradpower.hpp"
++#include <QFontMetricsF>
++#include <QMouseEvent>
++#include <QTimer>
++#include <QVariantAnimation>
++#include <QWidget>
++#include <functional>
++
++namespace amstrad {
++
++// The visible part inside each hotspot and the centre of its name tag, both
++// in master pixels. Tags sit just above their part, clear of the artwork.
++struct HintArea {
++    Hotspot hot;
++    QRectF  master;
++    qreal   radius;
++    QPointF tag;
++};
++constexpr int HintAreaCount = 4;
++
++inline const HintArea *hintAreas()
++{
++    static const HintArea all[HintAreaCount] = {
++        { HotLeftBay,      QRectF(185, 1022, 428, 118), 5, QPointF(399, 1005) },
++        { HotRightBay,     QRectF(642, 1022, 428, 118), 5, QPointF(856, 1005) },
++        { HotModelBadge,   QRectF(872, 1182, 206, 36),  3, QPointF(975, 1159) },
++        { HotMonitorBadge, QRectF(932, 751, 120, 38),   4, QPointF(992, 727) },
++    };
++    return all;
++}
++
++inline QRectF hintRect(const Layout &l, const HintArea &a)
++{
++    return QRectF(l.cabinet.left() + a.master.x() * l.scale, l.cabinet.top() + a.master.y() * l.scale,
++                  a.master.width() * l.scale, a.master.height() * l.scale);
++}
++
++// What each part is, by what is fitted. A single floppy drive is A: and sits
++// in the right bay; with two, A: is on the left and B: on the right.
++inline QString hintName(Hotspot hot, const Front &front)
++{
++    switch (hot) {
++        case HotLeftBay:
++            return front.left == BayFloppy ? QStringLiteral("DRIVE A")
++                 : front.left == BayHdd    ? QStringLiteral("HARD DISK") : QStringLiteral("DRIVE BAY");
++        case HotRightBay:     return front.rightDrive() ? QStringLiteral("DRIVE B") : QStringLiteral("DRIVE A");
++        case HotModelBadge:   return QStringLiteral("MACHINE");
++        case HotMonitorBadge: return QStringLiteral("MONITOR");
++        default:              return {};
++    }
++}
++
++// A few words on what opening the part is for.
++inline QString hintText(Hotspot hot, const Front &front)
++{
++    switch (hot) {
++        case HotLeftBay:
++            return front.left == BayFloppy ? QStringLiteral("Insert or eject a disk")
++                                           : QStringLiteral("Change what is fitted");
++        case HotRightBay:     return QStringLiteral("Insert or eject a disk");
++        case HotModelBadge:   return QStringLiteral("Choose the drives fitted");
++        case HotMonitorBadge: return QStringLiteral("Colour or mono");
++        default:              return {};
++    }
++}
++
++// Every live part: the menus' hover box around it and a name tag in the
++// power close-up's annotation style. power is that close-up's place on
++// screen (null to leave it out); it already carries its own POWER caption.
++inline void paintHintAreas(QPainter &p, const Layout &l, const Front &front, qreal opacity,
++                           const QRectF &power = QRectF())
++{
++    if (opacity <= 0) return;
++    p.save();
++    p.setRenderHint(QPainter::Antialiasing, true);
++    p.setOpacity(opacity);
++    QFont font = p.font();
++    font.setPixelSize(std::max(9, qRound(12 * l.scale)));
++    font.setBold(true);
++    font.setLetterSpacing(QFont::AbsoluteSpacing, 1.4);
++    QFont plain = font;
++    plain.setBold(false);
++    plain.setLetterSpacing(QFont::AbsoluteSpacing, 0);
++    plain.setPixelSize(std::max(10, qRound(13 * l.scale)));
++    const QFontMetricsF metrics(font), plainMetrics(plain);
++    const qreal out = 5 * l.scale;
++
++    // The area itself: the menus' hover box (drawChoiceBox), a thin light
++    // border around a translucent lift, set just outside the part. A soft
++    // dark edge keeps the light border readable on the cream casing. Over
++    // the pale computer the box is stronger than in the menus (solid) so it
++    // stands out; beside it, on the dark backdrop, the menus' own strength.
++    auto frame = [&](const QRectF &r, bool solid) {
++        const QRectF box    = r.adjusted(-out, -out, out, out);
++        const qreal  radius = 9 * l.scale;
++        p.setBrush(Qt::NoBrush);
++        p.setPen(QPen(QColor(0, 0, 0, solid ? 78 : 34), 4 * l.scale));
++        p.drawRoundedRect(box.adjusted(-l.scale, -l.scale, l.scale, l.scale), radius + l.scale, radius + l.scale);
++        p.setPen(QPen(QColor(255, 255, 255, solid ? 255 : 225), std::max(1.0, (solid ? 1.6 : 1.3) * l.scale)));
++        p.setBrush(solid ? QColor(255, 255, 255, 84) : PopupTheme::hover());
++        p.drawRoundedRect(box, radius, radius);
++    };
++    // One tag: the part's name, then what it is for in plainer type. Centred
++    // on c, as far as the right-hand limit allows.
++    auto tag = [&](const QPointF &c, qreal limit, const QString &name, const QString &text) {
++        const qreal h     = std::max(metrics.height(), plainMetrics.height()) + 7 * l.scale;
++        const qreal nameW = name.isEmpty() ? 0 : metrics.horizontalAdvance(name) + 9 * l.scale;
++        const qreal w     = nameW + plainMetrics.horizontalAdvance(text) + h;
++        QRectF box(c.x() - w / 2, c.y() - h / 2, w, h);
++        if (box.right() > limit) box.moveRight(limit);
++        p.setPen(QPen(calloutInk(), 1));
++        p.setBrush(QColor(19, 19, 28, 215));
++        p.drawRoundedRect(box, h / 2, h / 2);
++        p.setFont(font);
++        p.setPen(calloutInk());
++        p.drawText(QRectF(box.left() + h / 2, box.top(), nameW + 2, h), Qt::AlignVCenter | Qt::AlignLeft, name);
++        p.setFont(plain);
++        p.setPen(QColor(240, 234, 222, 205));
++        p.drawText(QRectF(box.left() + h / 2 + nameW, box.top(), w, h), Qt::AlignVCenter | Qt::AlignLeft, text);
++    };
++
++    const HintArea *all = hintAreas();
++    for (int i = 0; i < HintAreaCount; ++i) {
++        const QRectF r = hintRect(l, all[i]);
++        frame(r, true);
++        tag(QPointF(l.cabinet.left() + all[i].tag.x() * l.scale, l.cabinet.top() + all[i].tag.y() * l.scale),
++            r.right() + 44 * l.scale, hintName(all[i].hot, front), hintText(all[i].hot, front));
++    }
++    if (!power.isEmpty()) {
++        frame(power, false);
++        tag(QPointF(power.center().x(), power.top() - out - 23 * l.scale), power.right() + out, QString(),
++            QStringLiteral("Switch on or off"));
++    }
++    p.restore();
++}
++
++}
++
++// Covers the renderer while the parts are being shown. Never takes input.
++class AmstradHintAreas : public QWidget {
++public:
++    explicit AmstradHintAreas(QWidget *parent) : QWidget(parent)
++    {
++        setAttribute(Qt::WA_TranslucentBackground);
++        setAttribute(Qt::WA_TransparentForMouseEvents);
++        setFocusPolicy(Qt::NoFocus);
++        hide();
++    }
++    qreal          opacity = 0;
++    amstrad::Front front;
++    QRectF         power; // the power close-up, in this widget's coordinates
++
++protected:
++    void paintEvent(QPaintEvent *) override
++    {
++        QPainter p(this);
++        amstrad::paintHintAreas(p, amstrad::sceneLayout(size()), front, opacity, power);
++    }
++};
++
++// The corner mark. Resting the pointer on it shows the parts; they linger a
++// moment after it leaves, long enough for the eye to travel, then fade.
++class AmstradHints : public QWidget {
++public:
++    explicit AmstradHints(QWidget *parent) : QWidget(parent)
++    {
++        areas = new AmstradHintAreas(parent);
++        setObjectName("amstradHints");
++        setAttribute(Qt::WA_TranslucentBackground);
++        setMouseTracking(true);
++        setFocusPolicy(Qt::NoFocus);
++        setAccessibleName(tr("Show cabinet controls"));
++        setAccessibleDescription(tr("Rest the pointer here to see which parts of the cabinet open controls."));
++        // AMSTRAD_HINTS=0 removes the mark. Automated runs compare pictures:
++        // off there unless AMSTRAD_HINTS=1 asks for it.
++        const QString mode = qEnvironmentVariable("AMSTRAD_HINTS");
++        enabled = mode == "1" || (mode != "0" && qEnvironmentVariableIntValue("AMSTRAD_HEADLESS") != 1);
++        linger.setSingleShot(true);
++        linger.setInterval(600);
++        connect(&linger, &QTimer::timeout, this, [this] { fade(0, 380); });
++        connect(&animation, &QVariantAnimation::valueChanged, this, [this](const QVariant &v) {
++            areas->opacity = v.toReal();
++            areas->update();
++            if (areas->opacity <= 0 && !hovered) areas->hide();
++        });
++        // The guest takes and releases the mouse without telling this widget.
++        watch.setInterval(250);
++        connect(&watch, &QTimer::timeout, this, [this] { place(); });
++        watch.start();
++        hide();
++    }
++
++    // True while the guest has the mouse: the mark is then out of reach, so hidden.
++    std::function<bool()> blocked;
++    // The machine as fitted, for the left bay's name.
++    std::function<amstrad::Front()> front;
++    // Shown or dismissed; lets the renderer bring the power close-up along.
++    std::function<void(bool)> showing;
++    // Where that close-up is, in the parent's coordinates, once shown.
++    std::function<QRectF()> powerArea;
++
++    bool areasVisible() const { return areas->isVisible() && areas->opacity > 0; }
++    const AmstradHintAreas *overlay() const { return areas; }
++
++    // Bottom-right corner of the scene, scaled with the cabinet.
++    void place()
++    {
++        if (!parentWidget()) return;
++        const auto  l    = amstrad::sceneLayout(parentWidget()->size());
++        const int   side = std::max(22, qRound(34 * l.scale));
++        const int   gap  = std::max(8, qRound(16 * l.scale));
++        setGeometry(parentWidget()->width() - side - gap, parentWidget()->height() - side - gap, side, side);
++        areas->setGeometry(parentWidget()->rect());
++        const bool available = enabled && !(blocked && blocked());
++        if (!available && hovered) leave();
++        if (available != isVisible()) setVisible(available);
++    }
++
++protected:
++    void paintEvent(QPaintEvent *) override
++    {
++        QPainter p(this);
++        p.setRenderHint(QPainter::Antialiasing, true);
++        const qreal  s = width() / 34.0;
++        const QRectF ring(5 * s, 5 * s, 24 * s, 24 * s);
++        QColor ink = amstrad::calloutInk();
++        ink.setAlpha(hovered ? 225 : 105);
++        if (hovered) {
++            p.setPen(Qt::NoPen);
++            p.setBrush(QColor(240, 234, 222, 26));
++            p.drawEllipse(ring.adjusted(-3 * s, -3 * s, 3 * s, 3 * s));
++        }
++        p.setBrush(Qt::NoBrush);
++        p.setPen(QPen(ink, 1.3 * s));
++        p.drawEllipse(ring);
++        QFont font = p.font();
++        font.setPixelSize(std::max(10, qRound(15 * s)));
++        font.setBold(true);
++        p.setFont(font);
++        p.setPen(ink);
++        p.drawText(ring.adjusted(.5 * s, 0, 0, 0), Qt::AlignCenter, QStringLiteral("?"));
++    }
++
++#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
++    void enterEvent(QEnterEvent *) override
++#else
++    void enterEvent(QEvent *) override
++#endif
++    {
++        hovered = true;
++        linger.stop();
++        if (front) areas->front = front();
++        areas->setGeometry(parentWidget()->rect());
++        areas->show();
++        areas->stackUnder(this);
++        fade(1, 140);
++        if (showing) showing(true);
++        areas->power = powerArea ? powerArea() : QRectF();
++        update();
++    }
++    void leaveEvent(QEvent *) override { leave(); }
++    // Keep moves and clicks from reaching the cabinet beneath.
++    void mouseMoveEvent(QMouseEvent *e) override { e->accept(); }
++    void mousePressEvent(QMouseEvent *e) override { e->accept(); }
++    void mouseReleaseEvent(QMouseEvent *e) override { e->accept(); }
++
++private:
++    void leave()
++    {
++        if (!hovered) return;
++        hovered = false;
++        linger.start();
++        if (showing) showing(false);
++        update();
++    }
++    void fade(qreal to, int ms)
++    {
++        animation.stop();
++        animation.setDuration(ms);
++        animation.setStartValue(areas->opacity);
++        animation.setEndValue(to);
++        animation.start();
++    }
++
++    AmstradHintAreas *areas = nullptr;
++    bool              enabled = true, hovered = false;
++    QTimer            linger, watch;
++    QVariantAnimation animation;
++};
 +#endif
 diff --git a/src/qt/qt_amstradmenu.hpp b/src/qt/qt_amstradmenu.hpp
 new file mode 100644
@@ -5925,10 +6248,10 @@ new file mode 100644
 +}
 +
 +// Master-pixel rectangles of the configurable parts.
-+inline QRectF masterBay(int bay) { return QRectF(bay ? 632 : 174, 1006, 450, 180); }
++inline QRectF masterBay(int bay) { return QRectF(bay ? 632 : 174, 1011, 450, 180); }
 +inline QRectF masterModelBadge() { return QRectF(870, 1164, 216, 76); }
 +inline QRectF masterMonitorBadge() { return QRectF(923, 743, 140, 60); }
-+inline QRectF masterHddLed() { return QRectF(276, 1056, 48, 40); }
++inline QRectF masterHddLed() { return QRectF(276, 1061, 48, 40); }
 +
 +// The cabinet with this configuration's bay module and badges fitted. The
 +// master already shows DD and CM, so those need no patch.
@@ -5994,7 +6317,7 @@ new file mode 100644
 +
 +inline QRectF ledRect(const Layout &l, int led)
 +{
-+    static const QPointF pos[LedCount] = {{208, 960}, {511, 1014}, {969, 1014}};
++    static const QPointF pos[LedCount] = {{208, 960}, {511, 1019}, {969, 1019}};
 +    return QRectF(l.cabinet.left() + pos[led].x() * l.scale, l.cabinet.top() + pos[led].y() * l.scale,
 +                  48 * l.scale, 48 * l.scale);
 +}
@@ -6045,7 +6368,7 @@ new file mode 100644
 +
 +inline QRectF driveRect(const Layout &l, int drive)
 +{
-+    static const QPointF pos[2] = {{174, 1006}, {632, 1006}};
++    static const QPointF pos[2] = {{174, 1011}, {632, 1011}};
 +    return QRectF(l.cabinet.left() + pos[drive].x() * l.scale, l.cabinet.top() + pos[drive].y() * l.scale,
 +                  450 * l.scale, 180 * l.scale);
 +}

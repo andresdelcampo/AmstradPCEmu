@@ -11,8 +11,15 @@ They are preserved unchanged. Both physical bays use the same pictures:
 
 Draw the cabinet, the open face OR closed mechanism plus chosen disk, then
 the activity LEDs. All drive patches are 450 x 180 RGBA. Placement is left
-(174,1006), right (632,1006); see `placement.json`. Separate bay positions
+(174,1011), right (632,1011); see `placement.json`. Separate bay positions
 and disk states remain independent even though their images are shared.
+
+The bays sit 5 rows lower than in the source artwork and the recess has a
+short grey bottom wall and faint side walls. `scripts/deepen-front-recess.ps1`
+applies both to `pc1512-front.png` and is safe to re-run after the front is
+replaced: it detects the housings and moves them only as far as still needed.
+The position is a deliberate compromise (the real bays sit lower); if it
+changes, the bay, LED and hint coordinates must move with it.
 
 `archive/disk-materials/disk-*.png` retains one source per disk colour.
 Assembly registers the entire master face, excluding its white margins,
