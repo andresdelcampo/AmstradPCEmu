@@ -1631,7 +1631,7 @@ index d4d8f5d..20162e4 100644
  #define SETTINGS_CHANGED            1
  #define SETTINGS_REQUIRE_HARD_RESET 2
 diff --git a/src/qt/qt_main.cpp b/src/qt/qt_main.cpp
-index f694a38..f43ff6a 100644
+index f694a38..a9d6400 100644
 --- a/src/qt/qt_main.cpp
 +++ b/src/qt/qt_main.cpp
 @@ -32,6 +32,14 @@
@@ -1923,7 +1923,7 @@ index f694a38..f43ff6a 100644
 +        const Target targets[] = {
 +            { "left-drive", amstrad::masterBay(0).adjusted(0,0,0,-36), 5 },
 +            { "right-drive", amstrad::masterBay(1).adjusted(0,0,0,-36), 5 },
-+            { "configuration", amstrad::masterModelBadge(), 8 },
++            { "configuration", amstrad::masterModelBadge(), 6 },
 +            { "monitor", amstrad::masterMonitorBadge(), SoftwareRenderer::machineFront().pc1640 ? 3 : 2 }
 +        };
 +        for (const auto &target : targets) {
@@ -2108,7 +2108,7 @@ index f694a38..f43ff6a 100644
          main_window->showMaximized();
      } else {
 diff --git a/src/qt/qt_mainwindow.cpp b/src/qt/qt_mainwindow.cpp
-index 8b91429..b658a92 100644
+index 8b91429..880cd75 100644
 --- a/src/qt/qt_mainwindow.cpp
 +++ b/src/qt/qt_mainwindow.cpp
 @@ -32,7 +32,10 @@
@@ -2456,7 +2456,7 @@ index 8b91429..b658a92 100644
      if (acpi_enabled) {
          acpi_pwrbut_press();
          return;
-@@ -2950,3 +3092,461 @@ MainWindow::on_actionCGA_composite_settings_triggered()
+@@ -2950,3 +3092,433 @@ MainWindow::on_actionCGA_composite_settings_triggered()
      isNonPause = false;
      config_save();
  }
@@ -2600,44 +2600,16 @@ index 8b91429..b658a92 100644
 +        amstrad::addDrivePanel(&menu, panel, ratio);
 +    };
 +
-+    /* The model: the machine (PC1512 or PC1640) and its left bay fit, which
-+       gives the suffix: DD, SD (plain or sticker), HD20. One row per machine. */
++    /* The model: the machine (PC1512 or PC1640), then its left bay fit, which
++       gives the suffix: DD, SD (plain or sticker), HD20. Two separate choices. */
 +    auto addModelChoices = [&](QMenu *target) {
-+        struct Choice {
-+            amstrad::LeftBay bay;
-+            const char      *suffix, *text;
++        amstrad::MachinePanel panel;
++        panel.front  = front;
++        panel.unit   = [sw, ratio](const amstrad::Front &preview) {
++            return amstrad::unitPicture(sw->frontPreview(preview, amstrad::ConfigChoice::masterCrop()), ratio);
 +        };
-+        static const Choice choices[amstrad::LeftBayCount] = {
-+            { amstrad::BayFloppy, QT_TR_NOOP("DD"), QT_TR_NOOP("Two 5Â¼\" floppy drives: A: and B:.") },
-+            { amstrad::BayBlank, QT_TR_NOOP("SD"), QT_TR_NOOP("One floppy drive, A:. Blank plate in the left bay.") },
-+            { amstrad::BayBlankSticker, QT_TR_NOOP("SD, factory sticker"), QT_TR_NOOP("As SD, with the second-drive warning label on the plate.") },
-+            { amstrad::BayHdd, QT_TR_NOOP("HD20"), QT_TR_NOOP("20 MB hard disk C: and one floppy drive, A:.") },
-+        };
-+        amstrad::addCaption(target, tr("Machine configuration"),
-+                            tr("Choose the computer and its drive layout. Hardware changes restart the PC."), 16);
-+        /* A column per machine, a row per fit: each shows the whole unit. */
-+        auto *grid = amstrad::addGrid(target, true);
-+        grid->setHorizontalSpacing(24);
-+        grid->setVerticalSpacing(0);
-+        int column = 0;
-+        for (const bool pc1640 : { false, true }) {
-+            grid->addWidget(new amstrad::MenuCaption(pc1640 ? "PC1640" : "PC1512",
-+                                pc1640 ? tr("640K memory, EGA graphics") : tr("512K memory, CGA graphics"),
-+                                true, amstrad::ConfigChoice::Width, 16), 0, column);
-+            int row = 1;
-+            for (const Choice &c : choices) {
-+                amstrad::Front preview = front;
-+                preview.pc1640         = pc1640;
-+                preview.left           = c.bay;
-+                const int bay          = c.bay;
-+                grid->addWidget(new amstrad::ConfigChoice(
-+                    amstrad::unitPicture(sw->frontPreview(preview, amstrad::ConfigChoice::masterCrop()), ratio),
-+                    QString(pc1640 ? "PC1640 " : "PC1512 ") + tr(c.suffix), tr(c.text),
-+                    front.pc1640 == pc1640 && front.left == c.bay,
-+                    [this, pc1640, bay] { setAmstradModel(pc1640, bay); }), row++, column);
-+            }
-+            ++column;
-+        }
++        panel.choose = [this](bool pc1640, int bay) { setAmstradModel(pc1640, bay); };
++        amstrad::addMachinePanel(target, panel);
 +    };
 +
 +    auto addMonitorChoices = [&](QMenu *target) {
@@ -4780,7 +4752,7 @@ diff --git a/src/qt/qt_amstradmenu.hpp b/src/qt/qt_amstradmenu.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradmenu.hpp
-@@ -0,0 +1,622 @@
+@@ -0,0 +1,713 @@
 +// Graphical cabinet controls. GPL-2.0-or-later, like 86Box.
 +#ifndef QT_AMSTRADMENU_HPP
 +#define QT_AMSTRADMENU_HPP
@@ -4915,10 +4887,15 @@ new file mode 100644
 +        else if (auto *g = qobject_cast<QGridLayout *>(parentWidget()->layout()); g &&
 +                 (e->key()==Qt::Key_Left || e->key()==Qt::Key_Right || e->key()==Qt::Key_Up || e->key()==Qt::Key_Down)) {
 +            int r,c,rs,cs; g->getItemPosition(g->indexOf(this),&r,&c,&rs,&cs);
-+            r += e->key()==Qt::Key_Down ? 1 : e->key()==Qt::Key_Up ? -1 : 0;
-+            c += e->key()==Qt::Key_Right ? 1 : e->key()==Qt::Key_Left ? -1 : 0;
-+            if (auto *item = g->itemAtPosition(r,c); item && item->widget()->isEnabled() &&
-+                item->widget()->focusPolicy() != Qt::NoFocus) item->widget()->setFocus();
++            const int dr = e->key()==Qt::Key_Down ? 1 : e->key()==Qt::Key_Up ? -1 : 0;
++            const int dc = e->key()==Qt::Key_Right ? 1 : e->key()==Qt::Key_Left ? -1 : 0;
++            // Leave this card's own span, then pass over headings and gaps.
++            if (dr > 0) r += rs-1;
++            if (dc > 0) c += cs-1;
++            for (r += dr, c += dc; r >= 0 && c >= 0 && r < g->rowCount() && c < g->columnCount(); r += dr, c += dc) {
++                auto *item = g->itemAtPosition(r,c); QWidget *w = item ? item->widget() : nullptr;
++                if (w && w != this && w->isEnabled() && w->focusPolicy() != Qt::NoFocus) { w->setFocus(); break; }
++            }
 +            e->accept();
 +        } else QAbstractButton::keyPressEvent(e);
 +    }
@@ -5035,6 +5012,92 @@ new file mode 100644
 +{
 +    auto *a=new QWidgetAction(menu);
 +    a->setDefaultWidget(new MenuCaption(title,subtitle,false,MenuCard::Width,left)); a->setEnabled(false); menu->addAction(a);
++}
++// ---- The machine panel: the computer, then the drives fitted in it ----
++// The model nameplate as on the unit's fascia: red "PC" and pale numerals on
++// the grey strip, set in the cream casing. Drawn, because the lettering in
++// the cabinet artwork is too small to enlarge.
++inline void drawNameplate(QPainter &p, const QRectF &r, const QString &number)
++{
++    p.save(); p.setRenderHint(QPainter::Antialiasing); p.setPen(Qt::NoPen);
++    QLinearGradient casing(r.topLeft(),r.bottomLeft());
++    casing.setColorAt(0,QColor("#ece6d8")); casing.setColorAt(1,QColor("#cdc5b4"));
++    p.setBrush(casing); p.drawRoundedRect(r,7,7);
++    const QRectF strip = r.adjusted(6,6,-6,-6);
++    QLinearGradient grey(strip.topLeft(),strip.bottomLeft());
++    grey.setColorAt(0,QColor("#73747d")); grey.setColorAt(.12,QColor("#8b8c95")); grey.setColorAt(1,QColor("#7b7c85"));
++    p.setBrush(grey); p.drawRoundedRect(strip,2,2);
++    QFont f(QStringLiteral("Arial")); f.setPixelSize(qRound(strip.height()*.66)); f.setWeight(QFont::DemiBold);
++    QFont n = f; n.setWeight(QFont::Normal); n.setLetterSpacing(QFont::AbsoluteSpacing,.6);
++    const QString pc = QStringLiteral("PC");
++    const qreal gap = f.pixelSize()*.26, wp = QFontMetricsF(f).horizontalAdvance(pc), wn = QFontMetricsF(n).horizontalAdvance(number);
++    QRectF line = strip; line.setLeft(strip.center().x()-(wp+gap+wn)/2);
++    p.setFont(f); p.setPen(QColor("#c9392d")); p.drawText(line,Qt::AlignLeft|Qt::AlignVCenter,pc);
++    line.setLeft(line.left()+wp+gap);
++    p.setFont(n); p.setPen(QColor("#ececf0")); p.drawText(line,Qt::AlignLeft|Qt::AlignVCenter,number);
++    p.restore();
++}
++// A computer: its nameplate beside what sets it apart.
++class MachineChoice : public MenuCard {
++public:
++    static constexpr int Width = (ConfigChoice::Width-8)/2, Height = 84;
++    MachineChoice(QString number, const QString &name, const QString &body, bool selected, std::function<void()> callback)
++        : MenuCard({}, name, body, selected, std::move(callback)), number(std::move(number)) {}
++    QSize sizeHint() const override { return QSize(Width,Height); }
++protected:
++    void paintEvent(QPaintEvent *) override
++    {
++        QPainter p(this);
++        const bool lit = callback && (underMouse() || hasFocus());
++        drawChoiceBox(p,QRectF(rect()).adjusted(2,2,-2,-2),selected,lit,hasFocus());
++        const QRectF plate(16,(height()-48)/2.0,156,48);
++        drawNameplate(p,plate,number);
++        const int x = qRound(plate.right())+18, tw = width()-x-(selected ? 38 : 12);
++        const QFontMetrics plain(font());
++        const int wrap = Qt::AlignLeft|Qt::AlignTop|Qt::TextWordWrap;
++        const int bh = plain.boundingRect(QRect(0,0,tw,999),wrap,body).height();
++        drawPopupText(p,QRect(x,(height()-bh)/2,tw,bh),wrap,body,PopupTheme::secondaryText());
++        if (selected) drawChoiceTick(p,QPointF(width()-27,height()/2.0));
++    }
++private:
++    QString number;
++};
++// One choice for the computer and one for its left bay; the bay list is
++// named for the computer fitted. Each is applied on its own.
++struct MachinePanel {
++    Front front;                                    // as fitted now
++    std::function<QPixmap(const Front &)> unit;     // the system unit's front (unitPicture)
++    std::function<void(bool,int)> choose;           // PC1640?, left bay
++};
++inline void addMachinePanel(QMenu *menu, const MachinePanel &panel)
++{
++    auto tr = [](const char *text) { return QCoreApplication::translate("MainWindow",text); };
++    struct Bay { LeftBay bay; const char *suffix, *text; };
++    static const Bay bays[LeftBayCount] = {
++        { BayFloppy, QT_TRANSLATE_NOOP("MainWindow","DD"), QT_TRANSLATE_NOOP("MainWindow","Two 5¼\" floppy drives: A: and B:.") },
++        { BayBlank, QT_TRANSLATE_NOOP("MainWindow","SD"), QT_TRANSLATE_NOOP("MainWindow","One floppy drive, A:. Blank plate in the left bay.") },
++        { BayBlankSticker, QT_TRANSLATE_NOOP("MainWindow","SD, factory sticker"), QT_TRANSLATE_NOOP("MainWindow","As SD, with the second-drive warning label on the plate.") },
++        { BayHdd, QT_TRANSLATE_NOOP("MainWindow","HD20"), QT_TRANSLATE_NOOP("MainWindow","20 MB hard disk C: and one floppy drive, A:.") },
++    };
++    const Front &front = panel.front;
++    addCaption(menu, tr("Machine configuration"),
++               tr("Choose the computer, and the drives fitted in it. Hardware changes restart the PC."), 16);
++    auto *grid = addGrid(menu);
++    grid->setHorizontalSpacing(8); grid->setVerticalSpacing(0);
++    int row = 0;
++    grid->addWidget(new MenuCaption(tr("Computer"),{},true,ConfigChoice::Width,16),row++,0,1,2);
++    for (const bool pc1640 : { false, true })
++        grid->addWidget(new MachineChoice(pc1640 ? "1640" : "1512", pc1640 ? "PC1640" : "PC1512",
++            pc1640 ? tr("640K memory\nEGA graphics") : tr("512K memory\nCGA graphics"), front.pc1640 == pc1640,
++            [choose = panel.choose, pc1640, bay = int(front.left)] { choose(pc1640,bay); }),row,pc1640);
++    ++row;
++    const QString name = front.pc1640 ? QStringLiteral("PC1640 ") : QStringLiteral("PC1512 ");
++    grid->addWidget(new MenuCaption(tr("Drives"),{},true,ConfigChoice::Width,16),row++,0,1,2);
++    for (const Bay &b : bays) {
++        Front preview = front; preview.left = b.bay;
++        grid->addWidget(new ConfigChoice(panel.unit(preview), name+tr(b.suffix), tr(b.text), front.left == b.bay,
++            [choose = panel.choose, pc1640 = front.pc1640, bay = int(b.bay)] { choose(pc1640,bay); }),row++,0,1,2);
++    }
 +}
 +// ---- The disk box: floppies as pictures, shared by tiles and the drive card ----
 +// Artwork is in the 924 x 895 frame of scripts/make-disk-assets.ps1.

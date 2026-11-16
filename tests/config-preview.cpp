@@ -26,38 +26,27 @@ int main(int argc, char **argv)
     if (art.isNull() || !fittings.valid()) return 2;
     ConfigPreviewHost host; host.cabinet=art; host.resize(1500,900); host.show();
     QApplication::processEvents();
-    static const char *const names[] = { "DD", "SD", "SD, factory sticker", "HD20" };
-    static const char *const texts[] = { "Two 5¼\" floppy drives: A: and B:.",
-        "One floppy drive, A:. Blank plate in the left bay.",
-        "As SD, with the second-drive warning label on the plate.",
-        "20 MB hard disk C: and one floppy drive, A:." };
-    // One column as shipped, two with the PC1640 enabled.
-    for (int machines = 1; machines <= 2; ++machines) {
+    // The real panel (addMachinePanel), once for each computer fitted.
+    for (int machine = 0; machine < 2; ++machine) {
         QMenu menu(&host);
         amstrad::stylePopupMenu(&menu);
-        amstrad::addCaption(&menu, "Machine configuration",
-            "Choose the computer and its drive layout. Hardware changes restart the PC.", 16);
-        auto *grid = amstrad::addGrid(&menu, true);
-        grid->setHorizontalSpacing(24); grid->setVerticalSpacing(0);
-        for (int m = 0; m < machines; ++m) {
-            grid->addWidget(new amstrad::MenuCaption(m ? "PC1640" : "PC1512",
-                m ? "640K memory, EGA graphics" : "512K memory, CGA graphics", true, amstrad::ConfigChoice::Width, 16), 0, m);
-            for (int bay = 0; bay < amstrad::LeftBayCount; ++bay) {
-                amstrad::Front front; front.left = amstrad::LeftBay(bay); front.pc1640 = m;
-                QImage unit = amstrad::composeCabinet(art, fittings, front);
-                const QRectF c = amstrad::ConfigChoice::masterCrop();
-                const qreal s = unit.width() / 1254.0;
-                unit = unit.copy(QRectF(c.x()*s, c.y()*s, c.width()*s, c.height()*s).toAlignedRect().intersected(unit.rect()));
-                grid->addWidget(new amstrad::ConfigChoice(amstrad::unitPicture(unit, host.devicePixelRatioF()),
-                    QString(m ? "PC1640 " : "PC1512 ") + names[bay], QString::fromUtf8(texts[bay]),
-                    m == 0 && bay == 1, [] {}), bay + 1, m);
-            }
-        }
+        amstrad::MachinePanel panel;
+        panel.front.pc1640 = machine;
+        panel.front.left = machine ? amstrad::BayHdd : amstrad::BayBlank;
+        panel.unit = [&](const amstrad::Front &front) {
+            QImage unit = amstrad::composeCabinet(art, fittings, front);
+            const QRectF c = amstrad::ConfigChoice::masterCrop();
+            const qreal s = unit.width() / 1254.0;
+            unit = unit.copy(QRectF(c.x()*s, c.y()*s, c.width()*s, c.height()*s).toAlignedRect().intersected(unit.rect()));
+            return amstrad::unitPicture(unit, host.devicePixelRatioF());
+        };
+        panel.choose = [](bool, int) {};
+        amstrad::addMachinePanel(&menu, panel);
         menu.ensurePolished(); menu.resize(menu.sizeHint());
-        menu.move(host.mapToGlobal(QPoint(60,120)));
+        menu.move(host.mapToGlobal(QPoint(60,20)));
         menu.show(); QApplication::processEvents();
         QString out = QString::fromLocal8Bit(argv[2]);
-        if (machines == 2) out.replace(".png", "-1640.png");
+        if (machine) out.replace(".png", "-1640.png");
         if (!menu.grab().save(out)) return 3;
         std::printf("%s %dx%d\n", qPrintable(out), menu.width(), menu.height());
     }
