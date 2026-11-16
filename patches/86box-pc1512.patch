@@ -1628,7 +1628,7 @@ index d4d8f5d..20162e4 100644
  #define SETTINGS_CHANGED            1
  #define SETTINGS_REQUIRE_HARD_RESET 2
 diff --git a/src/qt/qt_main.cpp b/src/qt/qt_main.cpp
-index f694a38..1376fcb 100644
+index f694a38..1235c6c 100644
 --- a/src/qt/qt_main.cpp
 +++ b/src/qt/qt_main.cpp
 @@ -32,6 +32,14 @@
@@ -1858,7 +1858,7 @@ index f694a38..1376fcb 100644
 +        sendF11(QEvent::KeyRelease);
 +        settle();
 +        bool restored = !main_window->isFullScreen() && !video_fullscreen &&
-+                        !main_window->menuBar()->isHidden() && main_window->geometry() == previous;
++                        main_window->menuBar()->isHidden() && main_window->geometry() == previous;
 +#ifdef Q_OS_WINDOWS
 +        win_keyboard_handle(0x57, 0, 0, 0);
 +        bool nativeKeyReserved = !keyboard_recv_ui(0x57);
@@ -2048,7 +2048,7 @@ index f694a38..1376fcb 100644
  extern "C" {
  #include <86box/keyboard.h>
  #include "cpu.h"
-@@ -178,6 +560,11 @@ keyboard_getkeymap()
+@@ -178,6 +560,14 @@ keyboard_getkeymap()
  void
  win_keyboard_handle(uint32_t scancode, int up, int e0, int e1)
  {
@@ -2056,20 +2056,26 @@ index f694a38..1376fcb 100644
 +    // hook/raw-input path must not also deliver it to the emulated machine.
 +    if (!e0 && !e1 && (scancode == 0x57 || scancode == 0x58) && !qEnvironmentVariableIsEmpty("AMSTRAD_CABINET"))
 +        return;
++    // The Windows and Menu keys stay with the host: the Amstrad has neither.
++    if (e0 && !e1 && scancode >= 0x5b && scancode <= 0x5d && !qEnvironmentVariableIsEmpty("AMSTRAD_CABINET"))
++        return;
 +    if (runctl_pause_reasons() & RUN_PAUSE_POWER) return;
      /* If it's not a scan code that starts with 0xE1 */
      if (e1) {
          if (scancode == 0x1D) {
-@@ -389,7 +776,7 @@ emu_LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
+@@ -389,9 +779,9 @@ emu_LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
          ret = TRUE;
      else if ((lpKdhs->scanCode == 0x39) && (lpKdhs->flags & LLKHF_ALTDOWN) && !(lpKdhs->flags & (LLKHF_UP | LLKHF_EXTENDED)))
          ret = TRUE;
 -    else if ((lpKdhs->scanCode == 0x3e) && (lpKdhs->flags & LLKHF_ALTDOWN) && !(lpKdhs->flags & (LLKHF_UP | LLKHF_EXTENDED)))
 +    else if (qEnvironmentVariableIsEmpty("AMSTRAD_CABINET") && (lpKdhs->scanCode == 0x3e) && (lpKdhs->flags & LLKHF_ALTDOWN) && !(lpKdhs->flags & (LLKHF_UP | LLKHF_EXTENDED)))
          ret = TRUE;
-     else if ((lpKdhs->scanCode >= 0x5b) && (lpKdhs->scanCode <= 0x5d) && (lpKdhs->flags & LLKHF_EXTENDED))
+-    else if ((lpKdhs->scanCode >= 0x5b) && (lpKdhs->scanCode <= 0x5d) && (lpKdhs->flags & LLKHF_EXTENDED))
++    else if (qEnvironmentVariableIsEmpty("AMSTRAD_CABINET") && (lpKdhs->scanCode >= 0x5b) && (lpKdhs->scanCode <= 0x5d) && (lpKdhs->flags & LLKHF_EXTENDED))
          ret = TRUE;
-@@ -483,6 +870,17 @@ int
+     else if (inhibit_multimedia_keys &&
+             (lpKdhs->vkCode == VK_MEDIA_PLAY_PAUSE ||
+@@ -483,6 +873,17 @@ int
  main(int argc, char *argv[])
  {
  #ifdef Q_OS_WINDOWS
@@ -2087,7 +2093,7 @@ index f694a38..1376fcb 100644
  #    ifdef USE_QDARKSTYLE
      bool wasDarkTheme = false;
  #    endif
-@@ -737,6 +1135,10 @@ main(int argc, char *argv[])
+@@ -737,6 +1138,10 @@ main(int argc, char *argv[])
  #endif
  
      main_window = new MainWindow();
@@ -2099,7 +2105,7 @@ index f694a38..1376fcb 100644
          main_window->showMaximized();
      } else {
 diff --git a/src/qt/qt_mainwindow.cpp b/src/qt/qt_mainwindow.cpp
-index 8b91429..d38c0af 100644
+index 8b91429..999192d 100644
 --- a/src/qt/qt_mainwindow.cpp
 +++ b/src/qt/qt_mainwindow.cpp
 @@ -32,7 +32,10 @@
@@ -2131,6 +2137,15 @@ index 8b91429..d38c0af 100644
  #include <QSysInfo>
  #include <QEventLoop>
  #if QT_CONFIG(vulkan)
+@@ -451,7 +458,7 @@ MainWindow::MainWindow(QWidget *parent)
+         if (kbd_req_capture) {
+             qt_set_sequence_auto_mnemonic(!mouse_capture);
+             /* Hack to get the menubar to update the internal Alt+shortcut table */
+-            if (!video_fullscreen) {
++            if (!video_fullscreen && !amstradCabinet()) {
+                 ui->menubar->hide();
+                 ui->menubar->show();
+             }
 @@ -539,6 +546,13 @@ MainWindow::MainWindow(QWidget *parent)
      });
  
@@ -2145,17 +2160,17 @@ index 8b91429..d38c0af 100644
      connect(this, &MainWindow::updateStatusBarTip, status.get(), &MachineStatus::updateTip);
      connect(this, &MainWindow::statusBarMessage, status.get(), &MachineStatus::message, Qt::QueuedConnection);
  
-@@ -559,6 +573,39 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -559,6 +573,24 @@ MainWindow::MainWindow(QWidget *parent)
      ui->actionApply_fullscreen_stretch_mode_when_maximized->setVisible(false);
  #endif
  
 +    /* The cabinet frame lays out the picture itself: a freely resizable window,
-+       a square cabinet and a 4:3 inset drawn by the software renderer. Upstream
-+       options for sizing, stretching, aspect ratio, renderer choice and extra
-+       monitors have no effect on it, so hide them and pin the settings the
-+       cabinet relies on. Filtering only matters when the CRT shader is off. */
-+    if (!qEnvironmentVariableIsEmpty("AMSTRAD_CABINET")) {
++       a square cabinet and a 4:3 inset drawn by the software renderer. Its own
++       controls replace the upstream menus, so there is no menu bar; the actions
++       remain for their keyboard shortcuts. */
++    if (amstradCabinet()) {
 +        amstrad::installPopupTheme();
++        ui->menubar->hide();
 +        // Start with the cabinet switched off. Explicit diagnostic runs can boot automatically.
 +        amstrad_power_on = qEnvironmentVariableIntValue("AMSTRAD_POWER_ON") == 1;
 +        if (!amstrad_power_on) runctl_pause(RUN_PAUSE_POWER);
@@ -2163,34 +2178,19 @@ index 8b91429..d38c0af 100644
 +        ui->actionCtrl_Alt_Del->setEnabled(amstrad_power_on);
 +        ui->actionHard_Reset->setVisible(false);
 +        ui->actionHard_Reset->setEnabled(false);
-+        ui->actionACPI_Shutdown->setText(tr("Switch power on / off"));
-+        ui->actionCtrl_Alt_Del->setText(tr("Send Ctrl+Alt+Del to the PC"));
 +        vid_resize = 1;
 +        vid_api    = RENDERER_SOFTWARE;
-+        for (QAction *action : { ui->actionShow_non_primary_monitors, ui->actionResizable_window,
-+                                 ui->actionSpecify_dimensions, ui->actionForce_4_3_display_ratio,
-+                                 ui->actionForce_device_aspect_ratio,
-+                                 ui->actionApply_fullscreen_stretch_mode_when_maximized,
-+                                 ui->actionCGA_composite_settings, ui->actionHiDPI_scaling,
-+                                 ui->actionRenderer_options })
-+            action->setVisible(false);
-+        for (QMenu *menu : { ui->menuFullscreen_stretch_mode, ui->menuWindow_scale_factor,
-+                             ui->menuRenderer, ui->menuOpenGL_input_stretch_mode,
-+                             ui->menuOpenGL_input_scale })
-+            menu->menuAction()->setVisible(false);
-+        if (qEnvironmentVariable("AMSTRAD_CRT") != "0")
-+            ui->menuFilter_method->menuAction()->setVisible(false);
 +    }
 +
      if ((QApplication::platformName().contains("eglfs") || QApplication::platformName() == "haiku")) {
          if ((vid_api == RENDERER_OPENGL3) || (vid_api == RENDERER_VULKAN))
              fprintf(stderr, "OpenGL renderers are unsupported on %s.\n", QApplication::platformName().toUtf8().data());
-@@ -872,7 +919,17 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -872,7 +904,17 @@ MainWindow::MainWindow(QWidget *parent)
      if (!vnc_enabled)
          video_setblit(qt_blit);
  
 -    if (start_in_fullscreen) {
-+    if (start_in_fullscreen && !qEnvironmentVariableIsEmpty("AMSTRAD_CABINET")) {
++    if (start_in_fullscreen && amstradCabinet()) {
 +        // The cabinet is visible while the guest is off. Restore its window
 +        // mode now, not on the first guest frame after pressing power. Hard
 +        // resets reload start_in_fullscreen, so do not leave a blit callback
@@ -2204,7 +2204,7 @@ index 8b91429..d38c0af 100644
          connect(ui->stackedWidget, &RendererStack::blitToRenderer, this, [this]() {
              if (start_in_fullscreen) {
                  QTimer::singleShot(100, ui->actionFullscreen, &QAction::trigger);
-@@ -1004,6 +1061,20 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -1004,6 +1046,20 @@ MainWindow::MainWindow(QWidget *parent)
      updateShortcuts();
  }
  
@@ -2225,7 +2225,7 @@ index 8b91429..d38c0af 100644
  void
  MainWindow::closeEvent(QCloseEvent *event)
  {
-@@ -1035,12 +1106,7 @@ MainWindow::closeEvent(QCloseEvent *event)
+@@ -1035,12 +1091,7 @@ MainWindow::closeEvent(QCloseEvent *event)
              config_save_global_setting("Emulator", "confirm_exit");
      }
      if (window_remember && !video_fullscreen) {
@@ -2239,12 +2239,12 @@ index 8b91429..d38c0af 100644
          for (int i = 1; i < MONITORS_NUM; i++) {
              if (renderers[i]) {
                  monitor_settings[i].mon_window_w = renderers[i]->geometry().width();
-@@ -1144,7 +1210,14 @@ MainWindow::updateShortcuts()
+@@ -1144,7 +1195,14 @@ MainWindow::updateShortcuts()
  
      accID = FindAccelerator("fullscreen");
      seq   = QKeySequence::fromString(acc_keys[accID].seq);
 -    ui->actionFullscreen->setShortcut(seq);
-+    if (!qEnvironmentVariableIsEmpty("AMSTRAD_CABINET")) {
++    if (amstradCabinet()) {
 +        QList<QKeySequence> fullscreenKeys { QKeySequence(Qt::Key_F11) };
 +        if (!seq.isEmpty() && seq != fullscreenKeys.front())
 +            fullscreenKeys.append(seq);
@@ -2255,11 +2255,11 @@ index 8b91429..d38c0af 100644
  
      accID = FindAccelerator("pause");
      seq   = QKeySequence::fromString(acc_keys[accID].seq);
-@@ -1296,6 +1369,20 @@ MainWindow::showEvent(QShowEvent *event)
+@@ -1296,6 +1354,20 @@ MainWindow::showEvent(QShowEvent *event)
              window_h = 200;
      }
  
-+    if (!qEnvironmentVariableIsEmpty("AMSTRAD_CABINET") && window_remember) {
++    if (amstradCabinet() && window_remember) {
 +        QSettings settings(QDir(QString::fromUtf8(usr_path)).filePath("amstrad.ini"), QSettings::IniFormat);
 +        if (!settings.value("layout/powerSpace", false).toBool()) {
 +            // Migrate the old square window once: keep the cabinet's size and
@@ -2276,7 +2276,39 @@ index 8b91429..d38c0af 100644
      if (window_remember && !QApplication::platformName().contains("wayland")) {
          setGeometry(window_x, window_y, window_w, window_h + menuBar()->height() + (hide_status_bar ? 0 : statusBar()->height()) + (hide_tool_bar ? 0 : ui->toolBar->height()));
      }
-@@ -1358,6 +1445,8 @@ MainWindow::on_actionHard_Reset_triggered()
+@@ -1306,8 +1378,20 @@ MainWindow::showEvent(QShowEvent *event)
+         monitors[0].mon_scrnsz_y = fixed_size_y;
+     }
+     if (window_remember && vid_resize == 1) {
+-        ui->stackedWidget->setFixedSize(window_w, window_h);
+-        this->adjustSize();
++        if (!amstradCabinet()) {
++            ui->stackedWidget->setFixedSize(window_w, window_h);
++            this->adjustSize();
++        } else if (!isMaximized() && !isFullScreen()) {
++            /* Upstream keeps the picture pinned until the guest's first video
++               mode change, which never comes while the cabinet is switched
++               off: maximizing then left it in the corner. Size the window
++               around it once and let it follow the window from then on. */
++            ui->stackedWidget->setFixedSize(window_w, window_h);
++            this->adjustSize();
++            ui->stackedWidget->setFixedSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
++        }
++        if (amstradCabinet())
++            resizableonce = true;
+     }
+ }
+ 
+@@ -1318,7 +1402,7 @@ MainWindow::on_actionKeyboard_requires_capture_triggered()
+ #ifndef Q_OS_MACOS
+     qt_set_sequence_auto_mnemonic(!!kbd_req_capture);
+     /* Hack to get the menubar to update the internal Alt+shortcut table */
+-    if (!video_fullscreen) {
++    if (!video_fullscreen && !amstradCabinet()) {
+         ui->menubar->hide();
+         ui->menubar->show();
+     }
+@@ -1358,6 +1442,8 @@ MainWindow::on_actionHard_Reset_triggered()
  void
  MainWindow::on_actionCtrl_Alt_Del_triggered()
  {
@@ -2285,7 +2317,7 @@ index 8b91429..d38c0af 100644
      pc_send_cad();
  }
  
-@@ -1439,6 +1528,8 @@ MainWindow::on_actionSettings_triggered()
+@@ -1439,6 +1525,8 @@ MainWindow::on_actionSettings_triggered()
      /* Also changed by soft saves, which reject the dialog */
      ui->actionFast_forward_on_start->setChecked(fast_forward_on_start);
      runctl_resume(RUN_PAUSE_SYNC);
@@ -2294,19 +2326,21 @@ index 8b91429..d38c0af 100644
  }
  
  void
-@@ -1648,7 +1739,10 @@ MainWindow::on_actionFullscreen_triggered()
+@@ -1648,8 +1736,11 @@ MainWindow::on_actionFullscreen_triggered()
  {
      if (video_fullscreen > 0) {
          video_fullscreen = 0;
 -        showNormal();
+-        ui->menubar->show();
 +        if (monitor_settings[0].mon_window_maximized)
 +            showMaximized();
 +        else
 +            showNormal();
-         ui->menubar->show();
++        ui->menubar->setVisible(!amstradCabinet());
          if (!hide_status_bar)
              ui->statusbar->show();
-@@ -1659,7 +1753,12 @@ MainWindow::on_actionFullscreen_triggered()
+         if (!hide_tool_bar)
+@@ -1659,7 +1750,12 @@ MainWindow::on_actionFullscreen_triggered()
              emit resizeContents(vid_resize == 2 ? fixed_size_x : monitors[0].mon_scrnsz_x, vid_resize == 2 ? fixed_size_y : monitors[0].mon_scrnsz_y);
          }
      } else {
@@ -2314,13 +2348,13 @@ index 8b91429..d38c0af 100644
 +        rememberWindowGeometry();
 +        // Cabinet capture is explicit: changing window mode must leave the
 +        // pointer available for the power button and the other case controls.
-+        if (qEnvironmentVariableIsEmpty("AMSTRAD_CABINET") &&
++        if (!amstradCabinet() &&
 +            amstrad_power_on && !testAttribute(Qt::WA_DontShowOnScreen) &&
 +            ((mouse_type != MOUSE_TYPE_NONE) || machine_has_mouse()))
              emit setMouseCapture(true);
          video_fullscreen = 1;
          pclog("Full screen: %ix%i\n", QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
-@@ -1714,6 +1813,39 @@ MainWindow::keyMatchesAccelerator(const QKeyEvent *ke, const char *name)
+@@ -1714,6 +1810,39 @@ MainWindow::keyMatchesAccelerator(const QKeyEvent *ke, const char *name)
  bool
  MainWindow::eventFilter(QObject *receiver, QEvent *event)
  {
@@ -2332,7 +2366,7 @@ index 8b91429..d38c0af 100644
 +    // QWidgetWindow (a QWindow, not a QWidget) as receiver, where the guest
 +    // keyboard path below would otherwise swallow them, so match both kinds of
 +    // receiver. Accept ShortcutOverride to avoid a second QAction activation.
-+    if (!qEnvironmentVariableIsEmpty("AMSTRAD_CABINET") && !main_window_blocked &&
++    if (amstradCabinet() && !main_window_blocked &&
 +        (event->type() == QEvent::ShortcutOverride || event->type() == QEvent::KeyPress ||
 +         event->type() == QEvent::KeyRelease)) {
 +        auto *widget = qobject_cast<QWidget *>(receiver);
@@ -2360,7 +2394,7 @@ index 8b91429..d38c0af 100644
      /* Keys typed into the memory viewer are its own, not the guest's. */
      if ((event->type() == QEvent::KeyPress) || (event->type() == QEvent::KeyRelease) || (event->type() == QEvent::ShortcutOverride)) {
          auto *widget = qobject_cast<QWidget *>(receiver);
-@@ -1871,6 +2003,7 @@ MainWindow::refreshMediaMenu()
+@@ -1871,6 +2000,7 @@ MainWindow::refreshMediaMenu()
  {
      mm->refresh(ui->menuMedia);
      status->setSoundMenu(ui->menuSound);
@@ -2368,20 +2402,27 @@ index 8b91429..d38c0af 100644
      status->setDynarecMenu(dynarecMenu);
      status->refresh(ui->statusbar);
      ui->actionMCA_devices->setVisible(machine_has_bus(machine, MACHINE_BUS_MCA));
-@@ -1914,6 +2047,12 @@ MainWindow::hasKanaLock()
+@@ -1914,6 +2044,10 @@ MainWindow::hasKanaLock()
  void
  MainWindow::updatePowerOffAction()
  {
-+    if (!qEnvironmentVariableIsEmpty("AMSTRAD_CABINET")) {
-+        ui->actionACPI_Shutdown->setText(amstrad_power_on ? tr("Switch power off") : tr("Switch power on"));
-+        ui->actionACPI_Shutdown->setToolTip(tr("Operate the rear monitor power button"));
++    if (amstradCabinet()) {
 +        ui->actionACPI_Shutdown->setEnabled(!amstrad_power_busy);
 +        return;
 +    }
      const bool has_power_button = device_has_power_button();
      if (acpi_enabled || has_power_button) {
          ui->actionACPI_Shutdown->setText(tr("Power &off (soft)"));
-@@ -2733,7 +2872,9 @@ MainWindow::changeEvent(QEvent *event)
+@@ -2533,7 +2667,7 @@ MainWindow::toggleFullscreenUI()
+         }
+     }
+ 
+-    ui->menubar->setVisible(fullscreen_ui_visible);
++    ui->menubar->setVisible(fullscreen_ui_visible && !amstradCabinet());
+     ui->statusbar->setVisible(fullscreen_ui_visible && !hide_status_bar);
+     ui->toolBar->setVisible(fullscreen_ui_visible && !hide_tool_bar);
+ }
+@@ -2733,7 +2867,9 @@ MainWindow::changeEvent(QEvent *event)
  #endif
      QWidget::changeEvent(event);
      if (isVisible()) {
@@ -2392,18 +2433,18 @@ index 8b91429..d38c0af 100644
          config_save();
      }
      /* The renderer can get its resize event before the window reports being
-@@ -2916,6 +3057,10 @@ MainWindow::on_actionPen_triggered()
+@@ -2916,6 +3052,10 @@ MainWindow::on_actionPen_triggered()
  void
  MainWindow::on_actionACPI_Shutdown_triggered()
  {
-+    if (!qEnvironmentVariableIsEmpty("AMSTRAD_CABINET")) {
++    if (amstradCabinet()) {
 +        toggleAmstradPower();
 +        return;
 +    }
      if (acpi_enabled) {
          acpi_pwrbut_press();
          return;
-@@ -2950,3 +3095,387 @@ MainWindow::on_actionCGA_composite_settings_triggered()
+@@ -2950,3 +3090,387 @@ MainWindow::on_actionCGA_composite_settings_triggered()
      isNonPause = false;
      config_save();
  }
@@ -2427,7 +2468,7 @@ index 8b91429..d38c0af 100644
 +void
 +MainWindow::toggleAmstradPower()
 +{
-+    if (amstrad_power_busy || qEnvironmentVariableIsEmpty("AMSTRAD_CABINET")) return;
++    if (amstrad_power_busy || !amstradCabinet()) return;
 +    extern void amstrad_power_click();
 +    amstrad_power_click();
 +    if (amstrad_power_on) {
@@ -2792,20 +2833,22 @@ index 8b91429..d38c0af 100644
 +    refreshAmstradFront();
 +}
 diff --git a/src/qt/qt_mainwindow.hpp b/src/qt/qt_mainwindow.hpp
-index e085af5..48b05c9 100644
+index e085af5..21c2c28 100644
 --- a/src/qt/qt_mainwindow.hpp
 +++ b/src/qt/qt_mainwindow.hpp
-@@ -85,6 +85,9 @@ public slots:
+@@ -85,6 +85,11 @@ public slots:
      void updateStatusEmptyIcons();
      void updateUiPauseState();
      void updateUiFastForwardState();
 +    void toggleAmstradPower();
 +    void finishAmstradPowerOn();
 +    bool amstradPowerOn() const { return amstrad_power_on; }
++    /* The Amstrad cabinet front end, as opposed to a plain upstream window. */
++    static bool amstradCabinet() { return !qEnvironmentVariableIsEmpty("AMSTRAD_CABINET"); }
  private slots:
      void on_actionForce_interpretation_triggered();
      void on_actionFullscreen_triggered();
-@@ -182,7 +185,16 @@ private slots:
+@@ -182,7 +187,16 @@ private slots:
  
      void on_actionCGA_composite_settings_triggered();
  
@@ -2822,7 +2865,7 @@ index e085af5..48b05c9 100644
      Ui::MainWindow                *ui;
      std::unique_ptr<MachineStatus> status;
      std::shared_ptr<MediaMenu>     mm;
-@@ -233,6 +245,8 @@ private:
+@@ -233,6 +247,8 @@ private:
      bool window_blocked = false;
  
      bool skip_exit_confirmation = false;
@@ -4245,9 +4288,9 @@ new file mode 100644
 +inline const HintArea *hintAreas()
 +{
 +    static const HintArea all[HintAreaCount] = {
-+        { HotLeftBay,      QRectF(185, 1022, 428, 118), 5, QPointF(399, 1005) },
-+        { HotRightBay,     QRectF(642, 1022, 428, 118), 5, QPointF(856, 1005) },
-+        { HotModelBadge,   QRectF(872, 1182, 206, 36),  3, QPointF(975, 1159) },
++        { HotLeftBay,      QRectF(185, 1022, 428, 118), 5, QPointF(399, 999) },
++        { HotRightBay,     QRectF(642, 1022, 428, 118), 5, QPointF(856, 999) },
++        { HotModelBadge,   QRectF(872, 1187, 206, 26),  3, QPointF(975, 1164) },
 +        { HotMonitorBadge, QRectF(932, 751, 120, 38),   4, QPointF(992, 727) },
 +    };
 +    return all;
