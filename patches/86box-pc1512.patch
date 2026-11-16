@@ -2115,7 +2115,7 @@ index f694a38..ad9e460 100644
          main_window->showMaximized();
      } else {
 diff --git a/src/qt/qt_mainwindow.cpp b/src/qt/qt_mainwindow.cpp
-index 8b91429..8fdc2fc 100644
+index 8b91429..a71c109 100644
 --- a/src/qt/qt_mainwindow.cpp
 +++ b/src/qt/qt_mainwindow.cpp
 @@ -32,7 +32,10 @@
@@ -2156,7 +2156,17 @@ index 8b91429..8fdc2fc 100644
  #include <QSysInfo>
  #include <QEventLoop>
  #if QT_CONFIG(vulkan)
-@@ -451,7 +460,7 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -328,7 +337,8 @@ MainWindow::MainWindow(QWidget *parent)
+     QString vmname(vm_name);
+     if (vmname.at(vmname.size() - 1) == '"' || vmname.at(vmname.size() - 1) == '\'')
+         vmname.truncate(vmname.size() - 1);
+-    this->setWindowTitle(QString("%1 - %2 %3").arg(vmname, EMU_NAME, EMU_VERSION_FULL));
++    this->setWindowTitle(amstradCabinet() ? QStringLiteral("Amstrad PC1512/1640 Emulator")
++                                           : QString("%1 - %2 %3").arg(vmname, EMU_NAME, EMU_VERSION_FULL));
+ 
+     connect(this, &MainWindow::forceInterpretationCompleted, this, [this]() {
+         const auto fi_icon      = cpu_force_interpreter ? QIcon(":/menuicons/qt/icons/recompiler.ico") : QIcon(":/menuicons/qt/icons/interpreter.ico");
+@@ -451,7 +461,7 @@ MainWindow::MainWindow(QWidget *parent)
          if (kbd_req_capture) {
              qt_set_sequence_auto_mnemonic(!mouse_capture);
              /* Hack to get the menubar to update the internal Alt+shortcut table */
@@ -2165,7 +2175,7 @@ index 8b91429..8fdc2fc 100644
                  ui->menubar->hide();
                  ui->menubar->show();
              }
-@@ -539,6 +548,13 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -539,6 +549,13 @@ MainWindow::MainWindow(QWidget *parent)
      });
  
      connect(this, &MainWindow::updateStatusBarPanes, this, &MainWindow::refreshMediaMenu);
@@ -2179,7 +2189,7 @@ index 8b91429..8fdc2fc 100644
      connect(this, &MainWindow::updateStatusBarTip, status.get(), &MachineStatus::updateTip);
      connect(this, &MainWindow::statusBarMessage, status.get(), &MachineStatus::message, Qt::QueuedConnection);
  
-@@ -559,6 +575,24 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -559,6 +576,24 @@ MainWindow::MainWindow(QWidget *parent)
      ui->actionApply_fullscreen_stretch_mode_when_maximized->setVisible(false);
  #endif
  
@@ -2204,7 +2214,7 @@ index 8b91429..8fdc2fc 100644
      if ((QApplication::platformName().contains("eglfs") || QApplication::platformName() == "haiku")) {
          if ((vid_api == RENDERER_OPENGL3) || (vid_api == RENDERER_VULKAN))
              fprintf(stderr, "OpenGL renderers are unsupported on %s.\n", QApplication::platformName().toUtf8().data());
-@@ -872,7 +906,17 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -872,7 +907,17 @@ MainWindow::MainWindow(QWidget *parent)
      if (!vnc_enabled)
          video_setblit(qt_blit);
  
@@ -2223,7 +2233,7 @@ index 8b91429..8fdc2fc 100644
          connect(ui->stackedWidget, &RendererStack::blitToRenderer, this, [this]() {
              if (start_in_fullscreen) {
                  QTimer::singleShot(100, ui->actionFullscreen, &QAction::trigger);
-@@ -1004,6 +1048,20 @@ MainWindow::MainWindow(QWidget *parent)
+@@ -1004,6 +1049,20 @@ MainWindow::MainWindow(QWidget *parent)
      updateShortcuts();
  }
  
@@ -2244,7 +2254,7 @@ index 8b91429..8fdc2fc 100644
  void
  MainWindow::closeEvent(QCloseEvent *event)
  {
-@@ -1035,12 +1093,7 @@ MainWindow::closeEvent(QCloseEvent *event)
+@@ -1035,12 +1094,7 @@ MainWindow::closeEvent(QCloseEvent *event)
              config_save_global_setting("Emulator", "confirm_exit");
      }
      if (window_remember && !video_fullscreen) {
@@ -2258,7 +2268,7 @@ index 8b91429..8fdc2fc 100644
          for (int i = 1; i < MONITORS_NUM; i++) {
              if (renderers[i]) {
                  monitor_settings[i].mon_window_w = renderers[i]->geometry().width();
-@@ -1144,7 +1197,14 @@ MainWindow::updateShortcuts()
+@@ -1144,7 +1198,14 @@ MainWindow::updateShortcuts()
  
      accID = FindAccelerator("fullscreen");
      seq   = QKeySequence::fromString(acc_keys[accID].seq);
@@ -2274,7 +2284,7 @@ index 8b91429..8fdc2fc 100644
  
      accID = FindAccelerator("pause");
      seq   = QKeySequence::fromString(acc_keys[accID].seq);
-@@ -1296,6 +1356,20 @@ MainWindow::showEvent(QShowEvent *event)
+@@ -1296,6 +1357,20 @@ MainWindow::showEvent(QShowEvent *event)
              window_h = 200;
      }
  
@@ -2295,7 +2305,7 @@ index 8b91429..8fdc2fc 100644
      if (window_remember && !QApplication::platformName().contains("wayland")) {
          setGeometry(window_x, window_y, window_w, window_h + menuBar()->height() + (hide_status_bar ? 0 : statusBar()->height()) + (hide_tool_bar ? 0 : ui->toolBar->height()));
      }
-@@ -1306,8 +1380,20 @@ MainWindow::showEvent(QShowEvent *event)
+@@ -1306,8 +1381,20 @@ MainWindow::showEvent(QShowEvent *event)
          monitors[0].mon_scrnsz_y = fixed_size_y;
      }
      if (window_remember && vid_resize == 1) {
@@ -2318,7 +2328,7 @@ index 8b91429..8fdc2fc 100644
      }
  }
  
-@@ -1318,7 +1404,7 @@ MainWindow::on_actionKeyboard_requires_capture_triggered()
+@@ -1318,7 +1405,7 @@ MainWindow::on_actionKeyboard_requires_capture_triggered()
  #ifndef Q_OS_MACOS
      qt_set_sequence_auto_mnemonic(!!kbd_req_capture);
      /* Hack to get the menubar to update the internal Alt+shortcut table */
@@ -2327,7 +2337,7 @@ index 8b91429..8fdc2fc 100644
          ui->menubar->hide();
          ui->menubar->show();
      }
-@@ -1358,6 +1444,8 @@ MainWindow::on_actionHard_Reset_triggered()
+@@ -1358,6 +1445,8 @@ MainWindow::on_actionHard_Reset_triggered()
  void
  MainWindow::on_actionCtrl_Alt_Del_triggered()
  {
@@ -2336,7 +2346,7 @@ index 8b91429..8fdc2fc 100644
      pc_send_cad();
  }
  
-@@ -1439,6 +1527,8 @@ MainWindow::on_actionSettings_triggered()
+@@ -1439,6 +1528,8 @@ MainWindow::on_actionSettings_triggered()
      /* Also changed by soft saves, which reject the dialog */
      ui->actionFast_forward_on_start->setChecked(fast_forward_on_start);
      runctl_resume(RUN_PAUSE_SYNC);
@@ -2345,7 +2355,7 @@ index 8b91429..8fdc2fc 100644
  }
  
  void
-@@ -1648,8 +1738,11 @@ MainWindow::on_actionFullscreen_triggered()
+@@ -1648,8 +1739,11 @@ MainWindow::on_actionFullscreen_triggered()
  {
      if (video_fullscreen > 0) {
          video_fullscreen = 0;
@@ -2359,7 +2369,7 @@ index 8b91429..8fdc2fc 100644
          if (!hide_status_bar)
              ui->statusbar->show();
          if (!hide_tool_bar)
-@@ -1659,7 +1752,12 @@ MainWindow::on_actionFullscreen_triggered()
+@@ -1659,7 +1753,12 @@ MainWindow::on_actionFullscreen_triggered()
              emit resizeContents(vid_resize == 2 ? fixed_size_x : monitors[0].mon_scrnsz_x, vid_resize == 2 ? fixed_size_y : monitors[0].mon_scrnsz_y);
          }
      } else {
@@ -2373,7 +2383,7 @@ index 8b91429..8fdc2fc 100644
              emit setMouseCapture(true);
          video_fullscreen = 1;
          pclog("Full screen: %ix%i\n", QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
-@@ -1714,6 +1812,43 @@ MainWindow::keyMatchesAccelerator(const QKeyEvent *ke, const char *name)
+@@ -1714,6 +1813,43 @@ MainWindow::keyMatchesAccelerator(const QKeyEvent *ke, const char *name)
  bool
  MainWindow::eventFilter(QObject *receiver, QEvent *event)
  {
@@ -2417,7 +2427,7 @@ index 8b91429..8fdc2fc 100644
      /* Keys typed into the memory viewer are its own, not the guest's. */
      if ((event->type() == QEvent::KeyPress) || (event->type() == QEvent::KeyRelease) || (event->type() == QEvent::ShortcutOverride)) {
          auto *widget = qobject_cast<QWidget *>(receiver);
-@@ -1871,6 +2006,7 @@ MainWindow::refreshMediaMenu()
+@@ -1871,6 +2007,7 @@ MainWindow::refreshMediaMenu()
  {
      mm->refresh(ui->menuMedia);
      status->setSoundMenu(ui->menuSound);
@@ -2425,7 +2435,7 @@ index 8b91429..8fdc2fc 100644
      status->setDynarecMenu(dynarecMenu);
      status->refresh(ui->statusbar);
      ui->actionMCA_devices->setVisible(machine_has_bus(machine, MACHINE_BUS_MCA));
-@@ -1914,6 +2050,10 @@ MainWindow::hasKanaLock()
+@@ -1914,6 +2051,10 @@ MainWindow::hasKanaLock()
  void
  MainWindow::updatePowerOffAction()
  {
@@ -2436,7 +2446,7 @@ index 8b91429..8fdc2fc 100644
      const bool has_power_button = device_has_power_button();
      if (acpi_enabled || has_power_button) {
          ui->actionACPI_Shutdown->setText(tr("Power &off (soft)"));
-@@ -2533,7 +2673,7 @@ MainWindow::toggleFullscreenUI()
+@@ -2533,7 +2674,7 @@ MainWindow::toggleFullscreenUI()
          }
      }
  
@@ -2445,7 +2455,17 @@ index 8b91429..8fdc2fc 100644
      ui->statusbar->setVisible(fullscreen_ui_visible && !hide_status_bar);
      ui->toolBar->setVisible(fullscreen_ui_visible && !hide_tool_bar);
  }
-@@ -2733,7 +2873,9 @@ MainWindow::changeEvent(QEvent *event)
+@@ -2676,7 +2817,8 @@ MainWindow::applyGlobalPreferences()
+     QString vmname(vm_name);
+     if (vmname.at(vmname.size() - 1) == '"' || vmname.at(vmname.size() - 1) == '\'')
+         vmname.truncate(vmname.size() - 1);
+-    setWindowTitle(QString("%1 - %2 %3").arg(vmname, EMU_NAME, EMU_VERSION_FULL));
++    setWindowTitle(amstradCabinet() ? QStringLiteral("Amstrad PC1512/1640 Emulator")
++                                     : QString("%1 - %2 %3").arg(vmname, EMU_NAME, EMU_VERSION_FULL));
+     QString msg = status->getMessage();
+     status.reset(new MachineStatus(this));
+     refreshMediaMenu();
+@@ -2733,7 +2875,9 @@ MainWindow::changeEvent(QEvent *event)
  #endif
      QWidget::changeEvent(event);
      if (isVisible()) {
@@ -2456,7 +2476,7 @@ index 8b91429..8fdc2fc 100644
          config_save();
      }
      /* The renderer can get its resize event before the window reports being
-@@ -2916,6 +3058,10 @@ MainWindow::on_actionPen_triggered()
+@@ -2916,6 +3060,10 @@ MainWindow::on_actionPen_triggered()
  void
  MainWindow::on_actionACPI_Shutdown_triggered()
  {
@@ -2467,7 +2487,7 @@ index 8b91429..8fdc2fc 100644
      if (acpi_enabled) {
          acpi_pwrbut_press();
          return;
-@@ -2950,3 +3096,433 @@ MainWindow::on_actionCGA_composite_settings_triggered()
+@@ -2950,3 +3098,433 @@ MainWindow::on_actionCGA_composite_settings_triggered()
      isNonPause = false;
      config_save();
  }
@@ -4424,14 +4444,15 @@ diff --git a/src/qt/qt_amstradhints.hpp b/src/qt/qt_amstradhints.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradhints.hpp
-@@ -0,0 +1,423 @@
+@@ -0,0 +1,487 @@
 +// Where the cabinet's controls are. GPL-2.0-or-later, like 86Box.
 +//
 +// Nothing on the cabinet says that the drive bays and badges open controls.
 +// A small, muted mark in the bottom-right corner of the scene answers that on
 +// request: while the pointer rests on it, every live part is outlined and
-+// named, and the rear power close-up comes into view. Nothing moves or asks
-+// for attention otherwise.
++// named, the rear power close-up comes into view, and a card above the mark
++// credits the program and what it is built on. Nothing moves or asks for
++// attention otherwise.
 +#ifndef QT_AMSTRADHINTS_HPP
 +#define QT_AMSTRADHINTS_HPP
 +
@@ -4443,6 +4464,10 @@ new file mode 100644
 +#include <QVariantAnimation>
 +#include <QWidget>
 +#include <functional>
++// 86Box's own version, where this is built as part of it (not in the tests).
++#if __has_include(<86box/version.h>)
++#    include <86box/version.h>
++#endif
 +
 +namespace amstrad {
 +
@@ -4573,6 +4598,64 @@ new file mode 100644
 +    p.restore();
 +}
 +
++// What this program is and whose work it stands on: the cabinet has no menu
++// bar, so no About box. A small card in the tags' style, just above the
++// corner mark and sized like it, by the window rather than by the view.
++inline void paintCredits(QPainter &p, const QSize &size, qreal opacity)
++{
++    if (opacity <= 0) return;
++    const qreal s    = restLayout(size).scale;
++    const int   side = std::max(22, qRound(34 * s)); // the corner mark, as placed by AmstradHints
++    const int   gap  = std::max(8, qRound(16 * s));
++    p.save();
++    p.setRenderHint(QPainter::Antialiasing, true);
++    p.setOpacity(opacity);
++    QFont title = p.font();
++    title.setPixelSize(std::max(8, qRound(10 * s)));
++    title.setBold(true);
++    title.setLetterSpacing(QFont::AbsoluteSpacing, 1.0);
++    QFont plain = p.font();
++    plain.setPixelSize(std::max(9, qRound(11 * s)));
++    const QFontMetricsF titleMetrics(title), plainMetrics(plain);
++
++    const QString name = QStringLiteral("AMSTRAD PC1512/1640 EMULATOR");
++    const QString lines[] = {
++        QStringLiteral("by Andrés del Campo Novales"),
++#ifdef EMU_VERSION_MAJ
++        QStringLiteral("Built on 86Box %1").arg(EMU_VERSION_MAJ),
++#else
++        QStringLiteral("Built on 86Box"),
++#endif
++        // The release the shader was ported from: the IBMulator pin in UPSTREAM.md.
++        QStringLiteral("CRT shader from IBMulator 0.20"),
++        QStringLiteral("Free software, GPL-3.0-or-later"),
++    };
++    // Quiet and compact: lines set closer than the font's own leading.
++    const qreal pad = 8 * s, lineH = plain.pixelSize() * 1.28, nameH = title.pixelSize() * 1.28 + 3 * s;
++    qreal w = titleMetrics.horizontalAdvance(name);
++    for (const QString &line : lines) w = std::max(w, plainMetrics.horizontalAdvance(line));
++    w += 2 * pad;
++    const qreal h = nameH + lineH * qreal(std::size(lines)) + 2 * pad;
++    const QRectF box(size.width() - gap - w, size.height() - gap - side - 6 * s - h, w, h);
++    QColor ink = calloutInk();
++    ink.setAlpha(90);
++    p.setPen(QPen(ink, 1));
++    p.setBrush(QColor(19, 19, 28, 215));
++    p.drawRoundedRect(box, 7 * s, 7 * s);
++    ink.setAlpha(215);
++    p.setFont(title);
++    p.setPen(ink);
++    p.drawText(QRectF(box.left() + pad, box.top() + pad, w, nameH), Qt::AlignTop | Qt::AlignLeft, name);
++    p.setFont(plain);
++    p.setPen(QColor(240, 234, 222, 165));
++    qreal y = box.top() + pad + nameH;
++    for (const QString &line : lines) {
++        p.drawText(QRectF(box.left() + pad, y, w, lineH), Qt::AlignVCenter | Qt::AlignLeft, line);
++        y += lineH;
++    }
++    p.restore();
++}
++
 +}
 +
 +// Covers the renderer while the parts are being shown. Never takes input.
@@ -4594,6 +4677,7 @@ new file mode 100644
 +    {
 +        QPainter p(this);
 +        amstrad::paintHintAreas(p, amstrad::sceneLayout(size()), front, opacity, power);
++        amstrad::paintCredits(p, size(), opacity);
 +    }
 +};
 +

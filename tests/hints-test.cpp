@@ -97,6 +97,9 @@ int main(int argc, char **argv)
             require(differs(over, rest, amstrad::hintRect(l, amstrad::hintAreas()[i]).toAlignedRect()),
                     "A live part is not marked");
 
+        require(differs(over, rest, QRect(hints.x(), hints.y() - 40, hints.width(), 20)),
+                "Credits not shown above the mark");
+
         QEvent leave(QEvent::Leave);
         QApplication::sendEvent(&hints, &leave);
         settle(300);
