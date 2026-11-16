@@ -20,7 +20,7 @@ index 9dd431e..1883117 100644
 \ No newline at end of file
 +endif()
 diff --git a/src/automation.c b/src/automation.c
-index e973225..ef47da9 100644
+index e973225..5602b25 100644
 --- a/src/automation.c
 +++ b/src/automation.c
 @@ -103,6 +103,18 @@ typedef int sock_t;
@@ -63,10 +63,10 @@ index e973225..ef47da9 100644
 +        if (state < 0) respond_error("cabinet UI unavailable or invalid operation (headless runs only)");
 +        else {
 +            resp.len = 0;
-+            sb_printf(&resp, "{\"ok\":true,\"on\":%s,\"peek\":%s,\"reset_hidden\":%s,\"captured\":%s,\"cable_view\":%s,\"fullscreen\":%s,\"maximized\":%s,\"mode_changes\":%u,\"pause_reasons\":%u}",
++            sb_printf(&resp, "{\"ok\":true,\"on\":%s,\"peek\":%s,\"reset_hidden\":%s,\"captured\":%s,\"cable_view\":%s,\"fullscreen\":%s,\"maximized\":%s,\"zoomed\":%s,\"mode_changes\":%u,\"pause_reasons\":%u}",
 +                      state & 1 ? "true" : "false", state & 2 ? "true" : "false",
 +                      state & 4 ? "true" : "false", state & 8 ? "true" : "false", state & 16 ? "true" : "false",
-+                      state & 32 ? "true" : "false", state & 64 ? "true" : "false", (unsigned) state >> 8, runctl_pause_reasons());
++                      state & 32 ? "true" : "false", state & 64 ? "true" : "false", state & 128 ? "true" : "false", (unsigned) state >> 8, runctl_pause_reasons());
 +        }
 +    } else if (!strcmp(argv[0], "ui-model") && argc == 3) {
 +        const int state = qt_automation_model_ui(argv[1], argv[2]);
@@ -1631,7 +1631,7 @@ index d4d8f5d..20162e4 100644
  #define SETTINGS_CHANGED            1
  #define SETTINGS_REQUIRE_HARD_RESET 2
 diff --git a/src/qt/qt_main.cpp b/src/qt/qt_main.cpp
-index f694a38..a9d6400 100644
+index f694a38..ad9e460 100644
 --- a/src/qt/qt_main.cpp
 +++ b/src/qt/qt_main.cpp
 @@ -32,6 +32,14 @@
@@ -1697,7 +1697,7 @@ index f694a38..a9d6400 100644
  
  // Void Cast
  #define VC(x) const_cast<wchar_t *>(x)
-@@ -100,6 +135,353 @@ extern "C" {
+@@ -100,6 +135,360 @@ extern "C" {
  extern QElapsedTimer elapsed_timer;
  extern MainWindow   *main_window;
  
@@ -1787,11 +1787,12 @@ index f694a38..a9d6400 100644
 +                    (mouse_capture ? 8 : 0) | (sw->powerPeek()->isCableView() ? 16 : 0) |
 +                    (main_window->isFullScreen() ? 32 : 0) |
 +                    (main_window->isMaximized() ? 64 : 0) |
++                    (sw->monitorZoom() ? 128 : 0) |
 +                    (main_window->property("powerTestModeChanges").toInt() << 8);
 +        }, Qt::BlockingQueuedConnection);
 +        return state;
 +    }
-+    if (op != "peek" && op != "press" && op != "hide" && op != "leave" && op != "cad" && op != "close-view" && op != "bay-view" && op != "fullscreen") return -1;
++    if (op != "peek" && op != "press" && op != "hide" && op != "leave" && op != "cad" && op != "close-view" && op != "bay-view" && op != "fullscreen" && op != "zoom") return -1;
 +    // Queue mutations: the CPU must return from automation_poll before the
 +    // real UI handler can wait for its safe-point acknowledgement.
 +    QMetaObject::invokeMethod(main_window, [op] {
@@ -1819,7 +1820,13 @@ index f694a38..a9d6400 100644
 +        } else if (op == "hide") peek->hide();
 +        else if (op == "fullscreen")
 +            QMetaObject::invokeMethod(main_window, "on_actionFullscreen_triggered", Qt::DirectConnection);
-+        else {
++        else if (op == "zoom") {
++            // The real shortcut, through the application's key filter.
++            QKeyEvent down(QEvent::KeyPress, Qt::Key_F11, Qt::ControlModifier);
++            QCoreApplication::sendEvent(main_window, &down);
++            QKeyEvent up(QEvent::KeyRelease, Qt::Key_F11, Qt::ControlModifier);
++            QCoreApplication::sendEvent(main_window, &up);
++        } else {
 +            QKeyEvent down(QEvent::KeyPress, Qt::Key_F12, Qt::ControlModifier);
 +            QCoreApplication::sendEvent(main_window, &down);
 +            QKeyEvent up(QEvent::KeyRelease, Qt::Key_F12, Qt::ControlModifier);
@@ -2051,7 +2058,7 @@ index f694a38..a9d6400 100644
  extern "C" {
  #include <86box/keyboard.h>
  #include "cpu.h"
-@@ -178,6 +560,14 @@ keyboard_getkeymap()
+@@ -178,6 +567,14 @@ keyboard_getkeymap()
  void
  win_keyboard_handle(uint32_t scancode, int up, int e0, int e1)
  {
@@ -2066,7 +2073,7 @@ index f694a38..a9d6400 100644
      /* If it's not a scan code that starts with 0xE1 */
      if (e1) {
          if (scancode == 0x1D) {
-@@ -389,9 +779,9 @@ emu_LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
+@@ -389,9 +786,9 @@ emu_LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
          ret = TRUE;
      else if ((lpKdhs->scanCode == 0x39) && (lpKdhs->flags & LLKHF_ALTDOWN) && !(lpKdhs->flags & (LLKHF_UP | LLKHF_EXTENDED)))
          ret = TRUE;
@@ -2078,7 +2085,7 @@ index f694a38..a9d6400 100644
          ret = TRUE;
      else if (inhibit_multimedia_keys &&
              (lpKdhs->vkCode == VK_MEDIA_PLAY_PAUSE ||
-@@ -483,6 +873,17 @@ int
+@@ -483,6 +880,17 @@ int
  main(int argc, char *argv[])
  {
  #ifdef Q_OS_WINDOWS
@@ -2096,7 +2103,7 @@ index f694a38..a9d6400 100644
  #    ifdef USE_QDARKSTYLE
      bool wasDarkTheme = false;
  #    endif
-@@ -737,6 +1138,10 @@ main(int argc, char *argv[])
+@@ -737,6 +1145,10 @@ main(int argc, char *argv[])
  #endif
  
      main_window = new MainWindow();
@@ -2108,7 +2115,7 @@ index f694a38..a9d6400 100644
          main_window->showMaximized();
      } else {
 diff --git a/src/qt/qt_mainwindow.cpp b/src/qt/qt_mainwindow.cpp
-index 8b91429..880cd75 100644
+index 8b91429..8fdc2fc 100644
 --- a/src/qt/qt_mainwindow.cpp
 +++ b/src/qt/qt_mainwindow.cpp
 @@ -32,7 +32,10 @@
@@ -2366,14 +2373,14 @@ index 8b91429..880cd75 100644
              emit setMouseCapture(true);
          video_fullscreen = 1;
          pclog("Full screen: %ix%i\n", QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
-@@ -1714,6 +1812,39 @@ MainWindow::keyMatchesAccelerator(const QKeyEvent *ke, const char *name)
+@@ -1714,6 +1812,43 @@ MainWindow::keyMatchesAccelerator(const QKeyEvent *ke, const char *name)
  bool
  MainWindow::eventFilter(QObject *receiver, QEvent *event)
  {
 +    // Focused rear-button keyboard activation belongs to that control.
 +    if (receiver->objectName() == "amstradRearPower")
 +        return QMainWindow::eventFilter(receiver, event);
-+    // Reserve F11, Alt+Enter and Alt+F4 for this cabinet's host UI, including while the
++    // Reserve F11, Ctrl+F11, Alt+Enter and Alt+F4 for this cabinet's host UI, including while the
 +    // menu is hidden. Key events first reach the application filter with the
 +    // QWidgetWindow (a QWindow, not a QWidget) as receiver, where the guest
 +    // keyboard path below would otherwise swallow them, so match both kinds of
@@ -2396,7 +2403,11 @@ index 8b91429..880cd75 100644
 +                    on_actionExit_triggered();
 +                else if (guestCad)
 +                    ui->actionCtrl_Alt_Del->trigger();
-+                else
++                else if (key->key() == Qt::Key_F11 && mods == Qt::ControlModifier) {
++                    /* Ctrl+F11: the monitor close-up, or back to the whole computer. */
++                    if (auto *sw = ui->stackedWidget->softwareRenderer())
++                        sw->toggleMonitorZoom();
++                } else
 +                    ui->actionFullscreen->trigger();
 +            }
 +            event->accept();
@@ -2406,7 +2417,7 @@ index 8b91429..880cd75 100644
      /* Keys typed into the memory viewer are its own, not the guest's. */
      if ((event->type() == QEvent::KeyPress) || (event->type() == QEvent::KeyRelease) || (event->type() == QEvent::ShortcutOverride)) {
          auto *widget = qobject_cast<QWidget *>(receiver);
-@@ -1871,6 +2002,7 @@ MainWindow::refreshMediaMenu()
+@@ -1871,6 +2006,7 @@ MainWindow::refreshMediaMenu()
  {
      mm->refresh(ui->menuMedia);
      status->setSoundMenu(ui->menuSound);
@@ -2414,7 +2425,7 @@ index 8b91429..880cd75 100644
      status->setDynarecMenu(dynarecMenu);
      status->refresh(ui->statusbar);
      ui->actionMCA_devices->setVisible(machine_has_bus(machine, MACHINE_BUS_MCA));
-@@ -1914,6 +2046,10 @@ MainWindow::hasKanaLock()
+@@ -1914,6 +2050,10 @@ MainWindow::hasKanaLock()
  void
  MainWindow::updatePowerOffAction()
  {
@@ -2425,7 +2436,7 @@ index 8b91429..880cd75 100644
      const bool has_power_button = device_has_power_button();
      if (acpi_enabled || has_power_button) {
          ui->actionACPI_Shutdown->setText(tr("Power &off (soft)"));
-@@ -2533,7 +2669,7 @@ MainWindow::toggleFullscreenUI()
+@@ -2533,7 +2673,7 @@ MainWindow::toggleFullscreenUI()
          }
      }
  
@@ -2434,7 +2445,7 @@ index 8b91429..880cd75 100644
      ui->statusbar->setVisible(fullscreen_ui_visible && !hide_status_bar);
      ui->toolBar->setVisible(fullscreen_ui_visible && !hide_tool_bar);
  }
-@@ -2733,7 +2869,9 @@ MainWindow::changeEvent(QEvent *event)
+@@ -2733,7 +2873,9 @@ MainWindow::changeEvent(QEvent *event)
  #endif
      QWidget::changeEvent(event);
      if (isVisible()) {
@@ -2445,7 +2456,7 @@ index 8b91429..880cd75 100644
          config_save();
      }
      /* The renderer can get its resize event before the window reports being
-@@ -2916,6 +3054,10 @@ MainWindow::on_actionPen_triggered()
+@@ -2916,6 +3058,10 @@ MainWindow::on_actionPen_triggered()
  void
  MainWindow::on_actionACPI_Shutdown_triggered()
  {
@@ -2456,7 +2467,7 @@ index 8b91429..880cd75 100644
      if (acpi_enabled) {
          acpi_pwrbut_press();
          return;
-@@ -2950,3 +3092,433 @@ MainWindow::on_actionCGA_composite_settings_triggered()
+@@ -2950,3 +3096,433 @@ MainWindow::on_actionCGA_composite_settings_triggered()
      isNonPause = false;
      config_save();
  }
@@ -3392,7 +3403,7 @@ index 4703b31..3cf8300 100644
      QBoxLayout *boxLayout = nullptr;
  
 diff --git a/src/qt/qt_softwarerenderer.cpp b/src/qt/qt_softwarerenderer.cpp
-index 5fd1599..0ec4c09 100644
+index 5fd1599..9ab164c 100644
 --- a/src/qt/qt_softwarerenderer.cpp
 +++ b/src/qt/qt_softwarerenderer.cpp
 @@ -17,12 +17,22 @@
@@ -3513,7 +3524,7 @@ index 5fd1599..0ec4c09 100644
      images[0] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
      images[1] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
  
-@@ -47,6 +135,45 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
+@@ -47,6 +135,57 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
      buf_usage[0].clear();
      buf_usage[1].clear();
      this->setMouseTracking(true);
@@ -3544,6 +3555,18 @@ index 5fd1599..0ec4c09 100644
 +            if (auto *action = window()->findChild<QAction *>(QStringLiteral("actionFullscreen")))
 +                action->trigger();
 +        };
++        zoom_button = new AmstradCornerButton(this, AmstradCornerButton::Zoom);
++        zoom_button->blocked = hints->blocked;
++        zoom_button->zoomed = [this] { return zoom_target; };
++        zoom_button->activate = [this] { toggleMonitorZoom(); };
++        zoom_animation.setDuration(420);
++        zoom_animation.setEasingCurve(QEasingCurve::InOutCubic);
++        connect(&zoom_animation, &QVariantAnimation::valueChanged, this,
++                [this](const QVariant &v) { applyViewZoom(v.toReal()); });
++        /* Open on the view last chosen. */
++        zoom_target = QSettings(QDir(QString::fromUtf8(usr_path)).filePath("amstrad.ini"), QSettings::IniFormat)
++                          .value("view/monitor_zoom", false).toBool();
++        amstrad::viewZoom() = zoom_target ? 1 : 0;
 +    }
 +    /* Switched off, no frames arrive to redraw the front, yet disks can still
 +       be swapped: follow the drive faces (and the insert/eject sounds that
@@ -3559,7 +3582,7 @@ index 5fd1599..0ec4c09 100644
      /* Every paint covers the whole update region, so skip Qt's background erase. */
      this->setAttribute(Qt::WA_OpaquePaintEvent);
  
-@@ -88,10 +215,28 @@ SoftwareRenderer::Worker::stop()
+@@ -88,10 +227,28 @@ SoftwareRenderer::Worker::stop()
      thread.reset();
  }
  
@@ -3589,7 +3612,7 @@ index 5fd1599..0ec4c09 100644
      qt_osd_shutdown();
  }
  
-@@ -131,11 +276,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
+@@ -131,11 +288,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
  void
  SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
  {
@@ -3604,7 +3627,7 @@ index 5fd1599..0ec4c09 100644
  
      /* Only repaint the rows that changed since the last frame, which the other
         buffer still holds until it is released below. Every frame is blitted
-@@ -171,7 +319,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
+@@ -171,7 +331,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
          bottom      = std::min(bottom + 1, h);
          int dtop    = dest.y() + ((top * dest.height()) / h) - 1;
          int dbottom = dest.y() + (((bottom * dest.height()) + h - 1) / h) + 1;
@@ -3618,7 +3641,7 @@ index 5fd1599..0ec4c09 100644
      }
  
      if (monitors[r_monitor_index].mon_screenshots || monitors[r_monitor_index].mon_screenshots_clipboard || monitors[r_monitor_index].mon_screenshots_raw_clipboard)
-@@ -192,8 +345,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
+@@ -192,8 +357,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
      const bool relayout = (l.gen != w_layout_gen);
      w_layout_gen        = l.gen;
  
@@ -3632,14 +3655,14 @@ index 5fd1599..0ec4c09 100644
 +        const unsigned state = ledState();
 +        if (state != led_shown) {
 +            led_shown = state;
-+            damage |= amstrad::panelRegion(amstrad::sceneLayout(l.size), drive_faces_valid);
++            damage |= amstrad::panelRegion(amstrad::sceneLayout(l.size, l.zoom), drive_faces_valid);
 +        }
 +    }
 +    const QRegion painted = paintBuffer(back, l, damage, full, relayout);
      presentBuffer(back, painted);
  
      const QRect r     = painted.boundingRect();
-@@ -212,11 +375,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -212,11 +387,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
          img      = QImage(l.size, QImage::Format_RGB32);
          relayout = true;
      }
@@ -3662,7 +3685,7 @@ index 5fd1599..0ec4c09 100644
          painted               = (changed | stale[back]) & all;
      }
  
-@@ -225,9 +398,27 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -225,9 +410,27 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
      if (!painted.isEmpty()) {
          QPainter painter(&img);
          painter.setClipRegion(painted);
@@ -3674,7 +3697,7 @@ index 5fd1599..0ec4c09 100644
 +                painter.fillRect(r, cabinet.isNull() ? QColor(Qt::black) : amstrad::backgroundColor());
 +        }
 +        if (!cabinet.isNull()) {
-+            const auto    scene = amstrad::sceneLayout(l.size);
++            const auto    scene = amstrad::sceneLayout(l.size, l.zoom);
 +            const QImage &art   = l.art.isNull() ? cabinet : l.art;
 +            if (relayout)
 +                amstrad::paintCabinet(painter, art, scene);
@@ -3693,7 +3716,7 @@ index 5fd1599..0ec4c09 100644
              painter.setRenderHint(QPainter::SmoothPixmapTransform, video_filter_method > 0);
              /* The frame's alpha bytes are not set; adding it onto black ignores them
                 and leaves the result opaque, so the GUI thread can copy it as is. */
-@@ -248,6 +439,160 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
+@@ -248,6 +451,160 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
      stale[back ^ 1] |= painted;
  }
  
@@ -3854,27 +3877,75 @@ index 5fd1599..0ec4c09 100644
  SoftwareRenderer::Layout
  SoftwareRenderer::currentLayout()
  {
-@@ -335,6 +680,8 @@ SoftwareRenderer::publishLayout()
+@@ -335,6 +692,9 @@ SoftwareRenderer::publishLayout()
      std::scoped_lock lk(layout_mutex);
      layout.dest  = destination;
      layout.size  = QSize(qRound(width() * pixelRatio), qRound(height() * pixelRatio));
++    layout.zoom  = amstrad::viewZoom().load();
 +    if (!cabinet.isNull())
-+        layout.dest = amstrad::sceneLayout(layout.size).video.toAlignedRect();
++        layout.dest = amstrad::sceneLayout(layout.size, layout.zoom).video.toAlignedRect();
      layout.ratio = pixelRatio;
      layout.gen++;
  }
-@@ -343,12 +690,32 @@ void
+@@ -343,12 +703,79 @@ void
  SoftwareRenderer::resizeEvent(QResizeEvent *event)
  {
      layoutPicture();
-+    if (power_peek) power_peek->place();
-+    if (hints) hints->place();
-+    if (exit_button) exit_button->place();
-+    if (fullscreen_button) fullscreen_button->place();
++    placeControls();
 +    if (!power_led.load()) update();
      QWidget::resizeEvent(event);
  }
  
++void
++SoftwareRenderer::placeControls()
++{
++    if (power_peek) power_peek->place();
++    if (hints) hints->place();
++    if (exit_button) exit_button->place();
++    if (fullscreen_button) fullscreen_button->place();
++    if (zoom_button) zoom_button->place();
++}
++
++void
++SoftwareRenderer::setMonitorZoom(bool on, bool animate)
++{
++    if (cabinet.isNull())
++        return;
++    if (on != zoom_target) {
++        zoom_target = on;
++        QSettings(amstradSettingsPath(), QSettings::IniFormat).setValue("view/monitor_zoom", on);
++    }
++    if (zoom_button) zoom_button->update();
++    const qreal to = on ? 1 : 0;
++    zoom_animation.stop();
++    if (!animate || !isVisible()) {
++        applyViewZoom(to);
++        return;
++    }
++    /* From wherever the view is now, so that a second press turns it round. */
++    zoom_animation.setStartValue(amstrad::viewZoom().load());
++    zoom_animation.setEndValue(to);
++    zoom_animation.start();
++}
++
++void
++SoftwareRenderer::applyViewZoom(qreal zoom)
++{
++    amstrad::viewZoom() = zoom;
++    publishLayout();
++    placeControls();
++    if (hints) hints->refresh();
++    if (!power_led.load() || awaiting_power_frame.load())
++        update(); /* switched off: painted here, from the artwork */
++    /* The worker redraws the whole window for each step. If it cannot keep
++       up, steps are skipped rather than queued: it reads the latest layout. */
++    if (worker.context() && !zoom_frame_queued.exchange(true))
++        QMetaObject::invokeMethod(worker.context(), [this] {
++            zoom_frame_queued = false;
++            scaleFrame(QRegion(), true);
++        }, Qt::QueuedConnection);
++}
++
  bool
  SoftwareRenderer::event(QEvent *event)
  {
@@ -3888,7 +3959,7 @@ index 5fd1599..0ec4c09 100644
 +            if (event->type() == QEvent::MouseButtonRelease && power_edge_press) {
 +                power_edge_press = false; event->accept(); return true;
 +            }
-+            if (event->type() == QEvent::MouseButtonPress && power_peek->revealArea().contains(me->pos())) {
++            if (event->type() == QEvent::MouseButtonPress && power_peek->hoverArea().contains(me->pos())) {
 +                power_peek->reveal(); power_edge_press = true; event->accept(); return true;
 +            }
 +        }
@@ -3896,7 +3967,7 @@ index 5fd1599..0ec4c09 100644
      bool res = false;
      if (!eventDelegate(event, res))
          return QWidget::event(event);
-@@ -362,12 +729,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -362,12 +789,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
      const int  shown = frontBuffer();
      /* Repaint when the OSD is up, or once more right after it closes so a
       * lingering overlay is cleared even while the machine is paused. */
@@ -3915,7 +3986,7 @@ index 5fd1599..0ec4c09 100644
  
      if (osd) {
          painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-@@ -385,6 +755,69 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -385,6 +815,69 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
          QTimer::singleShot(16, this, [this] { update(); });
  }
  
@@ -3986,14 +4057,15 @@ index 5fd1599..0ec4c09 100644
  SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
  {
 diff --git a/src/qt/qt_softwarerenderer.hpp b/src/qt/qt_softwarerenderer.hpp
-index 265bb45..db81156 100644
+index 265bb45..352effe 100644
 --- a/src/qt/qt_softwarerenderer.hpp
 +++ b/src/qt/qt_softwarerenderer.hpp
-@@ -7,14 +7,20 @@
+@@ -7,14 +7,21 @@
  #include <QRegion>
  #include <QScopedPointer>
  #include <QBackingStore>
 +#include <QOffscreenSurface>
++#include <QVariantAnimation>
  #include <array>
  #include <atomic>
  #include <memory>
@@ -4010,7 +4082,7 @@ index 265bb45..db81156 100644
  
  class SoftwareRenderer :
      public QWidget,
-@@ -22,6 +28,7 @@ class SoftwareRenderer :
+@@ -22,6 +29,7 @@ class SoftwareRenderer :
      Q_OBJECT
  public:
      explicit SoftwareRenderer(QWidget *parent = nullptr);
@@ -4018,7 +4090,7 @@ index 265bb45..db81156 100644
      void finalize() override final;
  
      void paintEvent(QPaintEvent *event) override;
-@@ -59,6 +66,76 @@ protected:
+@@ -59,6 +67,88 @@ protected:
      QScopedPointer<QBackingStore> m_backingStore;
  
  private:
@@ -4072,7 +4144,19 @@ index 265bb45..db81156 100644
 +    // drawn in the left bay (if it holds a floppy) and the right bay.
 +    QImage frontPreview(const amstrad::Front &front, const QRectF &master,
 +                        int leftFace = -1, int rightFace = -1) const;
++    // The monitor close-up, or the whole computer. The view travels there
++    // unless told not to; the choice is kept beside the VM's 86box.cfg.
++    bool monitorZoom() const { return zoom_target; }
++    void setMonitorZoom(bool on, bool animate = true);
++    void toggleMonitorZoom() { setMonitorZoom(!zoom_target); }
 +private:
++    AmstradCornerButton *zoom_button = nullptr;
++    bool zoom_target = false;
++    QVariantAnimation zoom_animation;
++    // One repaint queued on the worker at a time while the view travels.
++    std::atomic<bool> zoom_frame_queued{false};
++    void applyViewZoom(qreal zoom);
++    void placeControls();
 +    AmstradPowerPeek *power_peek = nullptr;
 +    AmstradHints *hints = nullptr;
 +    AmstradCornerButton *exit_button = nullptr;
@@ -4095,9 +4179,11 @@ index 265bb45..db81156 100644
      /* A thread with an event loop and an object living on it, to deliver work to.
         Stopping it waits for the work in progress to finish. */
      class Worker {
-@@ -84,6 +161,9 @@ private:
+@@ -83,7 +173,11 @@ private:
+         QRect dest;
          QSize size;
          qreal ratio = 1.0;
++        qreal zoom  = 0; // amstrad::viewZoom() when published
          int   gen   = 0;
 +        // The cabinet with the configured bays and badges; null = plain cabinet.
 +        QImage         art;
@@ -4105,7 +4191,7 @@ index 265bb45..db81156 100644
      };
  
      /* Worker thread: scale the current frame into the back buffer, where dirty
-@@ -102,6 +182,7 @@ private:
+@@ -102,6 +196,7 @@ private:
      int   cur_image = -1;
      QRect wsource { 0, 0, 0, 0 };
      int   w_layout_gen = -1;
@@ -4338,7 +4424,7 @@ diff --git a/src/qt/qt_amstradhints.hpp b/src/qt/qt_amstradhints.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradhints.hpp
-@@ -0,0 +1,409 @@
+@@ -0,0 +1,423 @@
 +// Where the cabinet's controls are. GPL-2.0-or-later, like 86Box.
 +//
 +// Nothing on the cabinet says that the drive bays and badges open controls.
@@ -4554,12 +4640,14 @@ new file mode 100644
 +
 +    bool areasVisible() const { return areas->isVisible() && areas->opacity > 0; }
 +    const AmstradHintAreas *overlay() const { return areas; }
++    // The parts moved (the view changed): redraw their outlines where they are now.
++    void refresh() { areas->update(); }
 +
 +    // Bottom-right corner of the scene, scaled with the cabinet.
 +    void place()
 +    {
 +        if (!parentWidget()) return;
-+        const auto  l    = amstrad::sceneLayout(parentWidget()->size());
++        const auto  l    = amstrad::restLayout(parentWidget()->size());
 +        const int   side = std::max(22, qRound(34 * l.scale));
 +        const int   gap  = std::max(8, qRound(16 * l.scale));
 +        setGeometry(parentWidget()->width() - side - gap, parentWidget()->height() - side - gap, side, side);
@@ -4641,13 +4729,14 @@ new file mode 100644
 +    QVariantAnimation animation;
 +};
 +
-+// Matching corner controls for closing the app and changing window mode.
++// Matching corner controls for closing the app, changing window mode and
++// switching between the whole computer and the monitor close-up.
 +class AmstradCornerButton : public QWidget {
 +public:
-+    enum Role { Exit, Fullscreen };
++    enum Role { Exit, Fullscreen, Zoom }; // in this order from the right-hand corner
 +    explicit AmstradCornerButton(QWidget *parent, Role role) : QWidget(parent), role(role)
 +    {
-+        setObjectName(role == Exit ? "amstradExit" : "amstradFullscreen");
++        setObjectName(role == Exit ? "amstradExit" : role == Zoom ? "amstradZoom" : "amstradFullscreen");
 +        setAttribute(Qt::WA_TranslucentBackground);
 +        setFocusPolicy(Qt::NoFocus);
 +        if (role == Exit) {
@@ -4662,18 +4751,21 @@ new file mode 100644
 +
 +    std::function<bool()> blocked;
 +    std::function<bool()> fullscreen;
++    std::function<bool()> zoomed;
 +    std::function<void()> activate;
 +
 +    void place()
 +    {
 +        if (!parentWidget()) return;
-+        const auto l = amstrad::sceneLayout(parentWidget()->size());
++        const auto l = amstrad::restLayout(parentWidget()->size());
 +        const int side = std::max(22, qRound(34 * l.scale));
 +        const int gap = std::max(8, qRound(16 * l.scale));
-+        setGeometry(parentWidget()->width() - side - gap - (role == Fullscreen ? side + 4 : 0), gap, side, side);
-+        if (role == Fullscreen) {
-+            const bool on = fullscreen && fullscreen();
-+            const QString label = on ? tr("Exit fullscreen") : tr("Enter fullscreen");
++        setGeometry(parentWidget()->width() - side - gap - int(role) * (side + 4), gap, side, side);
++        if (role != Exit) {
++            const bool on = role == Zoom ? zoomed && zoomed() : fullscreen && fullscreen();
++            const QString label = role == Zoom ? (on ? tr("Show the whole computer (Ctrl+F11)")
++                                                     : tr("Zoom in on the monitor (Ctrl+F11)"))
++                                               : on ? tr("Exit fullscreen") : tr("Enter fullscreen");
 +            if (accessibleName() != label) {
 +                setAccessibleName(label);
 +                setToolTip(label);
@@ -4705,6 +4797,14 @@ new file mode 100644
 +        if (role == Exit) {
 +            p.drawLine(QPointF(13 * s, 13 * s), QPointF(21 * s, 21 * s));
 +            p.drawLine(QPointF(21 * s, 13 * s), QPointF(13 * s, 21 * s));
++        } else if (role == Zoom) {
++            // A magnifying glass: plus to close in, minus to step back.
++            const QPointF lens(15.5 * s, 15.5 * s);
++            p.drawEllipse(lens, 5 * s, 5 * s);
++            p.drawLine(QPointF(19.3 * s, 19.3 * s), QPointF(23 * s, 23 * s));
++            p.drawLine(lens - QPointF(2.4 * s, 0), lens + QPointF(2.4 * s, 0));
++            if (!(zoomed && zoomed()))
++                p.drawLine(lens - QPointF(0, 2.4 * s), lens + QPointF(0, 2.4 * s));
 +        } else if (fullscreen && fullscreen()) {
 +            // Four inward-facing corners indicate a return to the window.
 +            for (int x : {0, 1}) for (int y : {0, 1}) {
@@ -6139,7 +6239,7 @@ diff --git a/src/qt/qt_amstradpower.hpp b/src/qt/qt_amstradpower.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradpower.hpp
-@@ -0,0 +1,418 @@
+@@ -0,0 +1,434 @@
 +// Rear monitor power-button close-up. GPL-2.0-or-later, like 86Box.
 +#ifndef QT_AMSTRADPOWER_HPP
 +#define QT_AMSTRADPOWER_HPP
@@ -6284,6 +6384,18 @@ new file mode 100644
 +    // Its on-screen footprint remains a reveal target while hidden. Keep this
 +    // outside the monitor, clear of the colour/monochrome badge's menu target.
 +    QRectF revealArea() const { return QRectF(geometry()); }
++    // The part of it that brings the hidden close-up out under the pointer.
++    // In the monitor close-up it may have to lie over the monitor for want
++    // of room beside it: the glass then stays the guest's.
++    QRectF hoverArea() const
++    {
++        QRectF area = revealArea();
++        if (amstrad::viewZoom().load() > 0) {
++            const auto l = amstrad::sceneLayout(parentWidget()->size());
++            area.setLeft(std::max(area.left(), l.aperture.right() + 8 * l.scale));
++        }
++        return area;
++    }
 +
 +    // Where the button sits, seen from the front: low on the monitor's right edge.
 +    QPointF spot() const
@@ -6304,8 +6416,12 @@ new file mode 100644
 +        const int x = qRound(l.cabinet.left() + 1190 * s);
 +        // Preserve the picture's position while giving its caption more air.
 +        const int y = qRound(l.cabinet.top() + 650 * s) - qRound((photoHeight() * factor + 44) * s) / 2;
-+        const int rightLimit = std::max(leftLimit, parentWidget()->width() - sz.width() - qRound(8 * s));
-+        setGeometry(std::clamp(x, leftLimit, rightLimit),
++        const int fitRight   = parentWidget()->width() - sz.width() - qRound(8 * s);
++        const int rightLimit = std::max(leftLimit, fitRight);
++        // The monitor close-up can leave no room beside the monitor. Rather
++        // than hang off the window, the switch then lies over the housing.
++        const bool over = amstrad::viewZoom().load() > 0 && fitRight < leftLimit;
++        setGeometry(over ? std::max(0, fitRight) : std::clamp(x, leftLimit, rightLimit),
 +                    std::clamp(y, 0, std::max(0, parentWidget()->height() - sz.height())), sz.width(), sz.height());
 +        const int menuSize = std::max(20, qRound(26*s));
 +        viewButton->setGeometry(qRound((PhotoX + PhotoW*factor)*s) - menuSize - qRound(8*s),
@@ -6347,7 +6463,7 @@ new file mode 100644
 +    {
 +        if (!powered) { reveal(); return; }
 +        if (captured) { hide(); return; }
-+        if (revealArea().contains(point) || (isVisible() && travelArea.contains(point)))
++        if (hoverArea().contains(point) || (isVisible() && (travelArea.contains(point) || revealArea().contains(point))))
 +            reveal();
 +        else
 +            dismissLater();
@@ -6562,7 +6678,7 @@ diff --git a/src/qt/qt_amstradscene.hpp b/src/qt/qt_amstradscene.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradscene.hpp
-@@ -0,0 +1,404 @@
+@@ -0,0 +1,437 @@
 +// Amstrad cabinet presentation, GPL-2.0-or-later, same terms as 86Box.
 +// Geometry is measured in the unchanged 1254 x 1254 approved master image.
 +#ifndef QT_AMSTRADSCENE_HPP
@@ -6577,6 +6693,7 @@ new file mode 100644
 +#include <QFileInfo>
 +#include <QRegularExpression>
 +#include <algorithm>
++#include <atomic>
 +#include <cmath>
 +
 +namespace amstrad {
@@ -6594,12 +6711,39 @@ new file mode 100644
 +
 +constexpr qreal SceneWidth = 1460;
 +
-+inline Layout layout(const QSize &size, bool powerSpace = false)
++// The monitor close-up: its housing, bezel included, in master pixels, with
++// an even margin around it. The housing spans y = 14 to 830; the margin
++// below it shows the top of its neck on the system unit.
++inline QRectF masterMonitor() { return QRectF(114, -4, 1026, 852); }
++
++// The view shown: 0 is the whole computer, 1 the monitor close-up, and values
++// in between occur while the view travels from one to the other. Written by
++// the GUI thread; the scaling worker gets its copy with the published layout.
++inline std::atomic<qreal> &viewZoom()
++{
++    static std::atomic<qreal> zoom { 0 };
++    return zoom;
++}
++
++inline Layout layout(const QSize &size, bool powerSpace = false, qreal zoom = 0)
 +{
 +    const qreal width = powerSpace ? SceneWidth : 1254;
-+    const qreal scale = std::min(size.width() / width, size.height() / 1254.0);
-+    const QPointF origin((size.width() - width * scale) / 2,
-+                         (size.height() - 1254 * scale) / 2);
++    qreal scale = std::min(size.width() / width, size.height() / 1254.0);
++    QPointF origin((size.width() - width * scale) / 2,
++                   (size.height() - 1254 * scale) / 2);
++    if (zoom > 0) {
++        // The close-up fills the window with the monitor, centred, its lower
++        // edge on the window's: whatever room is left over lies above and
++        // beside it, never below, where the system unit would show. Scale and
++        // position are blended together, so every point travels in a line.
++        const QRectF  m     = masterMonitor();
++        const qreal   close = std::min(size.width() / m.width(), size.height() / m.height());
++        const QPointF closeOrigin(size.width() / 2.0 - m.center().x() * close,
++                                  size.height() - m.bottom() * close);
++        zoom   = std::min(zoom, qreal(1));
++        origin = origin + (closeOrigin - origin) * zoom;
++        scale  = scale + (close - scale) * zoom;
++    }
 +    auto rect = [=](qreal x, qreal y, qreal w, qreal h) {
 +        return QRectF(origin.x() + x * scale, origin.y() + y * scale, w * scale, h * scale);
 +    };
@@ -6611,7 +6755,12 @@ new file mode 100644
 +
 +// Keep a right-hand margin for the rear switch, even in a narrow window.
 +// Artwork preparation and cropped menu previews retain the master layout.
-+inline Layout sceneLayout(const QSize &size) { return layout(size, true); }
++// This is the view as shown now, close-up included.
++inline Layout sceneLayout(const QSize &size) { return layout(size, true, viewZoom().load()); }
++inline Layout sceneLayout(const QSize &size, qreal zoom) { return layout(size, true, zoom); }
++// The whole computer whatever the view: sizes the controls that belong to the
++// window rather than to the cabinet, so that they do not grow with a close-up.
++inline Layout restLayout(const QSize &size) { return layout(size, true); }
 +
 +inline QPainterPath aperture(const Layout &l)
 +{
