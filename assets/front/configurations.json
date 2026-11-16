@@ -38,6 +38,9 @@
                           "mm":  "badges/monitor-mm.png",
                           "width":  140,
                           "cm":  "badges/monitor-cm.png",
+                          "md":  "badges/monitor-md.png",
+                          "cd":  "badges/monitor-cd.png",
+                          "ecd":  "badges/monitor-ecd.png",
                           "y":  743,
                           "x":  923,
                           "height":  60

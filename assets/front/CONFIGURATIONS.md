@@ -10,7 +10,7 @@ This asset task does not wire the new SD/HD20/MM selections into the emulator.
 | Blank, plain/sticker, left | `drives/bay-left-blank.png`, `bay-left-blank-sticker.png` | 174, 1011 | 450 x 180 |
 | Blank, plain/sticker, right | `drives/bay-right-blank.png`, `bay-right-blank-sticker.png` | 632, 1011 | 450 x 180 |
 | Model suffix DD/SD/HD20 | `badges/model-dd.png`, `model-sd.png`, `model-hd20.png` | 870, 1164 | 216 x 76 |
-| Monitor CM/MM | `badges/monitor-cm.png`, `monitor-mm.png` | 923, 743 | 140 x 60 |
+| Monitor CM/MM/MD/CD/ECD | `badges/monitor-cm.png`, `monitor-mm.png`, `monitor-md.png`, `monitor-cd.png`, `monitor-ecd.png` | 923, 743 | 140 x 60 |
 | HDD activity OFF/ON | `leds/hdd-off.png`, `hdd-on.png` | 276, 1061 | 48 x 40 |
 
 All files are straight-alpha RGBA. Keep transparent padding. Draw the cabinet,
@@ -34,8 +34,8 @@ Existing floppy filenames `drive-a`/`drive-b` describe LEFT/RIGHT visual
 positions. In SD/HD20 the right-hand floppy is logically A: despite the
 `drive-b` image filenames. The configuration mapping records that distinction.
 
-Badge patches change only the model suffix or first white monitor letter;
-the existing PC/1512, hyphen, trailing monitor M and housings are retained.
+Badge patches change only the model suffix or monitor suffix lettering;
+the existing PC/1512, red monitor PC, hyphen and housings are retained.
 HDD OFF is extracted from the assembled module; ON matches the same window.
 The plain and sticker blank plates share one master.
 
@@ -70,3 +70,6 @@ after rebuilding the existing drive states. It refreshes HDD LED metadata.
 `configurations-preview.png` is a compositing preview of SD plain/sticker
 and HD20 idle/active. `badges/monitor-preview.png` compares CM/MM.
 `case-highlight-comparison.png` shows the final brightness correction.
+`badges/monitor-options-preview.png` compares all five monitor badges.
+Rebuild the three new monitor badges and preview with
+`scripts/create-monitor-badges.ps1`.

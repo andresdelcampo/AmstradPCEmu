@@ -65,8 +65,6 @@ def main():
     env['AMSTRAD_HEADLESS'] = '1'
     env['AMSTRAD_POWER_ON'] = '1'
     env['AMSTRAD_CRT'] = '1' if args.shader else '0'
-    # The PC1640 is disabled in normal use; only its own run switches it on.
-    env['AMSTRAD_PC1640'] = '1' if pc1640 else '0'
     for override in ['AMSTRAD_CRT_SAMPLING', 'AMSTRAD_CRT_CONVERGENCE', 'AMSTRAD_CRT_SHADER']:
         env.pop(override, None)
     env['AMSTRAD_CRT_LOG'] = str(out/'crt.log')

@@ -106,7 +106,7 @@ $manifest=[ordered]@{
     version=1;front='pc1512-front.png';canvas=@{width=1254;height=1254;origin='top-left'}
     bays=@{left=@{x=174;y=1011;width=450;height=180;hdd='drives/bay-left-hdd.png';blank='drives/bay-left-blank.png';blank_sticker='drives/bay-left-blank-sticker.png'};right=@{x=632;y=1011;width=450;height=180;blank='drives/bay-right-blank.png';blank_sticker='drives/bay-right-blank-sticker.png'}}
     badge=@{x=870;y=1164;width=216;height=76;dd='badges/model-dd.png';sd='badges/model-sd.png';hd20='badges/model-hd20.png'}
-    monitor_badge=@{x=923;y=743;width=140;height=60;cm='badges/monitor-cm.png';mm='badges/monitor-mm.png'}
+    monitor_badge=@{x=923;y=743;width=140;height=60;cm='badges/monitor-cm.png';mm='badges/monitor-mm.png';md='badges/monitor-md.png';cd='badges/monitor-cd.png';ecd='badges/monitor-ecd.png'}
     hdd_led=@{x=276;y=1061;width=48;height=40;off='leds/hdd-off.png';on='leds/hdd-on.png';requires='left HDD module'}
     configurations=@{dd=@{left='floppy A';right='floppy B';badge='dd'};sd=@{left='blank or blank_sticker';right='floppy A';badge='sd'};hd20=@{left='hdd';right='floppy A';badge='hd20'}}
     draw_order=@('cabinet','selected bay modules or floppy state patches','model badge','power LED and activity LEDs belonging to installed devices')

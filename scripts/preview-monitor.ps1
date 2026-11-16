@@ -1,6 +1,7 @@
 param(
     [string]$Toolchain = 'C:\msys64\mingw64',
-    [string]$FontRom = 'C:\Emulators\86Box\roms\machines\pc1512\40078'
+    [string]$FontRom = 'C:\Emulators\86Box\roms\machines\pc1512\40078',
+    [string]$Rom1640 = 'C:\Emulators\86Box\roms\machines\pc1640\40100'
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -17,7 +18,9 @@ try {
     if ($LASTEXITCODE) { throw 'Qt development libraries missing.' }
     & "$Toolchain\bin\g++.exe" -std=c++17 "-I$root\upstream\86Box\src\qt" (Join-Path $root 'tests\monitor-preview.cpp') -o "$out\monitor-preview.exe" ($flags -split ' ')
     if ($LASTEXITCODE) { throw 'Monitor preview compilation failed.' }
-    & "$out\monitor-preview.exe" $root $FontRom "$out\monitor.png"
+    # With the PC1640's video ROM present, its three monitors are rendered too.
+    if (Test-Path -LiteralPath $Rom1640) { & "$out\monitor-preview.exe" $root $FontRom "$out\monitor.png" $Rom1640 }
+    else { & "$out\monitor-preview.exe" $root $FontRom "$out\monitor.png" }
     if ($LASTEXITCODE) { throw "Monitor preview failed ($LASTEXITCODE)." }
     Write-Output "$out\monitor.png"
 } finally {

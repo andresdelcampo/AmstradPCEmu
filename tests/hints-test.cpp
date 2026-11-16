@@ -124,6 +124,45 @@ int main(int argc, char **argv)
         off.place();
         settle(300);
         require(off.isHidden(), "AMSTRAD_HINTS=0 ignored");
+        AmstradCornerButton exitButton(&host, AmstradCornerButton::Exit);
+        int exits = 0;
+        exitButton.blocked = [&] { return captured; };
+        exitButton.activate = [&] { ++exits; };
+        exitButton.place();
+        require(exitButton.isVisible(), "Exit control missing");
+        require(exitButton.geometry().topRight().x() == hints.geometry().right(),
+                "Exit control does not align with help");
+        require(exitButton.geometry().top() == host.height() - hints.geometry().bottom() - 1,
+                "Exit control does not mirror help vertically");
+        const QPoint center = exitButton.rect().center();
+        QMouseEvent press(QEvent::MouseButtonPress, center, Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QMouseEvent release(QEvent::MouseButtonRelease, center, Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(&exitButton, &press);
+        QApplication::sendEvent(&exitButton, &release);
+        require(exits == 1, "Exit control did not activate");
+        AmstradCornerButton modeButton(&host, AmstradCornerButton::Fullscreen);
+        bool fullscreen = false;
+        modeButton.blocked = [&] { return captured; };
+        modeButton.fullscreen = [&] { return fullscreen; };
+        modeButton.activate = [&] { fullscreen = !fullscreen; };
+        modeButton.place();
+        require(modeButton.isVisible() && modeButton.geometry().right() == exitButton.geometry().left() - 5,
+                "Fullscreen control is not next to exit");
+        require(modeButton.accessibleName() == "Enter fullscreen", "Windowed label is wrong");
+        QMouseEvent modePress(QEvent::MouseButtonPress, modeButton.rect().center(), Qt::LeftButton, Qt::LeftButton, Qt::NoModifier);
+        QMouseEvent modeRelease(QEvent::MouseButtonRelease, modeButton.rect().center(), Qt::LeftButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(&modeButton, &modePress);
+        QApplication::sendEvent(&modeButton, &modeRelease);
+        modeButton.place();
+        require(fullscreen && modeButton.accessibleName() == "Exit fullscreen", "Fullscreen control did not switch state");
+        QApplication::sendEvent(&modeButton, &modePress);
+        QApplication::sendEvent(&modeButton, &modeRelease);
+        require(!fullscreen, "Fullscreen control did not switch back");
+        captured = true;
+        exitButton.place();
+        modeButton.place();
+        require(exitButton.isHidden(), "Exit control stays visible during mouse capture");
+        require(modeButton.isHidden(), "Fullscreen control stays visible during mouse capture");
         std::puts("hints: ok");
         return 0;
     } catch (const std::exception &error) {
