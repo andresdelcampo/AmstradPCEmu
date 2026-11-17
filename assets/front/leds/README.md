@@ -3,21 +3,23 @@
 HDD additions: `hdd-off.png` and `hdd-on.png`, **48 x 40 RGBA**, at
 **(276, 1061)** in the left HD20 module. Use only with that module installed.
 See [configuration assets](../CONFIGURATIONS.md). `placement.json` includes
-this indicator and the current front hash.
+this indicator.
 
 Six original **48 x 48 RGBA PNG** patches matching `../pc1512-front.png`
 cabinet (1254 x 1254). Created 2026-11-14. Red power and green floppy
 activity indicators each have an on and an off state. Each drive has its own
 patches to preserve its slightly different lens size and surrounding recess.
 
-The current power states follow the improved lens in the front master. Its
-center is (232, 986), or (24, 26) inside the unchanged 48 x 48 patch at
-(208, 960). Both states keep that lens's circular outline, dark seating
-shadow, pale lower rim and surrounding POWER lettering. `power-off-master.png`
-supplies a deep ruby interior; `power-on-master.png` supplies a restrained
-warm luminous core. The overlay affects only the lens interior, leaving the
-front master's mounting details intact. These two compact source crops are
-tracked here so the power patches can be rebuilt with `-PowerOnly`.
+The current power lens is scaled from the improved front artwork to match the
+smaller indicator and position in the supplied hardware photograph. Its center
+is (223.5, 988.5), or (15.5, 28.5) inside the unchanged 48 x 48 patch at
+(208, 960). The visible lens and mounting rim are about 15 pixels across.
+The original POWER lettering is moved left without changing its font or size.
+`power-off-master.png` supplies a deep ruby interior;
+`power-on-master.png` supplies a restrained warm luminous core. Both overlays
+affect only the lens interior, retaining the front master's scaled rim and
+shadow. `power-panel-source.png` preserves the prior panel crop so the front
+resize is repeatable, while the compact state masters rebuild the overlays.
 Green drive and HDD patches and all runtime placement coordinates are unchanged.
 
 | Indicator | Off | On | Top-left x, y |
@@ -48,15 +50,18 @@ Recheck alignment if the front changes.
 
 The current power source crops were edited with the built-in image_gen tool
 using the improved lens from the front master, then resampled and feathered
-into its original interior geometry. These are photographic-style AI edits,
-not newly sourced photographs. Earlier power geometry is documented in
+into the smaller geometry. These are photographic-style AI edits, not newly
+sourced photographs. The lens resize and label move use the original panel
+pixels, with no new generated artwork. Earlier power geometry is documented in
 `front-power-led-geometry-v5.md`; the current front image takes precedence.
 
 Earlier geometry and backplate prompt: [front-power-led-geometry-v5.md](../../../docs/front-power-led-geometry-v5.md).
 Earlier power lens prompts: [front-power-led-v3-prompts.md](../../../docs/front-power-led-v3-prompts.md).
 Earlier and drive prompts: [front-led-prompts.md](../../../docs/front-led-prompts.md).
 Full-size generated source images and full-front composites are preserved under
-`local/artwork/led-states/`. Rebuild the power patches with
+`local/artwork/led-states/`. Reapply the front resize with
+`rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts/resize-power-led.ps1`.
+Rebuild the power patches with
 `rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts/assemble-led-assets.ps1 -PowerOnly`.
 Rebuild all patches with
 `rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scripts/assemble-led-assets.ps1`
