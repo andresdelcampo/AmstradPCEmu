@@ -1,6 +1,6 @@
 # Cabinet controls
 
-Updated 2026-11-14. Hover over either drive bay, the model badge or the monitor badge for 450 ms, or left-click for immediate access. Right-click remains available. The live screen still captures the guest mouse; cabinet menus are unavailable while it is captured.
+Updated 2026-11-17. Hover over either drive bay, the model badge, the monitor badge or the system unit's AMSTRAD plate for 450 ms, or left-click for immediate access. Right-click remains available. The live screen still captures the guest mouse; cabinet menus are unavailable while it is captured.
 
 The pointer changes to a hand over each part. Briefly passing over a part cancels the pending hover. Panels open above the part where space allows, stay inside the current screen, and leave a corridor for moving into the panel. Moving away dismisses them after 400 ms. Escape and outside clicks also dismiss them. Closing a panel does not immediately reopen it under a stationary pointer.
 
@@ -22,15 +22,19 @@ Write protection is the disk's own notch: a gold tab over it means protected. Cl
 
 The model badge opens **Machine configuration**, two separate choices in one panel (since 2026-11-16; before, every drive layout was listed once per computer). **Computer** is a row of two cards, **PC1512** (512K, CGA) and **PC1640** (640K, EGA), each shown by its nameplate: red "PC" and pale numerals on the grey strip in the cream casing, drawn in code (`drawNameplate`) because the lettering in the cabinet artwork is too small to enlarge. Neither machine had a logo of its own beyond that lettering. **Drives** is one vertical list of DD, SD, SD with factory sticker and HD20, named for the computer fitted (PC1640 DD, ...). Each entry shows the system unit's front cut out of the cabinet artwork (no picture well) beside its name, and the fitted one is marked like the monitor selector, with a rounded box and a tick (`drawChoiceBox` in `qt_amstradpopup.hpp`). The panel is `addMachinePanel` in `qt_amstradmenu.hpp` (`MachineChoice`, `ConfigChoice`); `scripts/preview-config.ps1` renders that same panel for each computer to `local/config-preview/`. Each choice is applied on its own, with its own restart confirmation: changing the computer keeps the drives, and the reverse. Disks, drives and the hard disk image carry over, and the badge numerals follow the machine. Arrow keys move through both groups, passing over the headings. The left bay also links to that panel. See [PC1640](PC1640.md). A disk collection box beside the computer remains an exploratory future idea.
 
+The system unit's **AMSTRAD** plate opens **About**: the program's name and author, the 86Box version it is built on, the IBMulator release the CRT shader comes from, and the licence. The cabinet has no menu bar and so no About box; until 2026-11-17 these lines were a card shown with the parts overlay. The panel is `addAboutPanel` in `qt_amstradmenu.hpp`, the area `masterMakerBadge()` in `qt_amstradscene.hpp`.
+
 ## Finding the controls
 
-Nothing on the cabinet says its parts are live. A small, muted **?** mark sits in the bottom-right corner of the scene. While the pointer rests on it, every live part is boxed like a hovered choice in the menus (thin light border, translucent lift; a soft dark edge keeps it readable on the cream casing) and tagged with its name and a few words on what it opens (**DRIVE A** / **DRIVE B** Insert or eject a disk, **MACHINE** Choose the drives fitted, **MONITOR** Colour or mono). Drive tags follow the fit: with two drives A is left and B right; with one, the right bay is **DRIVE A** and the left reads **HARD DISK** or **DRIVE BAY**. The rear power close-up comes into view too, boxed the same way and tagged "Switch on or off" above its own POWER caption. The overlay is static: nothing moves or plays unasked. It lingers 0.6 s after the pointer leaves, then fades.
+Nothing on the cabinet says its parts are live. A small, muted **?** mark sits in the bottom-right corner of the scene. While the pointer rests on it, every live part is boxed like a hovered choice in the menus (thin light border, translucent lift; a soft dark edge keeps it readable on the cream casing) and tagged with its name and a few words on what it opens (**DRIVE A** / **DRIVE B** Insert or eject a disk, **MACHINE** Choose the drives fitted, **MONITOR** Colour or mono, **AMSTRAD** About this emulator). Drive tags follow the fit: with two drives A is left and B right; with one, the right bay is **DRIVE A** and the left reads **HARD DISK** or **DRIVE BAY**. The rear power close-up comes into view too, boxed the same way and tagged "Switch on or off" above its own POWER caption. The overlay is static: nothing moves or plays unasked. It lingers 0.6 s after the pointer leaves, then fades.
 
-The mark scales with the cabinet, takes no clicks, and is hidden while the guest has the mouse. `AMSTRAD_HINTS=0` removes it; automated (`AMSTRAD_HEADLESS=1`) runs have it off unless `AMSTRAD_HINTS=1`.
+The mark scales with the cabinet, takes no clicks, and is hidden while the guest has the mouse. `AMSTRAD_HINTS=0` removes it; automated (`AMSTRAD_HEADLESS=1`) runs have it off unless `AMSTRAD_HINTS=1`. It stays in the bottom corner, apart from the window controls at the top right: it explains the machine, not the window.
+
+The corner controls (the mark, zoom, fullscreen and exit) fade out 2.5 s after the mouse last moved anywhere over the window, leaving only the cabinet, and come back as soon as it moves. They stay while one is under the pointer or the parts are shown. `AMSTRAD_FADE_CONTROLS=0` keeps them shown; automated runs keep them unless `AMSTRAD_FADE_CONTROLS=1`. `AmstradChromeFade` in `qt_amstradhints.hpp`.
 
 An earlier trial, timed highlights passing over each unused part, was dropped on 2026-11-16: several areas asking for attention at once for a second each was too much to take in.
 
-`qt_amstradhints.hpp` holds the mark (`AmstradHints`), the input-transparent overlay (`AmstradHintAreas`) and the tag geometry (`hintAreas`). `scripts/test-hints.ps1` saves the scene at rest and with the parts shown to `local/hints-test/` and checks hover, linger, fade and the captured-mouse case.
+`qt_amstradhints.hpp` holds the mark (`AmstradHints`), the input-transparent overlay (`AmstradHintAreas`) and the tag geometry (`hintAreas`). `scripts/test-hints.ps1` saves the scene at rest and with the parts shown to `local/hints-test/` and checks hover, linger, fade, the captured-mouse case and the corner controls' idle fade.
 
 ## Code
 
@@ -55,7 +59,7 @@ The machine family is real emulator state (`machine`, memory, firmware), kept se
 
 ## Verification
 
-`python scripts/verify-milestone.py` runs `ui-cabinet-test` on the authenticated offscreen test socket. It opens all four hotspots through the real renderer delegate, checks delayed hover and cancellation, dismissal/reopen suppression and captured-mouse exclusion, and saves menu PNGs under `local/verification/`. Existing screen mouse-capture checks dismiss cabinet popups before inspecting button release.
+`python scripts/verify-milestone.py` runs `ui-cabinet-test` on the authenticated offscreen test socket. It opens all five hotspots through the real renderer delegate, checks delayed hover and cancellation, dismissal/reopen suppression and captured-mouse exclusion, and saves menu PNGs under `local/verification/`. Existing screen mouse-capture checks dismiss cabinet popups before inspecting button release.
 
 `scripts/preview-disks.ps1` renders the drive panel in three states to `local/disk-preview/` and checks the disk box's bookkeeping (matching, ordering, tabs, unlinking) on a throwaway VM folder.
 

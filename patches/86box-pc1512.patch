@@ -1631,7 +1631,7 @@ index d4d8f5d..20162e4 100644
  #define SETTINGS_CHANGED            1
  #define SETTINGS_REQUIRE_HARD_RESET 2
 diff --git a/src/qt/qt_main.cpp b/src/qt/qt_main.cpp
-index f694a38..ad9e460 100644
+index f694a38..4819d58 100644
 --- a/src/qt/qt_main.cpp
 +++ b/src/qt/qt_main.cpp
 @@ -32,6 +32,14 @@
@@ -1697,7 +1697,7 @@ index f694a38..ad9e460 100644
  
  // Void Cast
  #define VC(x) const_cast<wchar_t *>(x)
-@@ -100,6 +135,360 @@ extern "C" {
+@@ -100,6 +135,361 @@ extern "C" {
  extern QElapsedTimer elapsed_timer;
  extern MainWindow   *main_window;
  
@@ -1931,7 +1931,8 @@ index f694a38..ad9e460 100644
 +            { "left-drive", amstrad::masterBay(0).adjusted(0,0,0,-36), 5 },
 +            { "right-drive", amstrad::masterBay(1).adjusted(0,0,0,-36), 5 },
 +            { "configuration", amstrad::masterModelBadge(), 6 },
-+            { "monitor", amstrad::masterMonitorBadge(), SoftwareRenderer::machineFront().pc1640 ? 3 : 2 }
++            { "monitor", amstrad::masterMonitorBadge(), SoftwareRenderer::machineFront().pc1640 ? 3 : 2 },
++            { "about", amstrad::masterMakerBadge(), 0 }
 +        };
 +        for (const auto &target : targets) {
 +            const QPoint point = at(target.rect);
@@ -2058,7 +2059,7 @@ index f694a38..ad9e460 100644
  extern "C" {
  #include <86box/keyboard.h>
  #include "cpu.h"
-@@ -178,6 +567,14 @@ keyboard_getkeymap()
+@@ -178,6 +568,14 @@ keyboard_getkeymap()
  void
  win_keyboard_handle(uint32_t scancode, int up, int e0, int e1)
  {
@@ -2073,7 +2074,7 @@ index f694a38..ad9e460 100644
      /* If it's not a scan code that starts with 0xE1 */
      if (e1) {
          if (scancode == 0x1D) {
-@@ -389,9 +786,9 @@ emu_LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
+@@ -389,9 +787,9 @@ emu_LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
          ret = TRUE;
      else if ((lpKdhs->scanCode == 0x39) && (lpKdhs->flags & LLKHF_ALTDOWN) && !(lpKdhs->flags & (LLKHF_UP | LLKHF_EXTENDED)))
          ret = TRUE;
@@ -2085,7 +2086,7 @@ index f694a38..ad9e460 100644
          ret = TRUE;
      else if (inhibit_multimedia_keys &&
              (lpKdhs->vkCode == VK_MEDIA_PLAY_PAUSE ||
-@@ -483,6 +880,17 @@ int
+@@ -483,6 +881,17 @@ int
  main(int argc, char *argv[])
  {
  #ifdef Q_OS_WINDOWS
@@ -2103,7 +2104,7 @@ index f694a38..ad9e460 100644
  #    ifdef USE_QDARKSTYLE
      bool wasDarkTheme = false;
  #    endif
-@@ -737,6 +1145,10 @@ main(int argc, char *argv[])
+@@ -737,6 +1146,10 @@ main(int argc, char *argv[])
  #endif
  
      main_window = new MainWindow();
@@ -2115,7 +2116,7 @@ index f694a38..ad9e460 100644
          main_window->showMaximized();
      } else {
 diff --git a/src/qt/qt_mainwindow.cpp b/src/qt/qt_mainwindow.cpp
-index 8b91429..a71c109 100644
+index 8b91429..cae7e3f 100644
 --- a/src/qt/qt_mainwindow.cpp
 +++ b/src/qt/qt_mainwindow.cpp
 @@ -32,7 +32,10 @@
@@ -2487,7 +2488,7 @@ index 8b91429..a71c109 100644
      if (acpi_enabled) {
          acpi_pwrbut_press();
          return;
-@@ -2950,3 +3098,433 @@ MainWindow::on_actionCGA_composite_settings_triggered()
+@@ -2950,3 +3098,436 @@ MainWindow::on_actionCGA_composite_settings_triggered()
      isNonPause = false;
      config_save();
  }
@@ -2727,6 +2728,9 @@ index 8b91429..a71c109 100644
 +            break;
 +        case amstrad::HotMonitorBadge:
 +            addMonitorChoices(&menu);
++            break;
++        case amstrad::HotMakerBadge:
++            amstrad::addAboutPanel(&menu);
 +            break;
 +        default:
 +            return;
@@ -3423,7 +3427,7 @@ index 4703b31..3cf8300 100644
      QBoxLayout *boxLayout = nullptr;
  
 diff --git a/src/qt/qt_softwarerenderer.cpp b/src/qt/qt_softwarerenderer.cpp
-index 5fd1599..95dd4c1 100644
+index 5fd1599..c518cb9 100644
 --- a/src/qt/qt_softwarerenderer.cpp
 +++ b/src/qt/qt_softwarerenderer.cpp
 @@ -17,22 +17,51 @@
@@ -3545,7 +3549,7 @@ index 5fd1599..95dd4c1 100644
      images[0] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
      images[1] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
  
-@@ -47,6 +136,57 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
+@@ -47,6 +136,71 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
      buf_usage[0].clear();
      buf_usage[1].clear();
      this->setMouseTracking(true);
@@ -3580,6 +3584,20 @@ index 5fd1599..95dd4c1 100644
 +        zoom_button->blocked = hints->blocked;
 +        zoom_button->zoomed = [this] { return zoom_target; };
 +        zoom_button->activate = [this] { toggleMonitorZoom(); };
++        /* The corner controls fade while the mouse rests, and return when it moves. */
++        chrome_fade = new AmstradChromeFade(this, this);
++        chrome_fade->hold = [this] {
++            return hints->isHovered() || hints->areasVisible() || exit_button->isHovered() ||
++                   fullscreen_button->isHovered() || zoom_button->isHovered();
++        };
++        chrome_fade->apply = [this](qreal opacity) {
++            hints->chrome = opacity;
++            hints->update();
++            for (AmstradCornerButton *button : { exit_button, fullscreen_button, zoom_button }) {
++                button->chrome = opacity;
++                button->update();
++            }
++        };
 +        zoom_animation.setDuration(560);
 +        zoom_animation.setEasingCurve(QEasingCurve::InOutSine);
 +        connect(&zoom_animation, &QVariantAnimation::valueChanged, this,
@@ -3603,7 +3621,7 @@ index 5fd1599..95dd4c1 100644
      /* Every paint covers the whole update region, so skip Qt's background erase. */
      this->setAttribute(Qt::WA_OpaquePaintEvent);
  
-@@ -88,10 +228,28 @@ SoftwareRenderer::Worker::stop()
+@@ -88,10 +242,28 @@ SoftwareRenderer::Worker::stop()
      thread.reset();
  }
  
@@ -3633,7 +3651,7 @@ index 5fd1599..95dd4c1 100644
      qt_osd_shutdown();
  }
  
-@@ -131,11 +289,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
+@@ -131,11 +303,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
  void
  SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
  {
@@ -3648,7 +3666,7 @@ index 5fd1599..95dd4c1 100644
  
      /* Only repaint the rows that changed since the last frame, which the other
         buffer still holds until it is released below. Every frame is blitted
-@@ -155,6 +316,8 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
+@@ -155,6 +330,8 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
              bottom--;
      }
      buf_usage[buf_idx ^ 1].clear();
@@ -3657,7 +3675,7 @@ index 5fd1599..95dd4c1 100644
  
      if (wsource != origSource) {
          /* The GUI thread owns the layout; it asks for a full repaint once it has
-@@ -171,7 +334,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
+@@ -171,7 +348,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
          bottom      = std::min(bottom + 1, h);
          int dtop    = dest.y() + ((top * dest.height()) / h) - 1;
          int dbottom = dest.y() + (((bottom * dest.height()) + h - 1) / h) + 1;
@@ -3671,7 +3689,7 @@ index 5fd1599..95dd4c1 100644
      }
  
      if (monitors[r_monitor_index].mon_screenshots || monitors[r_monitor_index].mon_screenshots_clipboard || monitors[r_monitor_index].mon_screenshots_raw_clipboard)
-@@ -192,8 +360,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
+@@ -192,8 +374,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
      const bool relayout = (l.gen != w_layout_gen);
      w_layout_gen        = l.gen;
  
@@ -3692,7 +3710,7 @@ index 5fd1599..95dd4c1 100644
      presentBuffer(back, painted);
  
      const QRect r     = painted.boundingRect();
-@@ -212,11 +390,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -212,11 +404,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
          img      = QImage(l.size, QImage::Format_RGB32);
          relayout = true;
      }
@@ -3715,7 +3733,7 @@ index 5fd1599..95dd4c1 100644
          painted               = (changed | stale[back]) & all;
      }
  
-@@ -225,9 +413,39 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -225,9 +427,39 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
      if (!painted.isEmpty()) {
          QPainter painter(&img);
          painter.setClipRegion(painted);
@@ -3758,7 +3776,7 @@ index 5fd1599..95dd4c1 100644
              painter.setRenderHint(QPainter::SmoothPixmapTransform, video_filter_method > 0);
              /* The frame's alpha bytes are not set; adding it onto black ignores them
                 and leaves the result opaque, so the GUI thread can copy it as is. */
-@@ -236,6 +454,7 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -236,6 +468,7 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
          }
      }
      img.setDevicePixelRatio(l.ratio);
@@ -3766,7 +3784,7 @@ index 5fd1599..95dd4c1 100644
      return painted;
  }
  
-@@ -248,6 +467,160 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
+@@ -248,6 +481,160 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
      stale[back ^ 1] |= painted;
  }
  
@@ -3927,7 +3945,7 @@ index 5fd1599..95dd4c1 100644
  SoftwareRenderer::Layout
  SoftwareRenderer::currentLayout()
  {
-@@ -335,6 +708,9 @@ SoftwareRenderer::publishLayout()
+@@ -335,6 +722,9 @@ SoftwareRenderer::publishLayout()
      std::scoped_lock lk(layout_mutex);
      layout.dest  = destination;
      layout.size  = QSize(qRound(width() * pixelRatio), qRound(height() * pixelRatio));
@@ -3937,7 +3955,7 @@ index 5fd1599..95dd4c1 100644
      layout.ratio = pixelRatio;
      layout.gen++;
  }
-@@ -343,12 +719,95 @@ void
+@@ -343,12 +733,95 @@ void
  SoftwareRenderer::resizeEvent(QResizeEvent *event)
  {
      layoutPicture();
@@ -4033,7 +4051,7 @@ index 5fd1599..95dd4c1 100644
      bool res = false;
      if (!eventDelegate(event, res))
          return QWidget::event(event);
-@@ -362,12 +821,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -362,12 +835,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
      const int  shown = frontBuffer();
      /* Repaint when the OSD is up, or once more right after it closes so a
       * lingering overlay is cleared even while the machine is paused. */
@@ -4052,7 +4070,7 @@ index 5fd1599..95dd4c1 100644
  
      if (osd) {
          painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-@@ -385,6 +847,70 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -385,6 +861,70 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
          QTimer::singleShot(16, this, [this] { update(); });
  }
  
@@ -4123,7 +4141,7 @@ index 5fd1599..95dd4c1 100644
  bool
  SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
  {
-@@ -392,15 +918,45 @@ SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
+@@ -392,15 +932,45 @@ SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
         cannot pick it as its back buffer in between. The worker never writes
         the front buffer, so this only waits if it is about to reuse it. */
      std::unique_lock idx(idx_mutex);
@@ -4173,10 +4191,10 @@ index 5fd1599..95dd4c1 100644
      return true;
  }
 diff --git a/src/qt/qt_softwarerenderer.hpp b/src/qt/qt_softwarerenderer.hpp
-index 265bb45..7c2823d 100644
+index 265bb45..95cf9c1 100644
 --- a/src/qt/qt_softwarerenderer.hpp
 +++ b/src/qt/qt_softwarerenderer.hpp
-@@ -7,14 +7,21 @@
+@@ -7,14 +7,22 @@
  #include <QRegion>
  #include <QScopedPointer>
  #include <QBackingStore>
@@ -4195,10 +4213,11 @@ index 265bb45..7c2823d 100644
 +class AmstradPowerPeek;
 +class AmstradHints;
 +class AmstradCornerButton;
++class AmstradChromeFade;
  
  class SoftwareRenderer :
      public QWidget,
-@@ -22,6 +29,7 @@ class SoftwareRenderer :
+@@ -22,6 +30,7 @@ class SoftwareRenderer :
      Q_OBJECT
  public:
      explicit SoftwareRenderer(QWidget *parent = nullptr);
@@ -4206,7 +4225,7 @@ index 265bb45..7c2823d 100644
      void finalize() override final;
  
      void paintEvent(QPaintEvent *event) override;
-@@ -59,6 +67,89 @@ protected:
+@@ -59,6 +68,90 @@ protected:
      QScopedPointer<QBackingStore> m_backingStore;
  
  private:
@@ -4278,6 +4297,7 @@ index 265bb45..7c2823d 100644
 +    AmstradHints *hints = nullptr;
 +    AmstradCornerButton *exit_button = nullptr;
 +    AmstradCornerButton *fullscreen_button = nullptr;
++    AmstradChromeFade *chrome_fade = nullptr;
 +    bool power_edge_press = false;
 +    std::atomic<bool> awaiting_power_frame{false};
 +    void paintUnpowered(QPainter &painter);
@@ -4296,7 +4316,7 @@ index 265bb45..7c2823d 100644
      /* A thread with an event loop and an object living on it, to deliver work to.
         Stopping it waits for the work in progress to finish. */
      class Worker {
-@@ -83,7 +174,11 @@ private:
+@@ -83,7 +176,11 @@ private:
          QRect dest;
          QSize size;
          qreal ratio = 1.0;
@@ -4308,7 +4328,7 @@ index 265bb45..7c2823d 100644
      };
  
      /* Worker thread: scale the current frame into the back buffer, where dirty
-@@ -101,7 +196,11 @@ private:
+@@ -101,7 +198,11 @@ private:
      /* Owned by the worker thread. */
      int   cur_image = -1;
      QRect wsource { 0, 0, 0, 0 };
@@ -4320,7 +4340,7 @@ index 265bb45..7c2823d 100644
  
      std::mutex layout_mutex;
      Layout     layout;
-@@ -112,6 +211,7 @@ private:
+@@ -112,6 +213,7 @@ private:
      std::mutex              idx_mutex;
      std::array<std::mutex, 2> scaled_mutex;
      std::array<QImage, 2>   scaled;
@@ -4553,30 +4573,28 @@ diff --git a/src/qt/qt_amstradhints.hpp b/src/qt/qt_amstradhints.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradhints.hpp
-@@ -0,0 +1,492 @@
+@@ -0,0 +1,510 @@
 +// Where the cabinet's controls are. GPL-2.0-or-later, like 86Box.
 +//
 +// Nothing on the cabinet says that the drive bays and badges open controls.
 +// A small, muted mark in the bottom-right corner of the scene answers that on
 +// request: while the pointer rests on it, every live part is outlined and
-+// named, the rear power close-up comes into view, and a card above the mark
-+// credits the program and what it is built on. Nothing moves or asks for
-+// attention otherwise.
++// named and the rear power close-up comes into view. The maker's AMSTRAD
++// plate is one of those parts: it opens the About panel. Nothing moves or
++// asks for attention otherwise; the corner controls fade while the mouse rests.
 +#ifndef QT_AMSTRADHINTS_HPP
 +#define QT_AMSTRADHINTS_HPP
 +
 +#include "qt_amstradscene.hpp"
 +#include "qt_amstradpower.hpp"
 +#include <QFontMetricsF>
++#include <QApplication>
 +#include <QMouseEvent>
++#include <QPointer>
 +#include <QTimer>
 +#include <QVariantAnimation>
 +#include <QWidget>
 +#include <functional>
-+// 86Box's own version, where this is built as part of it (not in the tests).
-+#if __has_include(<86box/version.h>)
-+#    include <86box/version.h>
-+#endif
 +
 +namespace amstrad {
 +
@@ -4588,7 +4606,7 @@ new file mode 100644
 +    qreal   radius;
 +    QPointF tag;
 +};
-+constexpr int HintAreaCount = 4;
++constexpr int HintAreaCount = 5;
 +
 +inline const HintArea *hintAreas()
 +{
@@ -4597,6 +4615,7 @@ new file mode 100644
 +        { HotRightBay,     QRectF(642, 1022, 428, 118), 5, QPointF(856, 999) },
 +        { HotModelBadge,   QRectF(872, 1187, 206, 26),  3, QPointF(975, 1164) },
 +        { HotMonitorBadge, QRectF(932, 751, 120, 38),   4, QPointF(992, 727) },
++        { HotMakerBadge,   QRectF(204, 1186, 92, 28),   3, QPointF(250, 1164) },
 +    };
 +    return all;
 +}
@@ -4618,6 +4637,7 @@ new file mode 100644
 +        case HotRightBay:     return front.rightDrive() ? QStringLiteral("DRIVE B") : QStringLiteral("DRIVE A");
 +        case HotModelBadge:   return QStringLiteral("MACHINE");
 +        case HotMonitorBadge: return QStringLiteral("MONITOR");
++        case HotMakerBadge:   return QStringLiteral("AMSTRAD");
 +        default:              return {};
 +    }
 +}
@@ -4633,6 +4653,7 @@ new file mode 100644
 +        case HotModelBadge:   return QStringLiteral("Choose the drives fitted");
 +        case HotMonitorBadge: return front.pc1640 ? QStringLiteral("Choose the screen")
 +                                                  : QStringLiteral("Colour or mono");
++        case HotMakerBadge:   return QStringLiteral("About this emulator");
 +        default:              return {};
 +    }
 +}
@@ -4712,63 +4733,6 @@ new file mode 100644
 +// does. The artwork for them is drawn on a 34-unit grid and scaled to this.
 +inline int cornerSide(qreal scale) { return std::max(33, qRound(51 * scale)); }
 +
-+// What this program is and whose work it stands on: the cabinet has no menu
-+// bar, so no About box. A small card in the tags' style, just above the
-+// corner mark and sized like it, by the window rather than by the view.
-+inline void paintCredits(QPainter &p, const QSize &size, qreal opacity)
-+{
-+    if (opacity <= 0) return;
-+    const qreal s    = restLayout(size).scale;
-+    const int   side = cornerSide(s); // the corner mark, as placed by AmstradHints
-+    const int   gap  = std::max(8, qRound(16 * s));
-+    p.save();
-+    p.setRenderHint(QPainter::Antialiasing, true);
-+    p.setOpacity(opacity);
-+    QFont title = p.font();
-+    title.setPixelSize(std::max(8, qRound(10 * s)));
-+    title.setBold(true);
-+    title.setLetterSpacing(QFont::AbsoluteSpacing, 1.0);
-+    QFont plain = p.font();
-+    plain.setPixelSize(std::max(9, qRound(11 * s)));
-+    const QFontMetricsF titleMetrics(title), plainMetrics(plain);
-+
-+    const QString name = QStringLiteral("AMSTRAD PC1512/1640 EMULATOR");
-+    const QString lines[] = {
-+        QStringLiteral("by Andrés del Campo Novales"),
-+#ifdef EMU_VERSION_MAJ
-+        QStringLiteral("Built on 86Box %1").arg(EMU_VERSION_MAJ),
-+#else
-+        QStringLiteral("Built on 86Box"),
-+#endif
-+        // The release the shader was ported from: the IBMulator pin in UPSTREAM.md.
-+        QStringLiteral("CRT shader from IBMulator 0.20"),
-+        QStringLiteral("Free software, GPL-3.0-or-later"),
-+    };
-+    // Quiet and compact: lines set closer than the font's own leading.
-+    const qreal pad = 8 * s, lineH = plain.pixelSize() * 1.28, nameH = title.pixelSize() * 1.28 + 3 * s;
-+    qreal w = titleMetrics.horizontalAdvance(name);
-+    for (const QString &line : lines) w = std::max(w, plainMetrics.horizontalAdvance(line));
-+    w += 2 * pad;
-+    const qreal h = nameH + lineH * qreal(std::size(lines)) + 2 * pad;
-+    const QRectF box(size.width() - gap - w, size.height() - gap - side - 6 * s - h, w, h);
-+    QColor ink = calloutInk();
-+    ink.setAlpha(90);
-+    p.setPen(QPen(ink, 1));
-+    p.setBrush(QColor(19, 19, 28, 215));
-+    p.drawRoundedRect(box, 7 * s, 7 * s);
-+    ink.setAlpha(215);
-+    p.setFont(title);
-+    p.setPen(ink);
-+    p.drawText(QRectF(box.left() + pad, box.top() + pad, w, nameH), Qt::AlignTop | Qt::AlignLeft, name);
-+    p.setFont(plain);
-+    p.setPen(QColor(240, 234, 222, 165));
-+    qreal y = box.top() + pad + nameH;
-+    for (const QString &line : lines) {
-+        p.drawText(QRectF(box.left() + pad, y, w, lineH), Qt::AlignVCenter | Qt::AlignLeft, line);
-+        y += lineH;
-+    }
-+    p.restore();
-+}
 +
 +}
 +
@@ -4791,7 +4755,6 @@ new file mode 100644
 +    {
 +        QPainter p(this);
 +        amstrad::paintHintAreas(p, amstrad::sceneLayout(size()), front, opacity, power);
-+        amstrad::paintCredits(p, size(), opacity);
 +    }
 +};
 +
@@ -4837,6 +4800,9 @@ new file mode 100644
 +    std::function<QRectF()> powerArea;
 +
 +    bool areasVisible() const { return areas->isVisible() && areas->opacity > 0; }
++    bool isHovered() const { return hovered; }
++    // How much of the mark shows: 1, or less while the corner controls fade.
++    qreal chrome = 1;
 +    const AmstradHintAreas *overlay() const { return areas; }
 +    // The parts moved (the view changed): redraw their outlines where they are now.
 +    void refresh() { areas->update(); }
@@ -4860,6 +4826,7 @@ new file mode 100644
 +    {
 +        QPainter p(this);
 +        p.setRenderHint(QPainter::Antialiasing, true);
++        p.setOpacity(hovered ? 1 : chrome);
 +        const qreal  s = width() / 34.0;
 +        const QRectF ring(5 * s, 5 * s, 24 * s, 24 * s);
 +        QColor ink = amstrad::calloutInk();
@@ -4951,6 +4918,9 @@ new file mode 100644
 +    std::function<bool()> fullscreen;
 +    std::function<bool()> zoomed;
 +    std::function<void()> activate;
++    // How much of the control shows: 1, or less while the corner controls fade.
++    qreal chrome = 1;
++    bool  isHovered() const { return hovered; }
 +
 +    void place()
 +    {
@@ -4980,6 +4950,7 @@ new file mode 100644
 +    {
 +        QPainter p(this);
 +        p.setRenderHint(QPainter::Antialiasing, true);
++        p.setOpacity(hovered ? 1 : chrome);
 +        const qreal s = width() / 34.0;
 +        const QRectF ring(5 * s, 5 * s, 24 * s, 24 * s);
 +        QColor ink = amstrad::calloutInk();
@@ -5045,12 +5016,79 @@ new file mode 100644
 +    Role role;
 +    QTimer watch;
 +};
++
++// Fades the corner controls (the parts mark, zoom, fullscreen and exit) out
++// while the mouse rests, and back in as soon as it moves anywhere over the
++// window, as video players do. Only the cabinet remains once it settles.
++class AmstradChromeFade : public QObject {
++public:
++    // anchor: moves anywhere in its top-level window count. Starts shown.
++    AmstradChromeFade(QWidget *anchor, QObject *parent) : QObject(parent), window(anchor)
++    {
++        // AMSTRAD_FADE_CONTROLS=0 keeps them shown. Automated runs compare
++        // pictures: shown there unless AMSTRAD_FADE_CONTROLS=1 asks for it.
++        const QString mode = qEnvironmentVariable("AMSTRAD_FADE_CONTROLS");
++        enabled = mode == "1" || (mode != "0" && qEnvironmentVariableIntValue("AMSTRAD_HEADLESS") != 1);
++        idle.setSingleShot(true);
++        idle.setInterval(RestMs);
++        connect(&idle, &QTimer::timeout, this, [this] {
++            if (hold && hold()) idle.start();
++            else fadeTo(0, 700);
++        });
++        connect(&animation, &QVariantAnimation::valueChanged, this, [this](const QVariant &v) {
++            opacity = v.toReal();
++            if (apply) apply(opacity);
++        });
++        if (enabled) {
++            qApp->installEventFilter(this);
++            idle.start();
++        }
++    }
++    static constexpr int RestMs = 2500;
++    qreal opacity = 1;
++    // Paints the controls at this opacity.
++    std::function<void(qreal)> apply;
++    // True while they must stay: one is under the pointer, or the parts are shown.
++    std::function<bool()> hold;
++    // The mouse moved: bring them back and start counting again.
++    void wake()
++    {
++        if (!enabled) return;
++        if (opacity < 1 && !(animation.state() == QAbstractAnimation::Running && animation.endValue().toReal() == 1))
++            fadeTo(1, 160);
++        idle.start();
++    }
++
++protected:
++    bool eventFilter(QObject *watched, QEvent *event) override
++    {
++        if (event->type() == QEvent::MouseMove || event->type() == QEvent::HoverMove) {
++            auto *w = qobject_cast<QWidget *>(watched);
++            if (w && window && w->window() == window->window()) wake();
++        }
++        return false;
++    }
++
++private:
++    void fadeTo(qreal to, int ms)
++    {
++        animation.stop();
++        animation.setDuration(ms);
++        animation.setStartValue(opacity);
++        animation.setEndValue(to);
++        animation.start();
++    }
++    QPointer<QWidget> window;
++    bool              enabled = true;
++    QTimer            idle;
++    QVariantAnimation animation;
++};
 +#endif
 diff --git a/src/qt/qt_amstradmenu.hpp b/src/qt/qt_amstradmenu.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradmenu.hpp
-@@ -0,0 +1,713 @@
+@@ -0,0 +1,782 @@
 +// Graphical cabinet controls. GPL-2.0-or-later, like 86Box.
 +#ifndef QT_AMSTRADMENU_HPP
 +#define QT_AMSTRADMENU_HPP
@@ -5072,6 +5110,10 @@ new file mode 100644
 +#include <QWidgetAction>
 +#include <algorithm>
 +#include <functional>
++// 86Box's own version, where this is built as part of it (not in the tests).
++#if __has_include(<86box/version.h>)
++#    include <86box/version.h>
++#endif
 +
 +namespace amstrad {
 +inline QPixmap menuPicture(const QImage &image, const QSize &box, qreal ratio)
@@ -5396,6 +5438,71 @@ new file mode 100644
 +        grid->addWidget(new ConfigChoice(panel.unit(preview), name+tr(b.suffix), tr(b.text), front.left == b.bay,
 +            [choose = panel.choose, pc1640 = front.pc1640, bay = int(b.bay)] { choose(pc1640,bay); }),row++,0,1,2);
 +    }
++}
++// ---- About: what this program is and whose work it stands on ----
++// Opened from the maker's AMSTRAD plate: the cabinet has no menu bar, so
++// no About box. Text only, in the panels' frosted style.
++inline QString aboutTitle() { return QStringLiteral("Amstrad PC1512/1640 Emulator"); }
++inline QStringList aboutLines()
++{
++    return {
++#ifdef EMU_VERSION_MAJ
++        QStringLiteral("Built on 86Box %1").arg(EMU_VERSION_MAJ),
++#else
++        QStringLiteral("Built on 86Box"),
++#endif
++        // The release the shader was ported from: the IBMulator pin in UPSTREAM.md.
++        QStringLiteral("CRT shader from IBMulator 0.20"),
++        QStringLiteral("Free software, GPL-3.0-or-later"),
++    };
++}
++inline QString aboutAuthor() { return QStringLiteral("by Andrés del Campo Novales"); }
++
++class AboutPanel : public QWidget {
++public:
++    AboutPanel()
++    {
++        setAccessibleName(aboutTitle());
++        setAccessibleDescription(aboutAuthor() + ". " + aboutLines().join(". "));
++    }
++    QSize sizeHint() const override
++    {
++        const QFontMetrics plain(font());
++        return QSize(Width, Pad * 2 + titleHeight() + plain.height() + Rule + plain.height() * int(aboutLines().size()));
++    }
++protected:
++    void paintEvent(QPaintEvent *) override
++    {
++        QPainter p(this); p.setRenderHint(QPainter::Antialiasing);
++        const int w = width() - 2 * Pad, line = QFontMetrics(font()).height();
++        int y = Pad;
++        p.setFont(titleFont());
++        drawPopupText(p, QRect(Pad, y, w, titleHeight()), Qt::AlignLeft | Qt::AlignVCenter, aboutTitle());
++        y += titleHeight();
++        p.setFont(font());
++        drawPopupText(p, QRect(Pad, y, w, line), Qt::AlignLeft | Qt::AlignVCenter, aboutAuthor(),
++                      PopupTheme::secondaryText());
++        y += line + Rule / 2;
++        p.setPen(QPen(PopupTheme::border(), 1));
++        p.drawLine(QPointF(Pad, y + .5), QPointF(width() - Pad, y + .5));
++        y += Rule / 2;
++        for (const QString &text : aboutLines()) {
++            drawPopupText(p, QRect(Pad, y, w, line), Qt::AlignLeft | Qt::AlignVCenter, text,
++                          PopupTheme::secondaryText());
++            y += line;
++        }
++    }
++private:
++    static constexpr int Width = 360, Pad = 16, Rule = 18;
++    QFont titleFont() const { QFont f = font(); f.setBold(true); f.setPointSizeF(f.pointSizeF() * 1.2); return f; }
++    int titleHeight() const { return QFontMetrics(titleFont()).height() + 2; }
++};
++inline void addAboutPanel(QMenu *menu)
++{
++    auto *a = new QWidgetAction(menu);
++    a->setDefaultWidget(new AboutPanel);
++    a->setEnabled(false);
++    menu->addAction(a);
 +}
 +// ---- The disk box: floppies as pictures, shared by tiles and the drive card ----
 +// Artwork is in the 924 x 895 frame of scripts/make-disk-assets.ps1.
@@ -6876,7 +6983,7 @@ diff --git a/src/qt/qt_amstradscene.hpp b/src/qt/qt_amstradscene.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradscene.hpp
-@@ -0,0 +1,437 @@
+@@ -0,0 +1,440 @@
 +// Amstrad cabinet presentation, GPL-2.0-or-later, same terms as 86Box.
 +// Geometry is measured in the unchanged 1254 x 1254 approved master image.
 +#ifndef QT_AMSTRADSCENE_HPP
@@ -7092,6 +7199,8 @@ new file mode 100644
 +inline QRectF masterModelBadge() { return QRectF(870, 1164, 216, 76); }
 +inline QRectF masterMonitorBadge() { return QRectF(923, 743, 140, 60); }
 +inline QRectF masterHddLed() { return QRectF(276, 1061, 48, 40); }
++// The maker's AMSTRAD plate on the system unit's lower strip: opens the About panel.
++inline QRectF masterMakerBadge() { return QRectF(196, 1176, 108, 46); }
 +
 +// The cabinet with this configuration's bay module and badges fitted. The
 +// master already shows DD and CM, so those need no patch.
@@ -7120,7 +7229,7 @@ new file mode 100644
 +}
 +
 +// Right-click targets, from a point in the same coordinates as the layout.
-+enum Hotspot { HotNone, HotLeftBay, HotRightBay, HotModelBadge, HotMonitorBadge };
++enum Hotspot { HotNone, HotLeftBay, HotRightBay, HotModelBadge, HotMonitorBadge, HotMakerBadge };
 +
 +inline Hotspot hotspot(const Layout &l, const QPointF &point)
 +{
@@ -7129,6 +7238,7 @@ new file mode 100644
 +    // bay patches reach below the drive housings into the badge strip.
 +    if (masterModelBadge().contains(m)) return HotModelBadge;
 +    if (masterMonitorBadge().contains(m)) return HotMonitorBadge;
++    if (masterMakerBadge().contains(m)) return HotMakerBadge;
 +    if (masterBay(0).adjusted(0, 0, 0, -36).contains(m)) return HotLeftBay;
 +    if (masterBay(1).adjusted(0, 0, 0, -36).contains(m)) return HotRightBay;
 +    return HotNone;

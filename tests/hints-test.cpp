@@ -97,8 +97,10 @@ int main(int argc, char **argv)
             require(differs(over, rest, amstrad::hintRect(l, amstrad::hintAreas()[i]).toAlignedRect()),
                     "A live part is not marked");
 
-        require(differs(over, rest, QRect(hints.x(), hints.y() - 40, hints.width(), 20)),
-                "Credits not shown above the mark");
+        require(!differs(over, rest, QRect(hints.x(), hints.y() - 40, hints.width(), 20)),
+                "Something drawn above the mark (credits moved to the AMSTRAD plate)");
+        require(amstrad::hotspot(l, amstrad::hintRect(l, amstrad::hintAreas()[4]).center()) == amstrad::HotMakerBadge,
+                "AMSTRAD plate is not a live part");
 
         QEvent leave(QEvent::Leave);
         QApplication::sendEvent(&hints, &leave);
@@ -166,6 +168,32 @@ int main(int argc, char **argv)
         modeButton.place();
         require(exitButton.isHidden(), "Exit control stays visible during mouse capture");
         require(modeButton.isHidden(), "Fullscreen control stays visible during mouse capture");
+        // The corner controls fade while the mouse rests and return when it moves.
+        captured = false;
+        qputenv("AMSTRAD_FADE_CONTROLS", "1");
+        bool held = false;
+        qreal shownAt = 1;
+        AmstradChromeFade fader(&host, &host);
+        fader.hold  = [&] { return held; };
+        fader.apply = [&](qreal o) { shownAt = o; };
+        settle(AmstradChromeFade::RestMs + 900);
+        require(shownAt == 0, "Corner controls did not fade while the mouse rested");
+        QMouseEvent move(QEvent::MouseMove, QPointF(40, 40), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(&host, &move);
+        settle(300);
+        require(shownAt == 1, "Corner controls did not return when the mouse moved");
+        held = true;
+        settle(AmstradChromeFade::RestMs + 900);
+        require(shownAt == 1, "Corner controls faded while held");
+        held = false;
+        settle(AmstradChromeFade::RestMs + 900);
+        require(shownAt == 0, "Corner controls did not fade once released");
+        qputenv("AMSTRAD_FADE_CONTROLS", "0");
+        qreal untouched = 1;
+        AmstradChromeFade still(&host, &host);
+        still.apply = [&](qreal o) { untouched = o; };
+        settle(AmstradChromeFade::RestMs + 900);
+        require(untouched == 1, "AMSTRAD_FADE_CONTROLS=0 ignored");
         std::puts("hints: ok");
         return 0;
     } catch (const std::exception &error) {
