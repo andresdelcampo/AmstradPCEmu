@@ -97,12 +97,39 @@ int main(int argc, char **argv)
             require(differs(over, rest, amstrad::hintRect(l, amstrad::hintAreas()[i]).toAlignedRect()),
                     "A live part is not marked");
 
-        require(!differs(over, rest, QRect(hints.x(), hints.y() - 40, hints.width(), 20)),
-                "Something drawn above the mark (credits moved to the AMSTRAD plate)");
+        // Every keyboard shortcut, in a KEYS card just above the mark.
+        const QRect keys = hints.keysArea().toAlignedRect();
+        require(!keys.isEmpty() && host.rect().contains(keys), "KEYS card missing or outside the window");
+        require(keys.bottom() < hints.y() && keys.right() <= hints.geometry().right() + 1, "KEYS card not above the mark");
+        require(differs(over, rest, keys.adjusted(10, 10, -10, -10)), "KEYS card not drawn");
+        require(!keys.intersects(power), "KEYS card over the power close-up");
+        for (int i = 0; i < amstrad::HintAreaCount; ++i)
+            require(!keys.intersects(amstrad::hintRect(l, amstrad::hintAreas()[i]).toAlignedRect()),
+                    "KEYS card over a live part");
         require(amstrad::hotspot(l, amstrad::hintRect(l, amstrad::hintAreas()[4]).center()) == amstrad::HotMakerBadge,
                 "AMSTRAD plate is not a live part");
 
         QEvent leave(QEvent::Leave);
+        // Other window shapes: the card still fits clear of the parts.
+        for (const QSize size : { QSize(820, 950), QSize(1600, 900), QSize(1920, 1080), QSize(700, 560) }) {
+            host.resize(size);
+            hints.place();
+            peek.place();
+            settle(120);
+            const auto lo = amstrad::sceneLayout(host.size());
+            const QRect k = hints.keysArea().toAlignedRect();
+            host.grab().save(out + QString("/keys-%1x%2.png").arg(size.width()).arg(size.height()));
+            require(host.rect().contains(k), "KEYS card outside a resized window");
+            require(!k.intersects(peek.geometry()), "KEYS card over the power close-up when resized");
+            if (size.height() < 700) continue; // a very small window has no room beside the cabinet
+            for (int i = 0; i < amstrad::HintAreaCount; ++i)
+                require(!k.intersects(amstrad::hintRect(lo, amstrad::hintAreas()[i]).toAlignedRect()),
+                        "KEYS card over a live part when resized");
+        }
+        host.resize(1100, 950);
+        hints.place();
+        peek.place();
+        settle(120);
         QApplication::sendEvent(&hints, &leave);
         settle(300);
         require(hints.areasVisible() && dismissed == 1, "Parts vanished without lingering");
@@ -194,6 +221,78 @@ int main(int argc, char **argv)
         still.apply = [&](qreal o) { untouched = o; };
         settle(AmstradChromeFade::RestMs + 900);
         require(untouched == 1, "AMSTRAD_FADE_CONTROLS=0 ignored");
+        // Taking the mouse shows how to release it, on the bezel under the glass.
+        qputenv("AMSTRAD_CAPTURE_HINT", "1");
+        {
+            bool guestHas = false;
+            AmstradCaptureHint capture(&host);
+            capture.captured = [&] { return guestHas; };
+            settle(200);
+            require(!capture.pill()->shown(), "Release hint shown before capture");
+            guestHas = true;
+            settle(400);
+            require(capture.pill()->shown(), "Release hint missing on capture");
+            const QRect pill = capture.pill()->geometry();
+            require(!pill.intersects(l.video.toAlignedRect()), "Release hint covers the picture");
+            require(pill.top() > l.aperture.bottom() && pill.bottom() < l.cabinet.top() + 830 * l.scale,
+                    "Release hint is not on the bezel below the glass");
+            for (int i = 0; i < amstrad::HintAreaCount; ++i)
+                require(!pill.intersects(amstrad::hintRect(l, amstrad::hintAreas()[i]).toAlignedRect()),
+                        "Release hint covers a badge");
+            host.grab().save(out + "/capture-hint.png");
+            settle(AmstradCaptureHint::HoldMs + 900);
+            require(!capture.pill()->shown(), "Release hint did not fade");
+            guestHas = false;
+            settle(200);
+            guestHas = true;
+            settle(300);
+            require(capture.pill()->shown(), "Release hint missing on the next capture");
+            guestHas = false;
+            settle(400);
+            require(!capture.pill()->shown(), "Release hint stays after release");
+        }
+        qputenv("AMSTRAD_CAPTURE_HINT", "0");
+        {
+            bool guestHas = false;
+            AmstradCaptureHint quiet(&host);
+            quiet.captured = [&] { return guestHas; };
+            guestHas = true;
+            settle(300);
+            require(!quiet.pill()->shown(), "AMSTRAD_CAPTURE_HINT=0 ignored");
+        }
+
+        // Corner controls name their keys once the pointer rests on them.
+        {
+            AmstradCornerButton zoomButton(&host, AmstradCornerButton::Zoom);
+            bool zoomed = false;
+            zoomButton.zoomed = [&] { return zoomed; };
+            zoomButton.place();
+            exitButton.place();
+            modeButton.place();
+            QApplication::sendEvent(&modeButton, &enter);
+            settle(AmstradCornerButton::TagDelayMs / 2);
+            require(!modeButton.keyTag()->shown(), "Key tag shown without a pause");
+            settle(AmstradCornerButton::TagDelayMs + 250);
+            require(modeButton.keyTag()->shown(), "Fullscreen key tag missing");
+            require(host.rect().contains(modeButton.keyTag()->geometry()), "Key tag outside the window");
+            require(modeButton.keyTag()->geometry().top() > modeButton.geometry().bottom(), "Key tag over its control");
+            host.grab().save(out + "/corner-tag-fullscreen.png");
+            QApplication::sendEvent(&modeButton, &leave);
+            settle(300);
+            require(!modeButton.keyTag()->shown(), "Key tag stays after leaving");
+            QApplication::sendEvent(&zoomButton, &enter);
+            settle(AmstradCornerButton::TagDelayMs + 250);
+            host.grab().save(out + "/corner-tag-zoom.png");
+            QApplication::sendEvent(&zoomButton, &leave);
+            QApplication::sendEvent(&exitButton, &enter);
+            settle(AmstradCornerButton::TagDelayMs + 250);
+            require(exitButton.keyTag()->shown(), "Exit key tag missing");
+            require(exitButton.keyTag()->geometry().right() == exitButton.geometry().right(),
+                    "Exit key tag not aligned with its control");
+            host.grab().save(out + "/corner-tag-exit.png");
+            QApplication::sendEvent(&exitButton, &leave);
+            settle(300);
+        }
         std::puts("hints: ok");
         return 0;
     } catch (const std::exception &error) {

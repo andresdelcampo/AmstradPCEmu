@@ -1631,7 +1631,7 @@ index d4d8f5d..20162e4 100644
  #define SETTINGS_CHANGED            1
  #define SETTINGS_REQUIRE_HARD_RESET 2
 diff --git a/src/qt/qt_main.cpp b/src/qt/qt_main.cpp
-index f694a38..4819d58 100644
+index f694a38..475f014 100644
 --- a/src/qt/qt_main.cpp
 +++ b/src/qt/qt_main.cpp
 @@ -32,6 +32,14 @@
@@ -1932,7 +1932,7 @@ index f694a38..4819d58 100644
 +            { "right-drive", amstrad::masterBay(1).adjusted(0,0,0,-36), 5 },
 +            { "configuration", amstrad::masterModelBadge(), 6 },
 +            { "monitor", amstrad::masterMonitorBadge(), SoftwareRenderer::machineFront().pc1640 ? 3 : 2 },
-+            { "about", amstrad::masterMakerBadge(), 0 }
++            { "about", amstrad::masterMakerBadge(), 1 }
 +        };
 +        for (const auto &target : targets) {
 +            const QPoint point = at(target.rect);
@@ -3429,7 +3429,7 @@ index 4703b31..3cf8300 100644
      QBoxLayout *boxLayout = nullptr;
  
 diff --git a/src/qt/qt_softwarerenderer.cpp b/src/qt/qt_softwarerenderer.cpp
-index 5fd1599..c518cb9 100644
+index 5fd1599..b23107c 100644
 --- a/src/qt/qt_softwarerenderer.cpp
 +++ b/src/qt/qt_softwarerenderer.cpp
 @@ -17,22 +17,51 @@
@@ -3551,7 +3551,7 @@ index 5fd1599..c518cb9 100644
      images[0] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
      images[1] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
  
-@@ -47,6 +136,71 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
+@@ -47,6 +136,75 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
      buf_usage[0].clear();
      buf_usage[1].clear();
      this->setMouseTracking(true);
@@ -3586,6 +3586,10 @@ index 5fd1599..c518cb9 100644
 +        zoom_button->blocked = hints->blocked;
 +        zoom_button->zoomed = [this] { return zoom_target; };
 +        zoom_button->activate = [this] { toggleMonitorZoom(); };
++        /* With the corner controls hidden while the guest has the mouse, say
++           briefly how to get it back each time it is taken. */
++        capture_hint = new AmstradCaptureHint(this);
++        capture_hint->captured = [] { return mouse_capture != 0; };
 +        /* The corner controls fade while the mouse rests, and return when it moves. */
 +        chrome_fade = new AmstradChromeFade(this, this);
 +        chrome_fade->hold = [this] {
@@ -3623,7 +3627,7 @@ index 5fd1599..c518cb9 100644
      /* Every paint covers the whole update region, so skip Qt's background erase. */
      this->setAttribute(Qt::WA_OpaquePaintEvent);
  
-@@ -88,10 +242,28 @@ SoftwareRenderer::Worker::stop()
+@@ -88,10 +246,28 @@ SoftwareRenderer::Worker::stop()
      thread.reset();
  }
  
@@ -3653,7 +3657,7 @@ index 5fd1599..c518cb9 100644
      qt_osd_shutdown();
  }
  
-@@ -131,11 +303,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
+@@ -131,11 +307,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
  void
  SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
  {
@@ -3668,7 +3672,7 @@ index 5fd1599..c518cb9 100644
  
      /* Only repaint the rows that changed since the last frame, which the other
         buffer still holds until it is released below. Every frame is blitted
-@@ -155,6 +330,8 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
+@@ -155,6 +334,8 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
              bottom--;
      }
      buf_usage[buf_idx ^ 1].clear();
@@ -3677,7 +3681,7 @@ index 5fd1599..c518cb9 100644
  
      if (wsource != origSource) {
          /* The GUI thread owns the layout; it asks for a full repaint once it has
-@@ -171,7 +348,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
+@@ -171,7 +352,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
          bottom      = std::min(bottom + 1, h);
          int dtop    = dest.y() + ((top * dest.height()) / h) - 1;
          int dbottom = dest.y() + (((bottom * dest.height()) + h - 1) / h) + 1;
@@ -3691,7 +3695,7 @@ index 5fd1599..c518cb9 100644
      }
  
      if (monitors[r_monitor_index].mon_screenshots || monitors[r_monitor_index].mon_screenshots_clipboard || monitors[r_monitor_index].mon_screenshots_raw_clipboard)
-@@ -192,8 +374,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
+@@ -192,8 +378,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
      const bool relayout = (l.gen != w_layout_gen);
      w_layout_gen        = l.gen;
  
@@ -3712,7 +3716,7 @@ index 5fd1599..c518cb9 100644
      presentBuffer(back, painted);
  
      const QRect r     = painted.boundingRect();
-@@ -212,11 +404,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -212,11 +408,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
          img      = QImage(l.size, QImage::Format_RGB32);
          relayout = true;
      }
@@ -3735,7 +3739,7 @@ index 5fd1599..c518cb9 100644
          painted               = (changed | stale[back]) & all;
      }
  
-@@ -225,9 +427,39 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -225,9 +431,39 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
      if (!painted.isEmpty()) {
          QPainter painter(&img);
          painter.setClipRegion(painted);
@@ -3778,7 +3782,7 @@ index 5fd1599..c518cb9 100644
              painter.setRenderHint(QPainter::SmoothPixmapTransform, video_filter_method > 0);
              /* The frame's alpha bytes are not set; adding it onto black ignores them
                 and leaves the result opaque, so the GUI thread can copy it as is. */
-@@ -236,6 +468,7 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -236,6 +472,7 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
          }
      }
      img.setDevicePixelRatio(l.ratio);
@@ -3786,7 +3790,7 @@ index 5fd1599..c518cb9 100644
      return painted;
  }
  
-@@ -248,6 +481,160 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
+@@ -248,6 +485,160 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
      stale[back ^ 1] |= painted;
  }
  
@@ -3947,7 +3951,7 @@ index 5fd1599..c518cb9 100644
  SoftwareRenderer::Layout
  SoftwareRenderer::currentLayout()
  {
-@@ -335,6 +722,9 @@ SoftwareRenderer::publishLayout()
+@@ -335,6 +726,9 @@ SoftwareRenderer::publishLayout()
      std::scoped_lock lk(layout_mutex);
      layout.dest  = destination;
      layout.size  = QSize(qRound(width() * pixelRatio), qRound(height() * pixelRatio));
@@ -3957,7 +3961,7 @@ index 5fd1599..c518cb9 100644
      layout.ratio = pixelRatio;
      layout.gen++;
  }
-@@ -343,12 +733,95 @@ void
+@@ -343,12 +737,96 @@ void
  SoftwareRenderer::resizeEvent(QResizeEvent *event)
  {
      layoutPicture();
@@ -3974,6 +3978,7 @@ index 5fd1599..c518cb9 100644
 +    if (exit_button) exit_button->place();
 +    if (fullscreen_button) fullscreen_button->place();
 +    if (zoom_button) zoom_button->place();
++    if (capture_hint) capture_hint->place();
 +}
 +
 +void
@@ -4053,7 +4058,7 @@ index 5fd1599..c518cb9 100644
      bool res = false;
      if (!eventDelegate(event, res))
          return QWidget::event(event);
-@@ -362,12 +835,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -362,12 +840,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
      const int  shown = frontBuffer();
      /* Repaint when the OSD is up, or once more right after it closes so a
       * lingering overlay is cleared even while the machine is paused. */
@@ -4072,7 +4077,7 @@ index 5fd1599..c518cb9 100644
  
      if (osd) {
          painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-@@ -385,6 +861,70 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -385,6 +866,70 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
          QTimer::singleShot(16, this, [this] { update(); });
  }
  
@@ -4143,7 +4148,7 @@ index 5fd1599..c518cb9 100644
  bool
  SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
  {
-@@ -392,15 +932,45 @@ SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
+@@ -392,15 +937,45 @@ SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
         cannot pick it as its back buffer in between. The worker never writes
         the front buffer, so this only waits if it is about to reuse it. */
      std::unique_lock idx(idx_mutex);
@@ -4193,10 +4198,10 @@ index 5fd1599..c518cb9 100644
      return true;
  }
 diff --git a/src/qt/qt_softwarerenderer.hpp b/src/qt/qt_softwarerenderer.hpp
-index 265bb45..95cf9c1 100644
+index 265bb45..6ed4a50 100644
 --- a/src/qt/qt_softwarerenderer.hpp
 +++ b/src/qt/qt_softwarerenderer.hpp
-@@ -7,14 +7,22 @@
+@@ -7,14 +7,23 @@
  #include <QRegion>
  #include <QScopedPointer>
  #include <QBackingStore>
@@ -4216,10 +4221,11 @@ index 265bb45..95cf9c1 100644
 +class AmstradHints;
 +class AmstradCornerButton;
 +class AmstradChromeFade;
++class AmstradCaptureHint;
  
  class SoftwareRenderer :
      public QWidget,
-@@ -22,6 +30,7 @@ class SoftwareRenderer :
+@@ -22,6 +31,7 @@ class SoftwareRenderer :
      Q_OBJECT
  public:
      explicit SoftwareRenderer(QWidget *parent = nullptr);
@@ -4227,7 +4233,7 @@ index 265bb45..95cf9c1 100644
      void finalize() override final;
  
      void paintEvent(QPaintEvent *event) override;
-@@ -59,6 +68,90 @@ protected:
+@@ -59,6 +69,91 @@ protected:
      QScopedPointer<QBackingStore> m_backingStore;
  
  private:
@@ -4300,6 +4306,7 @@ index 265bb45..95cf9c1 100644
 +    AmstradCornerButton *exit_button = nullptr;
 +    AmstradCornerButton *fullscreen_button = nullptr;
 +    AmstradChromeFade *chrome_fade = nullptr;
++    AmstradCaptureHint *capture_hint = nullptr;
 +    bool power_edge_press = false;
 +    std::atomic<bool> awaiting_power_frame{false};
 +    void paintUnpowered(QPainter &painter);
@@ -4318,7 +4325,7 @@ index 265bb45..95cf9c1 100644
      /* A thread with an event loop and an object living on it, to deliver work to.
         Stopping it waits for the work in progress to finish. */
      class Worker {
-@@ -83,7 +176,11 @@ private:
+@@ -83,7 +178,11 @@ private:
          QRect dest;
          QSize size;
          qreal ratio = 1.0;
@@ -4330,7 +4337,7 @@ index 265bb45..95cf9c1 100644
      };
  
      /* Worker thread: scale the current frame into the back buffer, where dirty
-@@ -101,7 +198,11 @@ private:
+@@ -101,7 +200,11 @@ private:
      /* Owned by the worker thread. */
      int   cur_image = -1;
      QRect wsource { 0, 0, 0, 0 };
@@ -4342,7 +4349,7 @@ index 265bb45..95cf9c1 100644
  
      std::mutex layout_mutex;
      Layout     layout;
-@@ -112,6 +213,7 @@ private:
+@@ -112,6 +215,7 @@ private:
      std::mutex              idx_mutex;
      std::array<std::mutex, 2> scaled_mutex;
      std::array<QImage, 2>   scaled;
@@ -4739,7 +4746,7 @@ diff --git a/src/qt/qt_amstradhints.hpp b/src/qt/qt_amstradhints.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradhints.hpp
-@@ -0,0 +1,510 @@
+@@ -0,0 +1,902 @@
 +// Where the cabinet's controls are. GPL-2.0-or-later, like 86Box.
 +//
 +// Nothing on the cabinet says that the drive bays and badges open controls.
@@ -4760,6 +4767,7 @@ new file mode 100644
 +#include <QTimer>
 +#include <QVariantAnimation>
 +#include <QWidget>
++#include <QtMath>
 +#include <functional>
 +
 +namespace amstrad {
@@ -4899,8 +4907,327 @@ new file mode 100644
 +// does. The artwork for them is drawn on a 34-unit grid and scaled to this.
 +inline int cornerSide(qreal scale) { return std::max(33, qRound(51 * scale)); }
 +
++// ---- Keyboard shortcuts, shown as the PC1512's own cream keys ----
++// A line of words and keycaps in the parts tags' dark pill. keysFirst puts
++// the keys before the words ("Ctrl + End releases the mouse"); otherwise the
++// words lead ("Zoom in on the monitor Ctrl + F11"). u is one logical pixel at
++// the size drawn: the tag grows with the cabinet, as the parts tags do.
++struct KeyLine {
++    QString     text;
++    QStringList keys;
++    bool        keysFirst = false;
++};
++
++struct KeyFonts {
++    QFont text, key;
++    explicit KeyFonts(const QFont &base, qreal u)
++    {
++        text = base;
++        text.setBold(false);
++        text.setPixelSize(std::max(11, qRound(13 * u)));
++        key = base;
++        key.setBold(true);
++        key.setPixelSize(std::max(9, qRound(11 * u)));
++    }
++};
++
++// One key: a cream cap on a darker skirt, legend in dark grey, as on the
++// Amstrad keyboard. top is the cap's upper edge; returns its width.
++inline qreal keycapWidth(qreal u, const QFont &font, const QString &label)
++{
++    const QFontMetricsF m(font);
++    return std::max((m.height() + 5 * u) * 1.15, m.horizontalAdvance(label) + 12 * u);
++}
++inline qreal drawKeycap(QPainter &p, const QPointF &topLeft, qreal u, const QFont &font, const QString &label)
++{
++    const qreal h = QFontMetricsF(font).height() + 5 * u;
++    const qreal w = keycapWidth(u, font, label);
++    const QRectF skirt(topLeft.x(), topLeft.y(), w, h + 2.5 * u);
++    const QRectF face(topLeft.x() + 1.2 * u, topLeft.y() + .6 * u, w - 2.4 * u, h - .6 * u);
++    const qreal  r = 3.5 * u;
++    p.setPen(QPen(QColor(10, 10, 14, 170), std::max(1.0, u)));
++    p.setBrush(QColor(156, 149, 134));
++    p.drawRoundedRect(skirt, r, r);
++    QLinearGradient top(face.topLeft(), face.bottomLeft());
++    top.setColorAt(0, QColor(241, 237, 226));
++    top.setColorAt(1, QColor(219, 213, 198));
++    p.setPen(Qt::NoPen);
++    p.setBrush(top);
++    p.drawRoundedRect(face, r * .8, r * .8);
++    p.setFont(font);
++    p.setPen(QColor(58, 55, 51));
++    p.drawText(face, Qt::AlignCenter, label);
++    return w;
++}
++
++inline qreal keyLineHeight(const KeyFonts &f, qreal u)
++{
++    return std::max(QFontMetricsF(f.text).height(), QFontMetricsF(f.key).height() + 7.5 * u) + 9 * u;
++}
++
++// The pill's size for a line, and drawing it into box (that size, anywhere).
++inline QSizeF keyLineSize(const KeyLine &line, const KeyFonts &f, qreal u)
++{
++    const qreal h = keyLineHeight(f, u);
++    qreal keys = 0;
++    for (int i = 0; i < line.keys.size(); ++i) {
++        keys += keycapWidth(u, f.key, line.keys[i]);
++        if (i) keys += QFontMetricsF(f.text).horizontalAdvance(QStringLiteral("+")) + 8 * u;
++    }
++    const qreal text = line.text.isEmpty() ? 0 : QFontMetricsF(f.text).horizontalAdvance(line.text) + 10 * u;
++    return QSizeF(h * .55 + keys + text + h * .55, h);
++}
++
++inline void paintKeyLine(QPainter &p, const QRectF &box, const KeyLine &line, const KeyFonts &f, qreal u)
++{
++    p.save();
++    p.setRenderHint(QPainter::Antialiasing, true);
++    p.setPen(QPen(calloutInk(), 1));
++    p.setBrush(QColor(19, 19, 28, 225));
++    p.drawRoundedRect(box, box.height() / 2, box.height() / 2);
++    const QFontMetricsF tm(f.text), km(f.key);
++    const qreal capH = km.height() + 5 * u;
++    const qreal capTop = box.center().y() - (capH + 2.5 * u) / 2;
++    qreal x = box.left() + box.height() * .55;
++    auto words = [&] {
++        if (line.text.isEmpty()) return;
++        const qreal w = tm.horizontalAdvance(line.text);
++        if (!line.keysFirst) {
++            p.setFont(f.text);
++            p.setPen(QColor(240, 234, 222, 225));
++            p.drawText(QRectF(x, box.top(), w + 2, box.height()), Qt::AlignVCenter | Qt::AlignLeft, line.text);
++            x += w + 10 * u;
++        } else {
++            x += 10 * u;
++            p.setFont(f.text);
++            p.setPen(QColor(240, 234, 222, 225));
++            p.drawText(QRectF(x, box.top(), w + 2, box.height()), Qt::AlignVCenter | Qt::AlignLeft, line.text);
++            x += w;
++        }
++    };
++    auto caps = [&] {
++        for (int i = 0; i < line.keys.size(); ++i) {
++            if (i) {
++                const qreal plus = tm.horizontalAdvance(QStringLiteral("+"));
++                p.setFont(f.text);
++                p.setPen(QColor(240, 234, 222, 170));
++                p.drawText(QRectF(x + 4 * u, box.top(), plus, box.height()), Qt::AlignCenter, QStringLiteral("+"));
++                x += plus + 8 * u;
++            }
++            x += drawKeycap(p, QPointF(x, capTop), u, f.key, line.keys[i]);
++        }
++    };
++    if (line.keysFirst) { caps(); words(); }
++    else { words(); caps(); }
++    p.restore();
++}
++
++// Where the capture pill goes: on the monitor bezel, centred under the glass
++// and level with the AMSTRAD and monitor badges either side of it,
++// in master pixels, so that it follows the close-up.
++inline QPointF capturePillCentre() { return QPointF(627, 770); }
++
++// Every shortcut, listed in a KEYS card above the corner mark while the parts
++// are shown: the one place that has them all.
++struct Shortcut {
++    QStringList keys;
++    QString     text;
++};
++inline const QList<Shortcut> &shortcuts()
++{
++    static const QList<Shortcut> all = {
++        { { QStringLiteral("Ctrl"), QStringLiteral("End") }, QStringLiteral("Release the mouse") },
++        { { QStringLiteral("Ctrl"), QStringLiteral("F12") }, QStringLiteral("Ctrl + Alt + Del") },
++        { { QStringLiteral("Ctrl"), QStringLiteral("F11") }, QStringLiteral("Monitor close-up") },
++        { { QStringLiteral("F11") }, QStringLiteral("Fullscreen") },
++        { { QStringLiteral("Alt"), QStringLiteral("F4") }, QStringLiteral("Exit") },
++    };
++    return all;
++}
++
++struct KeysCard {
++    KeyFonts fonts;
++    QFont    head;
++    qreal    u, pad, headH, capH, rowH, keyCol, textW;
++    KeysCard(const QFont &base, qreal unit) : fonts(base, unit), u(unit)
++    {
++        head = fonts.key;
++        head.setLetterSpacing(QFont::AbsoluteSpacing, 1.4);
++        pad   = 12 * u;
++        headH = QFontMetricsF(head).height() + 6 * u;
++        capH  = QFontMetricsF(fonts.key).height() + 7.5 * u;
++        rowH  = capH + 7 * u;
++        const QFontMetricsF tm(fonts.text);
++        keyCol = textW = 0;
++        for (const Shortcut &s : shortcuts()) {
++            qreal w = 0;
++            for (int i = 0; i < s.keys.size(); ++i)
++                w += keycapWidth(u, fonts.key, s.keys[i]) + (i ? tm.horizontalAdvance(QStringLiteral("+")) + 6 * u : 0);
++            keyCol = std::max(keyCol, w);
++            textW  = std::max(textW, tm.horizontalAdvance(s.text));
++        }
++        keyCol += 14 * u;
++    }
++    QSizeF size() const
++    {
++        return QSizeF(pad + keyCol + textW + pad + 2, pad + headH + shortcuts().size() * rowH - 7 * u + pad);
++    }
++    void paint(QPainter &p, const QRectF &card) const
++    {
++        p.save();
++        p.setRenderHint(QPainter::Antialiasing, true);
++        p.setPen(QPen(calloutInk(), 1));
++        p.setBrush(QColor(19, 19, 28, 215));
++        p.drawRoundedRect(card, 10 * u, 10 * u);
++        p.setFont(head);
++        p.setPen(calloutInk());
++        p.drawText(QRectF(card.left() + pad, card.top() + pad, card.width(), headH), Qt::AlignLeft | Qt::AlignTop,
++                   QStringLiteral("KEYS"));
++        const QFontMetricsF tm(fonts.text);
++        qreal y = card.top() + pad + headH;
++        for (const Shortcut &s : shortcuts()) {
++            qreal x = card.left() + pad;
++            for (int i = 0; i < s.keys.size(); ++i) {
++                if (i) {
++                    const qreal plus = tm.horizontalAdvance(QStringLiteral("+"));
++                    p.setFont(fonts.text);
++                    p.setPen(QColor(240, 234, 222, 170));
++                    p.drawText(QRectF(x + 3 * u, y, plus, capH), Qt::AlignCenter, QStringLiteral("+"));
++                    x += plus + 6 * u;
++                }
++                x += drawKeycap(p, QPointF(x, y), u, fonts.key, s.keys[i]);
++            }
++            p.setFont(fonts.text);
++            p.setPen(QColor(240, 234, 222, 230));
++            p.drawText(QRectF(card.left() + pad + keyCol, y, textW + 4, capH), Qt::AlignVCenter | Qt::AlignLeft, s.text);
++            y += rowH;
++        }
++        p.restore();
++    }
++};
 +
 +}
++
++// A tag of words and keycaps that fades in and out. Never takes input.
++class AmstradKeyTag : public QWidget {
++public:
++    explicit AmstradKeyTag(QWidget *parent) : QWidget(parent)
++    {
++        setAttribute(Qt::WA_TranslucentBackground);
++        setAttribute(Qt::WA_TransparentForMouseEvents);
++        setFocusPolicy(Qt::NoFocus);
++        connect(&animation, &QVariantAnimation::valueChanged, this, [this](const QVariant &v) {
++            opacity = v.toReal();
++            if (opacity <= 0 && animation.endValue().toReal() <= 0) hide();
++            update();
++        });
++        hide();
++    }
++    amstrad::KeyLine line;
++    qreal            unit = 1;
++    qreal            opacity = 0;
++
++    // Sized for its line; the caller places it.
++    QSize fit()
++    {
++        const amstrad::KeyFonts f(font(), unit);
++        const QSizeF s = amstrad::keyLineSize(line, f, unit);
++        return QSize(qCeil(s.width()) + 2, qCeil(s.height()) + 2);
++    }
++    void appear(int ms)
++    {
++        show();
++        raise();
++        fade(1, ms);
++    }
++    void vanish(int ms)
++    {
++        if (isHidden()) return;
++        fade(0, ms);
++    }
++    bool shown() const { return isVisible() && opacity > 0; }
++
++protected:
++    void paintEvent(QPaintEvent *) override
++    {
++        if (opacity <= 0) return;
++        QPainter p(this);
++        p.setOpacity(opacity);
++        const amstrad::KeyFonts f(font(), unit);
++        amstrad::paintKeyLine(p, QRectF(rect()).adjusted(1, 1, -1, -1), line, f, unit);
++    }
++
++private:
++    void fade(qreal to, int ms)
++    {
++        animation.stop();
++        animation.setDuration(ms);
++        animation.setStartValue(opacity);
++        animation.setEndValue(to);
++        animation.start();
++    }
++    QVariantAnimation animation;
++};
++
++// While the guest holds the mouse every corner control is hidden, and with
++// them any clue to getting it back. So each time it takes the mouse, a short
++// pill on the monitor bezel says how: Ctrl + End releases the mouse. It
++// stays a moment, then fades. AMSTRAD_CAPTURE_HINT=0 removes it; automated
++// (AMSTRAD_HEADLESS=1) runs have it off unless AMSTRAD_CAPTURE_HINT=1.
++class AmstradCaptureHint : public QObject {
++public:
++    explicit AmstradCaptureHint(QWidget *renderer) : QObject(renderer), host(renderer)
++    {
++        tag = new AmstradKeyTag(renderer);
++        tag->setObjectName("amstradCaptureHint");
++        tag->line = { QStringLiteral("releases the mouse"), { QStringLiteral("Ctrl"), QStringLiteral("End") }, true };
++        const QString mode = qEnvironmentVariable("AMSTRAD_CAPTURE_HINT");
++        enabled = mode == "1" || (mode != "0" && qEnvironmentVariableIntValue("AMSTRAD_HEADLESS") != 1);
++        stay.setSingleShot(true);
++        stay.setInterval(HoldMs);
++        connect(&stay, &QTimer::timeout, this, [this] { tag->vanish(650); });
++        watch.setInterval(80);
++        connect(&watch, &QTimer::timeout, this, [this] { poll(); });
++        if (enabled) watch.start();
++    }
++    static constexpr int HoldMs = 2800;
++    // True while the guest has the mouse.
++    std::function<bool()> captured;
++    const AmstradKeyTag *pill() const { return tag; }
++    // The view changed: keep the pill on the bezel.
++    void place()
++    {
++        if (!host) return;
++        const auto l = amstrad::sceneLayout(host->size());
++        tag->unit = std::max<qreal>(.8, l.scale);
++        const QSize   s = tag->fit();
++        const QPointF c = amstrad::capturePillCentre();
++        const QPointF at(l.cabinet.left() + c.x() * l.scale, l.cabinet.top() + c.y() * l.scale);
++        tag->setGeometry(QRect(qRound(at.x() - s.width() / 2.0), qRound(at.y() - s.height() / 2.0),
++                               s.width(), s.height()));
++    }
++
++private:
++    void poll()
++    {
++        const bool now = captured && captured();
++        if (now && !was) {
++            place();
++            tag->appear(180);
++            stay.start();
++        } else if (!now && was) {
++            stay.stop();
++            tag->vanish(150);
++        } else if (now && tag->shown()) {
++            place();
++        }
++        was = now;
++    }
++    QPointer<QWidget> host;
++    AmstradKeyTag    *tag = nullptr;
++    bool              enabled = true, was = false;
++    QTimer            stay, watch;
++};
 +
 +// Covers the renderer while the parts are being shown. Never takes input.
 +class AmstradHintAreas : public QWidget {
@@ -4915,12 +5242,18 @@ new file mode 100644
 +    qreal          opacity = 0;
 +    amstrad::Front front;
 +    QRectF         power; // the power close-up, in this widget's coordinates
++    QRectF         keys;  // the KEYS card, likewise
++    qreal          keysUnit = 1;
 +
 +protected:
 +    void paintEvent(QPaintEvent *) override
 +    {
 +        QPainter p(this);
 +        amstrad::paintHintAreas(p, amstrad::sceneLayout(size()), front, opacity, power);
++        if (opacity > 0 && !keys.isEmpty()) {
++            p.setOpacity(opacity);
++            amstrad::KeysCard(font(), keysUnit).paint(p, keys);
++        }
 +    }
 +};
 +
@@ -4970,6 +5303,8 @@ new file mode 100644
 +    // How much of the mark shows: 1, or less while the corner controls fade.
 +    qreal chrome = 1;
 +    const AmstradHintAreas *overlay() const { return areas; }
++    // Where the KEYS card goes: just above the mark, its right edge on the mark's.
++    QRectF keysArea() const { return areas->keys; }
 +    // The parts moved (the view changed): redraw their outlines where they are now.
 +    void refresh() { areas->update(); }
 +
@@ -4982,6 +5317,7 @@ new file mode 100644
 +        const int   gap  = std::max(8, qRound(16 * l.scale));
 +        setGeometry(parentWidget()->width() - side - gap, parentWidget()->height() - side - gap, side, side);
 +        areas->setGeometry(parentWidget()->rect());
++        if (areas->isVisible()) placeKeys();
 +        const bool available = enabled && !(blocked && blocked());
 +        if (!available && hovered) leave();
 +        if (available != isVisible()) setVisible(available);
@@ -5028,6 +5364,7 @@ new file mode 100644
 +        fade(1, 140);
 +        if (showing) showing(true);
 +        areas->power = powerArea ? powerArea() : QRectF();
++        placeKeys();
 +        update();
 +    }
 +    void leaveEvent(QEvent *) override { leave(); }
@@ -5037,6 +5374,24 @@ new file mode 100644
 +    void mouseReleaseEvent(QMouseEvent *e) override { e->accept(); }
 +
 +private:
++    void placeKeys()
++    {
++        if (!parentWidget()) return;
++        // The parts tags' size, smaller only where that keeps the card off the
++        // casing in a narrow window (the system unit ends at x = 1142).
++        const auto l     = amstrad::restLayout(parentWidget()->size());
++        const qreal clear = l.cabinet.left() + 1142 * l.scale + 8;
++        qreal  u = std::max<qreal>(.8, l.scale);
++        QSizeF s = amstrad::KeysCard(areas->font(), u).size();
++        while (u > .55 && geometry().right() + 1 - s.width() < clear) {
++            u -= .05;
++            s = amstrad::KeysCard(areas->font(), u).size();
++        }
++        areas->keysUnit = u;
++        areas->keys = QRectF(geometry().right() + 1 - s.width(), geometry().top() - 10 * u - s.height(),
++                             s.width(), s.height());
++        areas->update();
++    }
 +    void leave()
 +    {
 +        if (!hovered) return;
@@ -5070,10 +5425,17 @@ new file mode 100644
 +        setObjectName(role == Exit ? "amstradExit" : role == Zoom ? "amstradZoom" : "amstradFullscreen");
 +        setAttribute(Qt::WA_TranslucentBackground);
 +        setFocusPolicy(Qt::NoFocus);
-+        if (role == Exit) {
-+            setAccessibleName(tr("Exit emulator"));
-+            setToolTip(tr("Exit emulator"));
-+        }
++        if (role == Exit) setAccessibleName(tr("Exit emulator"));
++        // In place of a tooltip, the parts tags' pill: what it does and its keys.
++        tag = new AmstradKeyTag(parent);
++        tag->setObjectName(objectName() + "Tag");
++        linger.setSingleShot(true);
++        linger.setInterval(TagDelayMs);
++        connect(&linger, &QTimer::timeout, this, [this] {
++            if (!hovered || !isVisible()) return;
++            placeTag();
++            tag->appear(120);
++        });
 +        watch.setInterval(250);
 +        connect(&watch, &QTimer::timeout, this, [this] { place(); });
 +        watch.start();
@@ -5087,6 +5449,18 @@ new file mode 100644
 +    // How much of the control shows: 1, or less while the corner controls fade.
 +    qreal chrome = 1;
 +    bool  isHovered() const { return hovered; }
++    static constexpr int TagDelayMs = 350;
++    const AmstradKeyTag *keyTag() const { return tag; }
++
++    // What the control does now and the keys that do the same.
++    amstrad::KeyLine keyLine() const
++    {
++        if (role == Exit) return { tr("Exit emulator"), { QStringLiteral("Alt"), QStringLiteral("F4") } };
++        if (role == Zoom)
++            return { zoomed && zoomed() ? tr("Show the whole computer") : tr("Zoom in on the monitor"),
++                     { QStringLiteral("Ctrl"), QStringLiteral("F11") } };
++        return { fullscreen && fullscreen() ? tr("Leave fullscreen") : tr("Fullscreen"), { QStringLiteral("F11") } };
++    }
 +
 +    void place()
 +    {
@@ -5102,12 +5476,12 @@ new file mode 100644
 +                                               : on ? tr("Exit fullscreen") : tr("Enter fullscreen");
 +            if (accessibleName() != label) {
 +                setAccessibleName(label);
-+                setToolTip(label);
 +                update();
 +            }
 +        }
 +        const bool available = !(blocked && blocked());
-+        if (!available) { hovered = false; pressed = false; }
++        if (!available) { hovered = false; pressed = false; linger.stop(); tag->vanish(100); }
++        else if (tag->shown()) placeTag();
 +        if (available != isVisible()) setVisible(available);
 +    }
 +
@@ -5162,8 +5536,19 @@ new file mode 100644
 +#else
 +    void enterEvent(QEvent *) override
 +#endif
-+    { hovered = true; update(); }
-+    void leaveEvent(QEvent *) override { hovered = false; pressed = false; update(); }
++    {
++        hovered = true;
++        linger.start();
++        update();
++    }
++    void leaveEvent(QEvent *) override
++    {
++        hovered = false;
++        pressed = false;
++        linger.stop();
++        tag->vanish(120);
++        update();
++    }
 +    void mousePressEvent(QMouseEvent *e) override
 +    {
 +        pressed = e->button() == Qt::LeftButton;
@@ -5175,12 +5560,26 @@ new file mode 100644
 +        pressed = false;
 +        e->accept();
 +        if (activate && this->activate) this->activate();
++        // The state changed (fullscreen, close-up): the words follow.
++        if (activate && tag->shown()) placeTag();
 +    }
 +
 +private:
++    // Just below the control, its right edge on the control's, inside the window.
++    void placeTag()
++    {
++        if (!parentWidget()) return;
++        tag->unit = std::max<qreal>(.8, amstrad::restLayout(parentWidget()->size()).scale);
++        tag->line = keyLine();
++        const QSize s = tag->fit();
++        const int   x = std::max(8, geometry().right() + 1 - s.width());
++        tag->setGeometry(x, geometry().bottom() + 1 + std::max(4, height() / 10), s.width(), s.height());
++        tag->update();
++    }
 +    bool hovered = false, pressed = false;
 +    Role role;
-+    QTimer watch;
++    AmstradKeyTag *tag = nullptr;
++    QTimer watch, linger;
 +};
 +
 +// Fades the corner controls (the parts mark, zoom, fullscreen and exit) out
@@ -5254,13 +5653,15 @@ diff --git a/src/qt/qt_amstradmenu.hpp b/src/qt/qt_amstradmenu.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradmenu.hpp
-@@ -0,0 +1,782 @@
+@@ -0,0 +1,837 @@
 +// Graphical cabinet controls. GPL-2.0-or-later, like 86Box.
 +#ifndef QT_AMSTRADMENU_HPP
 +#define QT_AMSTRADMENU_HPP
 +#include "qt_amstradpopup.hpp"
 +#include "qt_amstraddiskbox.hpp"
 +#include <QApplication>
++#include <QDesktopServices>
++#include <QUrl>
 +#include <QAbstractButton>
 +#include <QElapsedTimer>
 +#include <QGridLayout>
@@ -5623,20 +6024,67 @@ new file mode 100644
 +    };
 +}
 +inline QString aboutAuthor() { return QStringLiteral("by Andrés del Campo Novales"); }
++// The project page: the licence, notices and complete source of this build.
++inline QUrl aboutUrl() { return QUrl(QStringLiteral("https://github.com/andresdelcampo/AmstradPCEmu")); }
++
++// A small pill that opens the project page in the browser.
++class AboutLink : public QAbstractButton {
++public:
++    AboutLink()
++    {
++        setText(QCoreApplication::translate("MainWindow", "Licence and source"));
++        setAccessibleName(text());
++        setAccessibleDescription(aboutUrl().toString());
++        setToolTip(aboutUrl().toString());
++        setCursor(Qt::PointingHandCursor);
++        setFocusPolicy(Qt::StrongFocus);
++        connect(this, &QAbstractButton::clicked, this, [] {
++            while (QWidget *popup = QApplication::activePopupWidget()) popup->close();
++            QTimer::singleShot(0, qApp, [] { QDesktopServices::openUrl(aboutUrl()); });
++        });
++    }
++    QSize sizeHint() const override
++    {
++        const QFontMetrics m(font());
++        return QSize(m.horizontalAdvance(text()) + 2 * m.height(), m.height() + 10);
++    }
++protected:
++    void paintEvent(QPaintEvent *) override
++    {
++        QPainter p(this); p.setRenderHint(QPainter::Antialiasing);
++        const bool lit = underMouse() || hasFocus();
++        const QRectF r = QRectF(rect()).adjusted(.5, .5, -.5, -.5);
++        p.setPen(QPen(lit ? PopupTheme::text() : PopupTheme::border(), hasFocus() ? 2 : 1));
++        p.setBrush(lit ? PopupTheme::hover() : QColor(255, 255, 255, 16));
++        p.drawRoundedRect(r, r.height() / 2, r.height() / 2);
++        drawPopupText(p, rect(), Qt::AlignCenter, text());
++    }
++    void enterEvent(QEvent *) override { update(); }
++    void leaveEvent(QEvent *) override { update(); }
++    void keyPressEvent(QKeyEvent *e) override
++    {
++        if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) { click(); e->accept(); }
++        else QAbstractButton::keyPressEvent(e);
++    }
++};
 +
 +class AboutPanel : public QWidget {
 +public:
-+    AboutPanel()
++    AboutPanel() : link(new AboutLink)
 +    {
++        link->setParent(this);
 +        setAccessibleName(aboutTitle());
 +        setAccessibleDescription(aboutAuthor() + ". " + aboutLines().join(". "));
 +    }
 +    QSize sizeHint() const override
 +    {
-+        const QFontMetrics plain(font());
-+        return QSize(Width, Pad * 2 + titleHeight() + plain.height() + Rule + plain.height() * int(aboutLines().size()));
++        return QSize(Width, textHeight() + LinkGap + link->sizeHint().height() + Pad);
 +    }
 +protected:
++    void resizeEvent(QResizeEvent *) override
++    {
++        link->setGeometry(QRect(QPoint(Pad, textHeight() + LinkGap), link->sizeHint()));
++    }
 +    void paintEvent(QPaintEvent *) override
 +    {
 +        QPainter p(this); p.setRenderHint(QPainter::Antialiasing);
@@ -5659,15 +6107,21 @@ new file mode 100644
 +        }
 +    }
 +private:
-+    static constexpr int Width = 360, Pad = 16, Rule = 18;
++    static constexpr int Width = 360, Pad = 16, Rule = 18, LinkGap = 12;
++    AboutLink *link;
++    // From the top to the last line of text.
++    int textHeight() const
++    {
++        const QFontMetrics plain(font());
++        return Pad + titleHeight() + plain.height() + Rule + plain.height() * int(aboutLines().size());
++    }
 +    QFont titleFont() const { QFont f = font(); f.setBold(true); f.setPointSizeF(f.pointSizeF() * 1.2); return f; }
 +    int titleHeight() const { return QFontMetrics(titleFont()).height() + 2; }
 +};
 +inline void addAboutPanel(QMenu *menu)
 +{
 +    auto *a = new QWidgetAction(menu);
-+    a->setDefaultWidget(new AboutPanel);
-+    a->setEnabled(false);
++    a->setDefaultWidget(new AboutPanel); // enabled, so that its link works
 +    menu->addAction(a);
 +}
 +// ---- The disk box: floppies as pictures, shared by tiles and the drive card ----
