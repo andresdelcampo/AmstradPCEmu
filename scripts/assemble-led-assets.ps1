@@ -16,7 +16,7 @@ New-Item -ItemType Directory -Force -Path $out | Out-Null
 $items = @(
     # The current front master supplies the power lens's position and outer rim.
     # The generated states contribute only the lens interior at that position.
-    @{ id='power'; x=208; y=960; cx=24.0; cy=26.0; rx=9.5; ry=9.5; source='power' },
+    @{ id='power'; x=208; y=960; cx=15.5; cy=28.5; rx=7.1; ry=7.1; source='power' },
     @{ id='drive-a'; x=522; y=1015; cx=23.5; cy=24.5; rx=8.0; ry=8.4; source='drive'; sx=616; sy=632; sr=221 },
     @{ id='drive-b'; x=980; y=1015; cx=23.0; cy=24.5; rx=7.5; ry=8.4; source='drive'; sx=616; sy=632; sr=221 }
 )
@@ -64,7 +64,7 @@ foreach ($item in $items) {
                 $distance = [Math]::Sqrt([Math]::Pow(($x-$item.cx)/$item.rx,2)+[Math]::Pow(($y-$item.cy)/$item.ry,2))
                 $alpha = if ($item.id -eq 'power') {
                     # Retain the master image's dark seating shadow and pale rim.
-                    [Math]::Max(0.0,[Math]::Min(1.0,(10.0-$distance*$item.rx)/1.5))
+                    [Math]::Max(0.0,[Math]::Min(1.0,(7.6-$distance*$item.rx)/1.3))
                 } else {
                     [Math]::Max(0.0,[Math]::Min(1.0,(1.30-$distance)/0.15))
                 }

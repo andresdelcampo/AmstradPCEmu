@@ -148,6 +148,13 @@ foreach ($model in @('sd', 'hd20')) {
         $mask = SuffixMask $glyph.letter $glyph.left $glyph.right
         for ($y = 23; $y -le 48; $y++) {
             $ink = SuffixInk $y
+            if ($glyph.letter -eq '2' -or $glyph.letter -eq '0') {
+                # Slightly deepen the numerals to balance HD20 in the UI.
+                $ink = [Drawing.Color]::FromArgb(
+                    [int][Math]::Round($ink.R * 0.96),
+                    [int][Math]::Round($ink.G * 0.96),
+                    [int][Math]::Round($ink.B * 0.96))
+            }
             for ($x = $glyph.left - 1; $x -le $glyph.right + 1; $x++) {
                 $sum = 0
                 for ($dy = -1; $dy -le 1; $dy++) {
