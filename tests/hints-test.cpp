@@ -121,6 +121,8 @@ int main(int argc, char **argv)
             host.grab().save(out + QString("/keys-%1x%2.png").arg(size.width()).arg(size.height()));
             require(host.rect().contains(k), "KEYS card outside a resized window");
             require(!k.intersects(peek.geometry()), "KEYS card over the power close-up when resized");
+            // The middle mouse button goes only where the card would meet the casing.
+            require(hints.overlay()->keysMouse == (size.width() >= 1600), "KEYS card mouse kept or dropped wrongly");
             if (size.height() < 700) continue; // a very small window has no room beside the cabinet
             for (int i = 0; i < amstrad::HintAreaCount; ++i)
                 require(!k.intersects(amstrad::hintRect(lo, amstrad::hintAreas()[i]).toAlignedRect()),

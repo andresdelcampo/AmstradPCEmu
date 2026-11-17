@@ -3429,7 +3429,7 @@ index 4703b31..3cf8300 100644
      QBoxLayout *boxLayout = nullptr;
  
 diff --git a/src/qt/qt_softwarerenderer.cpp b/src/qt/qt_softwarerenderer.cpp
-index 5fd1599..b23107c 100644
+index 5fd1599..478f3f7 100644
 --- a/src/qt/qt_softwarerenderer.cpp
 +++ b/src/qt/qt_softwarerenderer.cpp
 @@ -17,22 +17,51 @@
@@ -3657,11 +3657,14 @@ index 5fd1599..b23107c 100644
      qt_osd_shutdown();
  }
  
-@@ -131,11 +307,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
+@@ -131,11 +307,17 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
  void
  SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
  {
-+    if (power_led.load()) awaiting_power_frame = false;
++    /* Leave the switched-off cabinet only once this frame is in a buffer:
++       until then the buffers hold nothing, or the picture from before the
++       last power-off. scaleFrame() ends the wait. */
++    if (power_led.load() && awaiting_power_frame.load()) power_frame_pending = true;
      QRect origSource = wsource;
      int   prev_image = cur_image;
  
@@ -3672,7 +3675,7 @@ index 5fd1599..b23107c 100644
  
      /* Only repaint the rows that changed since the last frame, which the other
         buffer still holds until it is released below. Every frame is blitted
-@@ -155,6 +334,8 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
+@@ -155,6 +337,8 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
              bottom--;
      }
      buf_usage[buf_idx ^ 1].clear();
@@ -3681,7 +3684,7 @@ index 5fd1599..b23107c 100644
  
      if (wsource != origSource) {
          /* The GUI thread owns the layout; it asks for a full repaint once it has
-@@ -171,7 +352,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
+@@ -171,7 +355,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
          bottom      = std::min(bottom + 1, h);
          int dtop    = dest.y() + ((top * dest.height()) / h) - 1;
          int dbottom = dest.y() + (((bottom * dest.height()) + h - 1) / h) + 1;
@@ -3695,12 +3698,22 @@ index 5fd1599..b23107c 100644
      }
  
      if (monitors[r_monitor_index].mon_screenshots || monitors[r_monitor_index].mon_screenshots_clipboard || monitors[r_monitor_index].mon_screenshots_raw_clipboard)
-@@ -192,8 +378,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
-     const bool relayout = (l.gen != w_layout_gen);
-     w_layout_gen        = l.gen;
- 
+@@ -188,13 +377,27 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
+     if (l.size.isEmpty())
+         return;
+     /* A new layout repaints the window, borders included; a changed frame only
+-       repaints the picture. */
+-    const bool relayout = (l.gen != w_layout_gen);
+-    w_layout_gen        = l.gen;
+-
 -    const int     back    = (frontBuffer() == 0) ? 1 : 0;
 -    const QRegion painted = paintBuffer(back, l, dirty, full, relayout);
++       repaints the picture. The first frame after power-on repaints it all,
++       since the window has shown the switched-off cabinet until now. */
++    const bool powerFrame = power_frame_pending.exchange(false);
++    const bool relayout   = (l.gen != w_layout_gen) || powerFrame;
++    w_layout_gen          = l.gen;
++
 +    w_front = l.front;
 +
 +    const int back = (frontBuffer() == 0) ? 1 : 0;
@@ -3714,14 +3727,24 @@ index 5fd1599..b23107c 100644
 +    }
 +    const QRegion painted = paintBuffer(back, l, damage, full, relayout);
      presentBuffer(back, painted);
++    if (powerFrame && power_led.load())
++        awaiting_power_frame = false;
  
      const QRect r     = painted.boundingRect();
-@@ -212,11 +408,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+     const qreal ratio = l.ratio;
+@@ -212,11 +415,28 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
          img      = QImage(l.size, QImage::Format_RGB32);
          relayout = true;
      }
-+    /* A new bay/badge configuration replaces the cabinet artwork: each of
-+       the two buffers must repaint all of it once, not only the first one. */
++    /* A new layout (a close-up step, say, at the same window size) or a new
++       bay/badge configuration: each of the two buffers must repaint all of
++       the cabinet once, not only the first one. Otherwise the other buffer
++       keeps the old cabinet around the glass and panel, and the two
++       alternate on screen with every guest frame. */
++    if (buffer_gen[back] != l.gen) {
++        buffer_gen[back] = l.gen;
++        relayout         = true;
++    }
 +    const qint64 artKey = (l.art.isNull() ? cabinet : l.art).cacheKey();
 +    if (buffer_art[back] != artKey) {
 +        buffer_art[back] = artKey;
@@ -3739,7 +3762,7 @@ index 5fd1599..b23107c 100644
          painted               = (changed | stale[back]) & all;
      }
  
-@@ -225,9 +431,39 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -225,9 +445,39 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
      if (!painted.isEmpty()) {
          QPainter painter(&img);
          painter.setClipRegion(painted);
@@ -3782,7 +3805,7 @@ index 5fd1599..b23107c 100644
              painter.setRenderHint(QPainter::SmoothPixmapTransform, video_filter_method > 0);
              /* The frame's alpha bytes are not set; adding it onto black ignores them
                 and leaves the result opaque, so the GUI thread can copy it as is. */
-@@ -236,6 +472,7 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -236,6 +486,7 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
          }
      }
      img.setDevicePixelRatio(l.ratio);
@@ -3790,7 +3813,7 @@ index 5fd1599..b23107c 100644
      return painted;
  }
  
-@@ -248,6 +485,160 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
+@@ -248,6 +499,160 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
      stale[back ^ 1] |= painted;
  }
  
@@ -3951,7 +3974,7 @@ index 5fd1599..b23107c 100644
  SoftwareRenderer::Layout
  SoftwareRenderer::currentLayout()
  {
-@@ -335,6 +726,9 @@ SoftwareRenderer::publishLayout()
+@@ -335,6 +740,9 @@ SoftwareRenderer::publishLayout()
      std::scoped_lock lk(layout_mutex);
      layout.dest  = destination;
      layout.size  = QSize(qRound(width() * pixelRatio), qRound(height() * pixelRatio));
@@ -3961,7 +3984,7 @@ index 5fd1599..b23107c 100644
      layout.ratio = pixelRatio;
      layout.gen++;
  }
-@@ -343,12 +737,96 @@ void
+@@ -343,12 +751,96 @@ void
  SoftwareRenderer::resizeEvent(QResizeEvent *event)
  {
      layoutPicture();
@@ -4058,7 +4081,7 @@ index 5fd1599..b23107c 100644
      bool res = false;
      if (!eventDelegate(event, res))
          return QWidget::event(event);
-@@ -362,12 +840,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -362,12 +854,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
      const int  shown = frontBuffer();
      /* Repaint when the OSD is up, or once more right after it closes so a
       * lingering overlay is cleared even while the machine is paused. */
@@ -4077,13 +4100,14 @@ index 5fd1599..b23107c 100644
  
      if (osd) {
          painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-@@ -385,6 +866,70 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -385,6 +880,71 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
          QTimer::singleShot(16, this, [this] { update(); });
  }
  
 +void
 +SoftwareRenderer::setCabinetPower(bool on)
 +{
++    power_frame_pending  = false;
 +    awaiting_power_frame = on;
 +    power_led = on;
 +    if (power_peek) power_peek->changed(on);
@@ -4148,7 +4172,7 @@ index 5fd1599..b23107c 100644
  bool
  SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
  {
-@@ -392,15 +937,45 @@ SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
+@@ -392,15 +952,45 @@ SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
         cannot pick it as its back buffer in between. The worker never writes
         the front buffer, so this only waits if it is about to reuse it. */
      std::unique_lock idx(idx_mutex);
@@ -4198,7 +4222,7 @@ index 5fd1599..b23107c 100644
      return true;
  }
 diff --git a/src/qt/qt_softwarerenderer.hpp b/src/qt/qt_softwarerenderer.hpp
-index 265bb45..6ed4a50 100644
+index 265bb45..3e927bd 100644
 --- a/src/qt/qt_softwarerenderer.hpp
 +++ b/src/qt/qt_softwarerenderer.hpp
 @@ -7,14 +7,23 @@
@@ -4233,7 +4257,7 @@ index 265bb45..6ed4a50 100644
      void finalize() override final;
  
      void paintEvent(QPaintEvent *event) override;
-@@ -59,6 +69,91 @@ protected:
+@@ -59,6 +69,93 @@ protected:
      QScopedPointer<QBackingStore> m_backingStore;
  
  private:
@@ -4309,6 +4333,8 @@ index 265bb45..6ed4a50 100644
 +    AmstradCaptureHint *capture_hint = nullptr;
 +    bool power_edge_press = false;
 +    std::atomic<bool> awaiting_power_frame{false};
++    /* A guest frame arrived after power-on; the worker has yet to draw it. */
++    std::atomic<bool> power_frame_pending{false};
 +    void paintUnpowered(QPainter &painter);
 +    // Front-panel state while switched off, and what was last painted. GUI thread.
 +    unsigned unpoweredState();
@@ -4325,7 +4351,7 @@ index 265bb45..6ed4a50 100644
      /* A thread with an event loop and an object living on it, to deliver work to.
         Stopping it waits for the work in progress to finish. */
      class Worker {
-@@ -83,7 +178,11 @@ private:
+@@ -83,7 +180,11 @@ private:
          QRect dest;
          QSize size;
          qreal ratio = 1.0;
@@ -4337,7 +4363,7 @@ index 265bb45..6ed4a50 100644
      };
  
      /* Worker thread: scale the current frame into the back buffer, where dirty
-@@ -101,7 +200,11 @@ private:
+@@ -101,7 +202,12 @@ private:
      /* Owned by the worker thread. */
      int   cur_image = -1;
      QRect wsource { 0, 0, 0, 0 };
@@ -4346,10 +4372,11 @@ index 265bb45..6ed4a50 100644
 +    QImage filtered_frame;
      int   w_layout_gen = -1;
 +    std::array<qint64, 2> buffer_art { -1, -1 }; /* cabinet artwork each buffer shows */
++    std::array<int, 2>    buffer_gen { -1, -1 }; /* layout generation each buffer shows */
  
      std::mutex layout_mutex;
      Layout     layout;
-@@ -112,6 +215,7 @@ private:
+@@ -112,6 +218,7 @@ private:
      std::mutex              idx_mutex;
      std::array<std::mutex, 2> scaled_mutex;
      std::array<QImage, 2>   scaled;
@@ -4746,7 +4773,7 @@ diff --git a/src/qt/qt_amstradhints.hpp b/src/qt/qt_amstradhints.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradhints.hpp
-@@ -0,0 +1,902 @@
+@@ -0,0 +1,965 @@
 +// Where the cabinet's controls are. GPL-2.0-or-later, like 86Box.
 +//
 +// Nothing on the cabinet says that the drive bays and badges open controls.
@@ -4931,15 +4958,57 @@ new file mode 100644
 +    }
 +};
 +
++// In a list of keys, the mouse's middle button: drawn as a mouse, not a key.
++// The Amstrad mouse has two buttons, so 86Box keeps the middle one to
++// release the mouse (mouse_get_release_buttons()).
++inline const QString &middleButton()
++{
++    static const QString token = QStringLiteral("<middle button>");
++    return token;
++}
++// What joins a key to the one before it: "+" for a chord, "or" before the mouse.
++inline QString keyJoin(const QString &next) { return next == middleButton() ? QStringLiteral("or") : QStringLiteral("+"); }
++// Extra room either side of a word join, in logical pixels at unit size.
++inline qreal joinRoom(const QString &next) { return next == middleButton() ? 3 : 0; }
++
++// The mouse, the height of a keycap with its skirt: a cream body with the
++// middle button lit in the Amstrad red.
++inline qreal mouseGlyphWidth(qreal u, const QFont &font) { return (QFontMetricsF(font).height() + 7.5 * u) * .7; }
++inline qreal drawMouseGlyph(QPainter &p, const QPointF &topLeft, qreal u, const QFont &font)
++{
++    const qreal  h = QFontMetricsF(font).height() + 7.5 * u, w = mouseGlyphWidth(u, font);
++    const QRectF body(topLeft.x() + .5 * u, topLeft.y() + .5 * u, w - u, h - u);
++    QPainterPath shape;
++    shape.addRoundedRect(body, body.width() * .48, body.height() * .36);
++    QLinearGradient shade(body.topLeft(), body.bottomLeft());
++    shade.setColorAt(0, QColor(241, 237, 226));
++    shade.setColorAt(1, QColor(205, 198, 182));
++    p.setPen(QPen(QColor(10, 10, 14, 170), std::max(1.0, u)));
++    p.setBrush(shade);
++    p.drawPath(shape);
++    // The buttons end two-fifths down; the middle one, between them, is lit.
++    const qreal split = body.top() + body.height() * .42;
++    p.setPen(QPen(QColor(120, 113, 100), std::max(1.0, .9 * u)));
++    p.drawLine(QPointF(body.left() + .8 * u, split), QPointF(body.right() - .8 * u, split));
++    const qreal  mw = body.width() * .3;
++    const QRectF middle(body.center().x() - mw / 2, body.top() + body.height() * .1, mw, split - body.top() - body.height() * .14);
++    p.setPen(Qt::NoPen);
++    p.setBrush(QColor(200, 38, 40));
++    p.drawRoundedRect(middle, mw / 2, mw / 2);
++    return w;
++}
++
 +// One key: a cream cap on a darker skirt, legend in dark grey, as on the
 +// Amstrad keyboard. top is the cap's upper edge; returns its width.
 +inline qreal keycapWidth(qreal u, const QFont &font, const QString &label)
 +{
++    if (label == middleButton()) return mouseGlyphWidth(u, font);
 +    const QFontMetricsF m(font);
 +    return std::max((m.height() + 5 * u) * 1.15, m.horizontalAdvance(label) + 12 * u);
 +}
 +inline qreal drawKeycap(QPainter &p, const QPointF &topLeft, qreal u, const QFont &font, const QString &label)
 +{
++    if (label == middleButton()) return drawMouseGlyph(p, topLeft, u, font);
 +    const qreal h = QFontMetricsF(font).height() + 5 * u;
 +    const qreal w = keycapWidth(u, font, label);
 +    const QRectF skirt(topLeft.x(), topLeft.y(), w, h + 2.5 * u);
@@ -4972,7 +5041,7 @@ new file mode 100644
 +    qreal keys = 0;
 +    for (int i = 0; i < line.keys.size(); ++i) {
 +        keys += keycapWidth(u, f.key, line.keys[i]);
-+        if (i) keys += QFontMetricsF(f.text).horizontalAdvance(QStringLiteral("+")) + 8 * u;
++        if (i) keys += QFontMetricsF(f.text).horizontalAdvance(keyJoin(line.keys[i])) + (8 + 2 * joinRoom(line.keys[i])) * u;
 +    }
 +    const qreal text = line.text.isEmpty() ? 0 : QFontMetricsF(f.text).horizontalAdvance(line.text) + 10 * u;
 +    return QSizeF(h * .55 + keys + text + h * .55, h);
@@ -5008,11 +5077,13 @@ new file mode 100644
 +    auto caps = [&] {
 +        for (int i = 0; i < line.keys.size(); ++i) {
 +            if (i) {
-+                const qreal plus = tm.horizontalAdvance(QStringLiteral("+"));
++                const QString join = keyJoin(line.keys[i]);
++                const qreal   plus = tm.horizontalAdvance(join);
 +                p.setFont(f.text);
 +                p.setPen(QColor(240, 234, 222, 170));
-+                p.drawText(QRectF(x + 4 * u, box.top(), plus, box.height()), Qt::AlignCenter, QStringLiteral("+"));
-+                x += plus + 8 * u;
++                const qreal   room = joinRoom(line.keys[i]) * u;
++                p.drawText(QRectF(x + 4 * u + room, box.top(), plus, box.height()), Qt::AlignCenter, join);
++                x += plus + 8 * u + 2 * room;
 +            }
 +            x += drawKeycap(p, QPointF(x, capTop), u, f.key, line.keys[i]);
 +        }
@@ -5036,7 +5107,7 @@ new file mode 100644
 +inline const QList<Shortcut> &shortcuts()
 +{
 +    static const QList<Shortcut> all = {
-+        { { QStringLiteral("Ctrl"), QStringLiteral("End") }, QStringLiteral("Release the mouse") },
++        { { QStringLiteral("Ctrl"), QStringLiteral("End"), middleButton() }, QStringLiteral("Release the mouse") },
 +        { { QStringLiteral("Ctrl"), QStringLiteral("F12") }, QStringLiteral("Ctrl + Alt + Del") },
 +        { { QStringLiteral("Ctrl"), QStringLiteral("F11") }, QStringLiteral("Monitor close-up") },
 +        { { QStringLiteral("F11") }, QStringLiteral("Fullscreen") },
@@ -5045,12 +5116,16 @@ new file mode 100644
 +    return all;
 +}
 +
++// mouse false leaves the middle button out, for a window too narrow to fit it.
 +struct KeysCard {
-+    KeyFonts fonts;
-+    QFont    head;
-+    qreal    u, pad, headH, capH, rowH, keyCol, textW;
-+    KeysCard(const QFont &base, qreal unit) : fonts(base, unit), u(unit)
++    KeyFonts        fonts;
++    QFont           head;
++    qreal           u, pad, headH, capH, rowH, keyCol, textW;
++    QList<Shortcut> rows;
++    KeysCard(const QFont &base, qreal unit, bool mouse = true) : fonts(base, unit), u(unit), rows(shortcuts())
 +    {
++        if (!mouse)
++            for (Shortcut &s : rows) s.keys.removeAll(middleButton());
 +        head = fonts.key;
 +        head.setLetterSpacing(QFont::AbsoluteSpacing, 1.4);
 +        pad   = 12 * u;
@@ -5059,10 +5134,10 @@ new file mode 100644
 +        rowH  = capH + 7 * u;
 +        const QFontMetricsF tm(fonts.text);
 +        keyCol = textW = 0;
-+        for (const Shortcut &s : shortcuts()) {
++        for (const Shortcut &s : rows) {
 +            qreal w = 0;
 +            for (int i = 0; i < s.keys.size(); ++i)
-+                w += keycapWidth(u, fonts.key, s.keys[i]) + (i ? tm.horizontalAdvance(QStringLiteral("+")) + 6 * u : 0);
++                w += keycapWidth(u, fonts.key, s.keys[i]) + (i ? tm.horizontalAdvance(keyJoin(s.keys[i])) + (6 + 2 * joinRoom(s.keys[i])) * u : 0);
 +            keyCol = std::max(keyCol, w);
 +            textW  = std::max(textW, tm.horizontalAdvance(s.text));
 +        }
@@ -5070,7 +5145,7 @@ new file mode 100644
 +    }
 +    QSizeF size() const
 +    {
-+        return QSizeF(pad + keyCol + textW + pad + 2, pad + headH + shortcuts().size() * rowH - 7 * u + pad);
++        return QSizeF(pad + keyCol + textW + pad + 2, pad + headH + rows.size() * rowH - 7 * u + pad);
 +    }
 +    void paint(QPainter &p, const QRectF &card) const
 +    {
@@ -5085,15 +5160,17 @@ new file mode 100644
 +                   QStringLiteral("KEYS"));
 +        const QFontMetricsF tm(fonts.text);
 +        qreal y = card.top() + pad + headH;
-+        for (const Shortcut &s : shortcuts()) {
++        for (const Shortcut &s : rows) {
 +            qreal x = card.left() + pad;
 +            for (int i = 0; i < s.keys.size(); ++i) {
 +                if (i) {
-+                    const qreal plus = tm.horizontalAdvance(QStringLiteral("+"));
++                    const QString join = keyJoin(s.keys[i]);
++                    const qreal   plus = tm.horizontalAdvance(join);
 +                    p.setFont(fonts.text);
 +                    p.setPen(QColor(240, 234, 222, 170));
-+                    p.drawText(QRectF(x + 3 * u, y, plus, capH), Qt::AlignCenter, QStringLiteral("+"));
-+                    x += plus + 6 * u;
++                    const qreal   room = joinRoom(s.keys[i]) * u;
++                    p.drawText(QRectF(x + 3 * u + room, y, plus, capH), Qt::AlignCenter, join);
++                    x += plus + 6 * u + 2 * room;
 +                }
 +                x += drawKeycap(p, QPointF(x, y), u, fonts.key, s.keys[i]);
 +            }
@@ -5171,7 +5248,8 @@ new file mode 100644
 +
 +// While the guest holds the mouse every corner control is hidden, and with
 +// them any clue to getting it back. So each time it takes the mouse, a short
-+// pill on the monitor bezel says how: Ctrl + End releases the mouse. It
++// pill on the monitor bezel says how: Ctrl + End, or the middle mouse
++// button, releases the mouse. It
 +// stays a moment, then fades. AMSTRAD_CAPTURE_HINT=0 removes it; automated
 +// (AMSTRAD_HEADLESS=1) runs have it off unless AMSTRAD_CAPTURE_HINT=1.
 +class AmstradCaptureHint : public QObject {
@@ -5180,7 +5258,8 @@ new file mode 100644
 +    {
 +        tag = new AmstradKeyTag(renderer);
 +        tag->setObjectName("amstradCaptureHint");
-+        tag->line = { QStringLiteral("releases the mouse"), { QStringLiteral("Ctrl"), QStringLiteral("End") }, true };
++        tag->line = { QStringLiteral("releases the mouse"),
++                      { QStringLiteral("Ctrl"), QStringLiteral("End"), amstrad::middleButton() }, true };
 +        const QString mode = qEnvironmentVariable("AMSTRAD_CAPTURE_HINT");
 +        enabled = mode == "1" || (mode != "0" && qEnvironmentVariableIntValue("AMSTRAD_HEADLESS") != 1);
 +        stay.setSingleShot(true);
@@ -5244,6 +5323,7 @@ new file mode 100644
 +    QRectF         power; // the power close-up, in this widget's coordinates
 +    QRectF         keys;  // the KEYS card, likewise
 +    qreal          keysUnit = 1;
++    bool           keysMouse = true; // false: too narrow for the middle button
 +
 +protected:
 +    void paintEvent(QPaintEvent *) override
@@ -5252,7 +5332,7 @@ new file mode 100644
 +        amstrad::paintHintAreas(p, amstrad::sceneLayout(size()), front, opacity, power);
 +        if (opacity > 0 && !keys.isEmpty()) {
 +            p.setOpacity(opacity);
-+            amstrad::KeysCard(font(), keysUnit).paint(p, keys);
++            amstrad::KeysCard(font(), keysUnit, keysMouse).paint(p, keys);
 +        }
 +    }
 +};
@@ -5379,15 +5459,25 @@ new file mode 100644
 +        if (!parentWidget()) return;
 +        // The parts tags' size, smaller only where that keeps the card off the
 +        // casing in a narrow window (the system unit ends at x = 1142).
-+        const auto l     = amstrad::restLayout(parentWidget()->size());
++        // If even the smallest card meets the casing, leave out the middle
++        // mouse button: the capture pill on the bezel still shows it.
++        const auto  l     = amstrad::restLayout(parentWidget()->size());
 +        const qreal clear = l.cabinet.left() + 1142 * l.scale + 8;
-+        qreal  u = std::max<qreal>(.8, l.scale);
-+        QSizeF s = amstrad::KeysCard(areas->font(), u).size();
-+        while (u > .55 && geometry().right() + 1 - s.width() < clear) {
-+            u -= .05;
-+            s = amstrad::KeysCard(areas->font(), u).size();
++        qreal  u     = 1;
++        bool   mouse = true;
++        QSizeF s;
++        for (const bool withMouse : { true, false }) {
++            mouse = withMouse;
++            u     = std::max<qreal>(.8, l.scale);
++            s     = amstrad::KeysCard(areas->font(), u, mouse).size();
++            while (u > .55 && geometry().right() + 1 - s.width() < clear) {
++                u -= .05;
++                s = amstrad::KeysCard(areas->font(), u, mouse).size();
++            }
++            if (geometry().right() + 1 - s.width() >= clear) break;
 +        }
-+        areas->keysUnit = u;
++        areas->keysUnit  = u;
++        areas->keysMouse = mouse;
 +        areas->keys = QRectF(geometry().right() + 1 - s.width(), geometry().top() - 10 * u - s.height(),
 +                             s.width(), s.height());
 +        areas->update();
