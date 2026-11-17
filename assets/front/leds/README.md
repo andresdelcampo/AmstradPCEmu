@@ -14,7 +14,8 @@ The current power lens is scaled from the improved front artwork to match the
 smaller indicator and position in the supplied hardware photograph. Its center
 is (223.5, 988.5), or (15.5, 28.5) inside the unchanged 48 x 48 patch at
 (208, 960). The visible lens and mounting rim are about 15 pixels across.
-The original POWER lettering is moved left without changing its font or size.
+The original POWER lettering is moved left and two pixels down without changing
+its font or size.
 `power-off-master.png` supplies a deep ruby interior;
 `power-on-master.png` supplies a restrained warm luminous core. Both overlays
 affect only the lens interior, retaining the front master's scaled rim and

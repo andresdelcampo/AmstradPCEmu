@@ -3423,10 +3423,10 @@ index 4703b31..3cf8300 100644
      QBoxLayout *boxLayout = nullptr;
  
 diff --git a/src/qt/qt_softwarerenderer.cpp b/src/qt/qt_softwarerenderer.cpp
-index 5fd1599..9ab164c 100644
+index 5fd1599..95dd4c1 100644
 --- a/src/qt/qt_softwarerenderer.cpp
 +++ b/src/qt/qt_softwarerenderer.cpp
-@@ -17,12 +17,22 @@
+@@ -17,22 +17,51 @@
   *          Copyright 2021-2022 Teemu Korhonen
   */
  #include "qt_softwarerenderer.hpp"
@@ -3447,9 +3447,10 @@ index 5fd1599..9ab164c 100644
 +#include <QDateTime>
 +#include <QSettings>
  #include <algorithm>
++#include <cmath>
  #include <cstring>
  #include "qt_util.hpp"
-@@ -30,9 +40,27 @@
+ #include "qt_osd.hpp"
  
  extern "C" {
  #include <86box/86box.h>
@@ -3477,7 +3478,7 @@ index 5fd1599..9ab164c 100644
  }
  
  SoftwareRenderer::SoftwareRenderer(QWidget *parent)
-@@ -40,6 +68,66 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
+@@ -40,6 +69,66 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
  {
      RendererCommon::parentWidget = parent;
  
@@ -3544,7 +3545,7 @@ index 5fd1599..9ab164c 100644
      images[0] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
      images[1] = std::make_unique<QImage>(QSize(2048, 2048), QImage::Format_RGB32);
  
-@@ -47,6 +135,57 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
+@@ -47,6 +136,57 @@ SoftwareRenderer::SoftwareRenderer(QWidget *parent)
      buf_usage[0].clear();
      buf_usage[1].clear();
      this->setMouseTracking(true);
@@ -3579,8 +3580,8 @@ index 5fd1599..9ab164c 100644
 +        zoom_button->blocked = hints->blocked;
 +        zoom_button->zoomed = [this] { return zoom_target; };
 +        zoom_button->activate = [this] { toggleMonitorZoom(); };
-+        zoom_animation.setDuration(420);
-+        zoom_animation.setEasingCurve(QEasingCurve::InOutCubic);
++        zoom_animation.setDuration(560);
++        zoom_animation.setEasingCurve(QEasingCurve::InOutSine);
 +        connect(&zoom_animation, &QVariantAnimation::valueChanged, this,
 +                [this](const QVariant &v) { applyViewZoom(v.toReal()); });
 +        /* Open on the view last chosen. */
@@ -3602,7 +3603,7 @@ index 5fd1599..9ab164c 100644
      /* Every paint covers the whole update region, so skip Qt's background erase. */
      this->setAttribute(Qt::WA_OpaquePaintEvent);
  
-@@ -88,10 +227,28 @@ SoftwareRenderer::Worker::stop()
+@@ -88,10 +228,28 @@ SoftwareRenderer::Worker::stop()
      thread.reset();
  }
  
@@ -3632,7 +3633,7 @@ index 5fd1599..9ab164c 100644
      qt_osd_shutdown();
  }
  
-@@ -131,11 +288,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
+@@ -131,11 +289,14 @@ extern void take_screenshot_clipboard_monitor(int sx, int sy, int sw, int sh, in
  void
  SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
  {
@@ -3647,7 +3648,16 @@ index 5fd1599..9ab164c 100644
  
      /* Only repaint the rows that changed since the last frame, which the other
         buffer still holds until it is released below. Every frame is blitted
-@@ -171,7 +331,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
+@@ -155,6 +316,8 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
+             bottom--;
+     }
+     buf_usage[buf_idx ^ 1].clear();
++    if (wsource != origSource || top < bottom)
++        ++video_serial;
+ 
+     if (wsource != origSource) {
+         /* The GUI thread owns the layout; it asks for a full repaint once it has
+@@ -171,7 +334,12 @@ SoftwareRenderer::onBlit(int buf_idx, int x, int y, int w, int h)
          bottom      = std::min(bottom + 1, h);
          int dtop    = dest.y() + ((top * dest.height()) / h) - 1;
          int dbottom = dest.y() + (((bottom * dest.height()) + h - 1) / h) + 1;
@@ -3661,7 +3671,7 @@ index 5fd1599..9ab164c 100644
      }
  
      if (monitors[r_monitor_index].mon_screenshots || monitors[r_monitor_index].mon_screenshots_clipboard || monitors[r_monitor_index].mon_screenshots_raw_clipboard)
-@@ -192,8 +357,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
+@@ -192,8 +360,18 @@ SoftwareRenderer::scaleFrame(const QRegion &dirty, bool full)
      const bool relayout = (l.gen != w_layout_gen);
      w_layout_gen        = l.gen;
  
@@ -3682,7 +3692,7 @@ index 5fd1599..9ab164c 100644
      presentBuffer(back, painted);
  
      const QRect r     = painted.boundingRect();
-@@ -212,11 +387,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -212,11 +390,21 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
          img      = QImage(l.size, QImage::Format_RGB32);
          relayout = true;
      }
@@ -3705,7 +3715,7 @@ index 5fd1599..9ab164c 100644
          painted               = (changed | stale[back]) & all;
      }
  
-@@ -225,9 +410,27 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+@@ -225,9 +413,39 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
      if (!painted.isEmpty()) {
          QPainter painter(&img);
          painter.setClipRegion(painted);
@@ -3722,10 +3732,22 @@ index 5fd1599..9ab164c 100644
 +            if (relayout)
 +                amstrad::paintCabinet(painter, art, scene);
 +            QImage filtered;
-+            if (crt_filter)
-+                filtered = crt_filter->apply(*images[cur_image], wsource, scene.video.size().toSize());
++            const bool zooming = l.zoom > 0 && l.zoom < 1;
++            if (crt_filter) {
++                /* Keep the CRT framebuffer at one size during the transition.
++                   Resizing it on every tick forces a GPU allocation and readback. */
++                const QSize filterSize = zooming
++                    ? amstrad::sceneLayout(l.size, 1).video.size().toSize()
++                    : scene.video.size().toSize();
++                if (filtered_frame.isNull() || filtered_serial != video_serial ||
++                    filtered_frame.size() != filterSize) {
++                    filtered_frame = crt_filter->apply(*images[cur_image], wsource, filterSize);
++                    filtered_serial = video_serial;
++                }
++                filtered = filtered_frame;
++            }
 +            if (!filtered.isNull())
-+                amstrad::paintVideo(painter, filtered, filtered.rect(), art, scene, false);
++                amstrad::paintVideo(painter, filtered, filtered.rect(), art, scene, zooming);
 +            else
 +                amstrad::paintVideo(painter, *images[cur_image], wsource, art, scene, video_filter_method > 0);
 +            if (panelValid() && painted.intersects(amstrad::panelRegion(scene, drive_faces_valid)))
@@ -3736,7 +3758,15 @@ index 5fd1599..9ab164c 100644
              painter.setRenderHint(QPainter::SmoothPixmapTransform, video_filter_method > 0);
              /* The frame's alpha bytes are not set; adding it onto black ignores them
                 and leaves the result opaque, so the GUI thread can copy it as is. */
-@@ -248,6 +451,160 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
+@@ -236,6 +454,7 @@ SoftwareRenderer::paintBuffer(int back, const Layout &l, const QRegion &dirty, b
+         }
+     }
+     img.setDevicePixelRatio(l.ratio);
++    scaled_zoom[back] = l.zoom;
+     return painted;
+ }
+ 
+@@ -248,6 +467,160 @@ SoftwareRenderer::presentBuffer(int back, const QRegion &painted)
      stale[back ^ 1] |= painted;
  }
  
@@ -3897,7 +3927,7 @@ index 5fd1599..9ab164c 100644
  SoftwareRenderer::Layout
  SoftwareRenderer::currentLayout()
  {
-@@ -335,6 +692,9 @@ SoftwareRenderer::publishLayout()
+@@ -335,6 +708,9 @@ SoftwareRenderer::publishLayout()
      std::scoped_lock lk(layout_mutex);
      layout.dest  = destination;
      layout.size  = QSize(qRound(width() * pixelRatio), qRound(height() * pixelRatio));
@@ -3907,7 +3937,7 @@ index 5fd1599..9ab164c 100644
      layout.ratio = pixelRatio;
      layout.gen++;
  }
-@@ -343,12 +703,79 @@ void
+@@ -343,12 +719,95 @@ void
  SoftwareRenderer::resizeEvent(QResizeEvent *event)
  {
      layoutPicture();
@@ -3943,7 +3973,11 @@ index 5fd1599..9ab164c 100644
 +        return;
 +    }
 +    /* From wherever the view is now, so that a second press turns it round. */
-+    zoom_animation.setStartValue(amstrad::viewZoom().load());
++    const qreal from = amstrad::viewZoom().load();
++    if (from == to)
++        return;
++    zoom_animation.setDuration(std::max(120, qRound(560 * std::abs(to - from))));
++    zoom_animation.setStartValue(from);
 +    zoom_animation.setEndValue(to);
 +    zoom_animation.start();
 +}
@@ -3955,14 +3989,26 @@ index 5fd1599..9ab164c 100644
 +    publishLayout();
 +    placeControls();
 +    if (hints) hints->refresh();
-+    if (!power_led.load() || awaiting_power_frame.load())
-+        update(); /* switched off: painted here, from the artwork */
++    /* Paint every animation tick. The GUI can transform the latest completed
++       worker frame while a full-resolution replacement is still rendering. */
++    update();
 +    /* The worker redraws the whole window for each step. If it cannot keep
 +       up, steps are skipped rather than queued: it reads the latest layout. */
-+    if (worker.context() && !zoom_frame_queued.exchange(true))
++    queueZoomFrame();
++}
++
++void
++SoftwareRenderer::queueZoomFrame()
++{
++    if (power_led.load() && !awaiting_power_frame.load() && worker.context() && !zoom_frame_queued.exchange(true))
 +        QMetaObject::invokeMethod(worker.context(), [this] {
-+            zoom_frame_queued = false;
 +            scaleFrame(QRegion(), true);
++            zoom_frame_queued = false;
++            /* A tick can arrive while this frame paints. Queue its successor
++               behind the worker's other events, including guest blits. */
++            const Layout latest = currentLayout();
++            if (cur_image != -1 && !latest.size.isEmpty() && latest.gen != w_layout_gen)
++                queueZoomFrame();
 +        }, Qt::QueuedConnection);
 +}
 +
@@ -3987,7 +4033,7 @@ index 5fd1599..9ab164c 100644
      bool res = false;
      if (!eventDelegate(event, res))
          return QWidget::event(event);
-@@ -362,12 +789,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -362,12 +821,15 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
      const int  shown = frontBuffer();
      /* Repaint when the OSD is up, or once more right after it closes so a
       * lingering overlay is cleared even while the machine is paused. */
@@ -4006,7 +4052,7 @@ index 5fd1599..9ab164c 100644
  
      if (osd) {
          painter.setRenderHint(QPainter::SmoothPixmapTransform, false);
-@@ -385,6 +815,69 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
+@@ -385,6 +847,70 @@ SoftwareRenderer::onPaint(QPaintDevice *device)
          QTimer::singleShot(16, this, [this] { update(); });
  }
  
@@ -4033,15 +4079,16 @@ index 5fd1599..9ab164c 100644
 +void
 +SoftwareRenderer::paintUnpowered(QPainter &painter)
 +{
++    refreshFront(false);
 +    const auto scene = amstrad::sceneLayout(size());
-+    const auto front = machineFront();
++    const Layout l = currentLayout();
 +    unpowered_shown  = unpoweredState();
-+    const QImage art = fittings_valid ? amstrad::composeCabinet(cabinet, fittings, front) : cabinet;
++    const QImage &art = l.art.isNull() ? cabinet : l.art;
 +    painter.fillRect(rect(), amstrad::backgroundColor());
 +    amstrad::paintCabinet(painter, art, scene);
 +    amstrad::paintPanel(painter, art, leds_valid ? &leds : nullptr,
 +                        drive_faces_valid ? &drive_faces : nullptr, fittings_valid ? &fittings : nullptr,
-+                        front, scene, unpowered_shown);
++                        l.front, scene, unpowered_shown);
 +}
 +
 +/* GUI thread: the front-panel state of a switched-off machine. The media
@@ -4076,8 +4123,57 @@ index 5fd1599..9ab164c 100644
  bool
  SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
  {
+@@ -392,15 +918,45 @@ SoftwareRenderer::drawFront(QPainter &painter, const QPaintDevice *device)
+        cannot pick it as its back buffer in between. The worker never writes
+        the front buffer, so this only waits if it is about to reuse it. */
+     std::unique_lock idx(idx_mutex);
+-    std::scoped_lock lk(scaled_mutex[front]);
+-    const QImage    &img = scaled[front];
++    const int shown = front;
++    std::scoped_lock lk(scaled_mutex[shown]);
++    const QImage    &img = scaled[shown];
++    const qreal renderedZoom = scaled_zoom[shown];
+     idx.unlock();
+ 
+     const qreal ratio = img.devicePixelRatio();
+     if (img.size() != QSize(qRound(device->width() * ratio), qRound(device->height() * ratio)))
+         return false;
++    const qreal wantedZoom = amstrad::viewZoom().load();
+     painter.setCompositionMode(QPainter::CompositionMode_Source);
+-    painter.drawImage(QPointF(0, 0), img);
++    if (cabinet.isNull() || std::abs(renderedZoom - wantedZoom) < 0.001) {
++        painter.drawImage(QPointF(0, 0), img);
++    } else {
++        /* Resample the completed frame into the current view on the GUI tick.
++           The worker may take longer than a tick to render the next one. Fill
++           newly exposed cabinet areas when travelling back from the close-up. */
++        const Layout l = currentLayout();
++        const QImage &art = l.art.isNull() ? cabinet : l.art;
++        const auto sourceScene = amstrad::sceneLayout(img.size(), renderedZoom);
++        const auto targetScene = amstrad::sceneLayout(img.size(), wantedZoom);
++        const QRectF sourceCabinet = sourceScene.cabinet;
++        const QRectF targetCabinet = targetScene.cabinet;
++        const QRectF visible = sourceCabinet.intersected(QRectF(QPointF(0, 0), QSizeF(img.size())));
++        const qreal factor = targetCabinet.width() / sourceCabinet.width();
++        const QRectF projected(targetCabinet.x() + (visible.x() - sourceCabinet.x()) * factor,
++                               targetCabinet.y() + (visible.y() - sourceCabinet.y()) * factor,
++                               visible.width() * factor, visible.height() * factor);
++        painter.fillRect(rect(), amstrad::backgroundColor());
++        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
++        amstrad::Layout logicalScene = targetScene;
++        logicalScene.cabinet = QRectF(targetCabinet.x() / ratio, targetCabinet.y() / ratio,
++                                     targetCabinet.width() / ratio, targetCabinet.height() / ratio);
++        amstrad::paintCabinet(painter, art, logicalScene);
++        painter.setCompositionMode(QPainter::CompositionMode_Source);
++        painter.drawImage(QRectF(projected.x() / ratio, projected.y() / ratio,
++                                 projected.width() / ratio, projected.height() / ratio),
++                          img, visible);
++    }
+     painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+     return true;
+ }
 diff --git a/src/qt/qt_softwarerenderer.hpp b/src/qt/qt_softwarerenderer.hpp
-index 265bb45..352effe 100644
+index 265bb45..7c2823d 100644
 --- a/src/qt/qt_softwarerenderer.hpp
 +++ b/src/qt/qt_softwarerenderer.hpp
 @@ -7,14 +7,21 @@
@@ -4110,7 +4206,7 @@ index 265bb45..352effe 100644
      void finalize() override final;
  
      void paintEvent(QPaintEvent *event) override;
-@@ -59,6 +67,88 @@ protected:
+@@ -59,6 +67,89 @@ protected:
      QScopedPointer<QBackingStore> m_backingStore;
  
  private:
@@ -4176,6 +4272,7 @@ index 265bb45..352effe 100644
 +    // One repaint queued on the worker at a time while the view travels.
 +    std::atomic<bool> zoom_frame_queued{false};
 +    void applyViewZoom(qreal zoom);
++    void queueZoomFrame();
 +    void placeControls();
 +    AmstradPowerPeek *power_peek = nullptr;
 +    AmstradHints *hints = nullptr;
@@ -4199,7 +4296,7 @@ index 265bb45..352effe 100644
      /* A thread with an event loop and an object living on it, to deliver work to.
         Stopping it waits for the work in progress to finish. */
      class Worker {
-@@ -83,7 +173,11 @@ private:
+@@ -83,7 +174,11 @@ private:
          QRect dest;
          QSize size;
          qreal ratio = 1.0;
@@ -4211,14 +4308,26 @@ index 265bb45..352effe 100644
      };
  
      /* Worker thread: scale the current frame into the back buffer, where dirty
-@@ -102,6 +196,7 @@ private:
+@@ -101,7 +196,11 @@ private:
+     /* Owned by the worker thread. */
      int   cur_image = -1;
      QRect wsource { 0, 0, 0, 0 };
++    quint64 video_serial = 0;
++    quint64 filtered_serial = ~quint64(0);
++    QImage filtered_frame;
      int   w_layout_gen = -1;
 +    std::array<qint64, 2> buffer_art { -1, -1 }; /* cabinet artwork each buffer shows */
  
      std::mutex layout_mutex;
      Layout     layout;
+@@ -112,6 +211,7 @@ private:
+     std::mutex              idx_mutex;
+     std::array<std::mutex, 2> scaled_mutex;
+     std::array<QImage, 2>   scaled;
++    std::array<qreal, 2>    scaled_zoom { 0, 0 };
+     std::array<QRegion, 2>  stale;
+     int                     front = -1;
+ 
 diff --git a/src/qt/qt_winrawinputfilter.cpp b/src/qt/qt_winrawinputfilter.cpp
 index 0acd483..b9bbbaa 100644
 --- a/src/qt/qt_winrawinputfilter.cpp
@@ -4444,7 +4553,7 @@ diff --git a/src/qt/qt_amstradhints.hpp b/src/qt/qt_amstradhints.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradhints.hpp
-@@ -0,0 +1,487 @@
+@@ -0,0 +1,492 @@
 +// Where the cabinet's controls are. GPL-2.0-or-later, like 86Box.
 +//
 +// Nothing on the cabinet says that the drive bays and badges open controls.
@@ -4598,6 +4707,11 @@ new file mode 100644
 +    p.restore();
 +}
 +
++// The side of the window's corner controls (exit, fullscreen, zoom and the
++// parts mark), in logical pixels: they grow with the window, as the cabinet
++// does. The artwork for them is drawn on a 34-unit grid and scaled to this.
++inline int cornerSide(qreal scale) { return std::max(33, qRound(51 * scale)); }
++
 +// What this program is and whose work it stands on: the cabinet has no menu
 +// bar, so no About box. A small card in the tags' style, just above the
 +// corner mark and sized like it, by the window rather than by the view.
@@ -4605,7 +4719,7 @@ new file mode 100644
 +{
 +    if (opacity <= 0) return;
 +    const qreal s    = restLayout(size).scale;
-+    const int   side = std::max(22, qRound(34 * s)); // the corner mark, as placed by AmstradHints
++    const int   side = cornerSide(s); // the corner mark, as placed by AmstradHints
 +    const int   gap  = std::max(8, qRound(16 * s));
 +    p.save();
 +    p.setRenderHint(QPainter::Antialiasing, true);
@@ -4732,7 +4846,7 @@ new file mode 100644
 +    {
 +        if (!parentWidget()) return;
 +        const auto  l    = amstrad::restLayout(parentWidget()->size());
-+        const int   side = std::max(22, qRound(34 * l.scale));
++        const int   side = amstrad::cornerSide(l.scale);
 +        const int   gap  = std::max(8, qRound(16 * l.scale));
 +        setGeometry(parentWidget()->width() - side - gap, parentWidget()->height() - side - gap, side, side);
 +        areas->setGeometry(parentWidget()->rect());
@@ -4842,9 +4956,9 @@ new file mode 100644
 +    {
 +        if (!parentWidget()) return;
 +        const auto l = amstrad::restLayout(parentWidget()->size());
-+        const int side = std::max(22, qRound(34 * l.scale));
++        const int side = amstrad::cornerSide(l.scale);
 +        const int gap = std::max(8, qRound(16 * l.scale));
-+        setGeometry(parentWidget()->width() - side - gap - int(role) * (side + 4), gap, side, side);
++        setGeometry(parentWidget()->width() - side - gap - int(role) * (side + side / 8), gap, side, side);
 +        if (role != Exit) {
 +            const bool on = role == Zoom ? zoomed && zoomed() : fullscreen && fullscreen();
 +            const QString label = role == Zoom ? (on ? tr("Show the whole computer (Ctrl+F11)")

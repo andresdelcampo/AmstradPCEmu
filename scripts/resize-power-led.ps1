@@ -67,7 +67,7 @@ try {
     }
     $lens.Dispose()
 
-    # Move the original letter shapes left without changing their size or font.
+    # Move the original letter shapes left and two pixels down without changing their size or font.
     $ink = [Drawing.Color]::FromArgb(17,17,16)
     for ($y=979; $y -le 996; $y++) {
         for ($x=249; $x -le 296; $x++) {
@@ -77,7 +77,7 @@ try {
             $backgroundLuma = 0.2126*$background.R + 0.7152*$background.G + 0.0722*$background.B
             $inkAlpha = ($backgroundLuma-$originalLuma)/100.0
             if ($inkAlpha -gt 0) {
-                $front.SetPixel($x-11,$y,(Mix ($front.GetPixel($x-11,$y)) $ink $inkAlpha))
+                $front.SetPixel($x-11,$y+2,(Mix ($front.GetPixel($x-11,$y+2)) $ink $inkAlpha))
             }
         }
     }
