@@ -2116,7 +2116,7 @@ index f694a38..4819d58 100644
          main_window->showMaximized();
      } else {
 diff --git a/src/qt/qt_mainwindow.cpp b/src/qt/qt_mainwindow.cpp
-index 8b91429..cae7e3f 100644
+index 8b91429..93ce7a9 100644
 --- a/src/qt/qt_mainwindow.cpp
 +++ b/src/qt/qt_mainwindow.cpp
 @@ -32,7 +32,10 @@
@@ -2488,7 +2488,7 @@ index 8b91429..cae7e3f 100644
      if (acpi_enabled) {
          acpi_pwrbut_press();
          return;
-@@ -2950,3 +3098,436 @@ MainWindow::on_actionCGA_composite_settings_triggered()
+@@ -2950,3 +3098,438 @@ MainWindow::on_actionCGA_composite_settings_triggered()
      isNonPause = false;
      config_save();
  }
@@ -2499,6 +2499,7 @@ index 8b91429..cae7e3f 100644
 +#include "qt_amstradscene.hpp"
 +#include "qt_amstradmenu.hpp"
 +#include "qt_amstradmonitor.hpp"
++#include "qt_amstraddialog.hpp"
 +#include <QFile>
 +#include <QFileInfo>
 +#include <QSettings>
@@ -2770,9 +2771,10 @@ index 8b91429..cae7e3f 100644
 +    /* vid_1640_config: 0Bh with the paper-white tube, 7, 9. */
 +    static const int types[amstrad::Screen1640Count] = { 0x5b, 7, 9 };
 +    if (!testAttribute(Qt::WA_DontShowOnScreen) &&
-+        QMessageBox::question(this, tr("Change monitor"),
-+                              tr("Fitting the %1 restarts the PC. Unsaved work in it is lost.\n"
-+                                 "Disks and drives stay as they are.\n\nContinue?").arg(tr(names[screen]))) != QMessageBox::Yes)
++        !amstrad::askPanel(this, tr("Change monitor"),
++                           tr("Fitting the %1 restarts the PC. Unsaved work in it is lost.\n"
++                              "Disks and drives stay as they are.").arg(tr(names[screen])),
++                           tr("Restart"), tr("Cancel")))
 +        return;
 +    runctl_pause_wait(RUN_PAUSE_SYNC);
 +    config_set_int("Amstrad PC1640 (Video)", "monitor_type", types[screen]);
@@ -2809,11 +2811,11 @@ index 8b91429..cae7e3f 100644
 +    if (machineChange) {
 +        machineId = machine_get_machine_from_internal_name(pc1640 ? "pc1640" : "pc1512");
 +        if (machineId < 0 || !machine_available(machineId)) {
-+            QMessageBox::warning(this, pc1640 ? tr("Amstrad PC1640") : tr("Amstrad PC1512"),
++            amstrad::tellPanel(this, pc1640 ? tr("Amstrad PC1640") : tr("Amstrad PC1512"),
 +                pc1640 ? tr("The PC1640 firmware is missing.\n"
 +                            "Place 40043.v3, 40044.v3 and 40100 under roms/machines/pc1640 and try again.")
 +                       : tr("The PC1512 firmware is missing.\n"
-+                            "Place 40043, 40044 and 40078 under roms/machines/pc1512 and try again."));
++                            "Place 40043, 40044 and 40078 under roms/machines/pc1512 and try again."), tr("OK"));
 +            return;
 +        }
 +    }
@@ -2824,9 +2826,9 @@ index 8b91429..cae7e3f 100644
 +    if (fitHdd) {
 +        hdcId = hdc_get_from_internal_name(hd20_controller);
 +        if (hdcId <= 0 || !hdc_available(hdcId)) {
-+            QMessageBox::warning(this, tr("Hard disk"),
++            amstrad::tellPanel(this, tr("Hard disk"),
 +                tr("The Western Digital WD1002A-WX1 controller ROM is missing.\n"
-+                   "Place wd1002a_wx1-62-000094-032.bin under roms/hdd/st506 and try again."));
++                   "Place wd1002a_wx1-62-000094-032.bin under roms/hdd/st506 and try again."), tr("OK"));
 +            return;
 +        }
 +        hd20Image = QSettings(amstradSettingsFile(), QSettings::IniFormat)
@@ -2857,15 +2859,15 @@ index 8b91429..cae7e3f 100644
 +        question += tr("\nA new, empty 20 MB disk is created: partition it with FDISK and FORMAT it from DOS.");
 +    /* The headless regression (ui-model) has nobody to ask. */
 +    if (!testAttribute(Qt::WA_DontShowOnScreen) &&
-+        QMessageBox::question(this, machineChange ? tr("Change computer") : tr("Change drive bay"),
-+                              question + tr("\n\nContinue?")) != QMessageBox::Yes)
++        !amstrad::askPanel(this, machineChange ? tr("Change computer") : tr("Change drive bay"),
++                           question, tr("Restart"), tr("Cancel")))
 +        return;
 +
 +    if (fitHdd && !QFileInfo::exists(hd20Image)) {
 +        QFile image(hd20Image);
 +        if (!image.open(QIODevice::WriteOnly | QIODevice::NewOnly) ||
 +            !image.resize(qint64(hd20_tracks) * hd20_heads * hd20_sectors * 512)) {
-+            QMessageBox::warning(this, tr("Hard disk"), tr("Cannot create %1: %2").arg(hd20Image, image.errorString()));
++            amstrad::tellPanel(this, tr("Hard disk"), tr("Cannot create %1: %2").arg(hd20Image, image.errorString()), tr("OK"));
 +            return;
 +        }
 +    }
@@ -4409,6 +4411,170 @@ index c12a7d1..4b86579 100644
          givealbuffer_fdd(fdd_float_buffer, SOUNDBUFLEN * 2);
  
          frames_rendered += SOUNDBUFLEN;
+diff --git a/src/qt/qt_amstraddialog.hpp b/src/qt/qt_amstraddialog.hpp
+new file mode 100644
+--- /dev/null
++++ b/src/qt/qt_amstraddialog.hpp
+@@ -0,0 +1,159 @@
++// Cabinet message panels: the frosted popup look for questions and notices
++// that would otherwise be stock Windows message boxes. GPL-2.0-or-later, like 86Box.
++#ifndef QT_AMSTRADDIALOG_HPP
++#define QT_AMSTRADDIALOG_HPP
++#include "qt_amstradpopup.hpp"
++#include <QDialog>
++#include <QGuiApplication>
++#include <QKeyEvent>
++#include <QPushButton>
++#include <QScreen>
++#include <algorithm>
++#include <vector>
++
++namespace amstrad {
++
++// A button in the panels' style: a rounded outline, lit under the pointer,
++// a firmer outline for the default (Enter) choice and the keyboard focus.
++class PanelButton : public QPushButton {
++public:
++    PanelButton(const QString &text, QWidget *parent) : QPushButton(text, parent)
++    {
++        setCursor(Qt::PointingHandCursor);
++        setFocusPolicy(Qt::StrongFocus);
++        setAttribute(Qt::WA_Hover);
++    }
++    QSize sizeHint() const override
++    {
++        const QFontMetrics m(font());
++        return QSize(std::max(104, m.horizontalAdvance(text()) + 40), m.height() + 18);
++    }
++protected:
++    void paintEvent(QPaintEvent *) override
++    {
++        QPainter p(this); p.setRenderHint(QPainter::Antialiasing);
++        const bool lit = underMouse() || isDown();
++        const bool firm = isDefault() || hasFocus();
++        p.setPen(QPen(firm ? PopupTheme::text() : PopupTheme::border(), firm ? 2 : 1,
++                      hasFocus() && !isDefault() ? Qt::DashLine : Qt::SolidLine));
++        p.setBrush(isDown() ? QColor(255,255,255,56) : lit ? PopupTheme::hover() : QColor(255,255,255,16));
++        p.drawRoundedRect(QRectF(rect()).adjusted(1.5,1.5,-1.5,-1.5),8,8);
++        if (isDefault()) { QFont f = font(); f.setBold(true); p.setFont(f); }
++        drawPopupText(p, QRectF(rect()), Qt::AlignCenter, text());
++    }
++    void enterEvent(QEvent *e) override { update(); QPushButton::enterEvent(e); }
++    void leaveEvent(QEvent *e) override { update(); QPushButton::leaveEvent(e); }
++};
++
++// A small modal panel centred on the cabinet window: a title, a hairline,
++// the message, then the choices along the bottom right. Escape cancels.
++class MessagePanel : public QDialog {
++public:
++    // An empty cancel label leaves a single (acknowledge) button.
++    MessagePanel(QWidget *parent, QString title, QString text, const QString &accept, const QString &cancel = {})
++        : QDialog(parent, Qt::Dialog | Qt::FramelessWindowHint), title(std::move(title)), text(std::move(text))
++    {
++        setModal(true);
++        setWindowTitle(this->title);
++        setAccessibleName(this->title);
++        setAccessibleDescription(this->text);
++        QPalette palette = this->palette();
++        palette.setColor(QPalette::Window, PopupTheme::solidBackground());
++        palette.setColor(QPalette::WindowText, PopupTheme::text());
++        palette.setColor(QPalette::ButtonText, PopupTheme::text());
++        setPalette(palette);
++        if (!cancel.isEmpty()) {
++            auto *no = new PanelButton(cancel, this);
++            connect(no, &QPushButton::clicked, this, &QDialog::reject);
++            buttons.push_back(no);
++        }
++        auto *yes = new PanelButton(accept, this);
++        yes->setDefault(true); yes->setAutoDefault(true);
++        connect(yes, &QPushButton::clicked, this, &QDialog::accept);
++        buttons.push_back(yes);
++        for (auto *b : buttons) b->resize(b->sizeHint());
++        resize(sizeHint());
++        yes->setFocus();
++    }
++    QSize sizeHint() const override
++    {
++        return QSize(Width, Pad + titleHeight() + Rule + bodyHeight() + Gap + buttonHeight() + Pad);
++    }
++    // Shows the panel centred on its window and waits for the answer.
++    bool ask()
++    {
++        if (QWidget *owner = parentWidget() ? parentWidget()->window() : nullptr) {
++            const QRect area = owner->frameGeometry();
++            QPoint at = area.center() - QPoint(width()/2, height()/2);
++            if (auto *screen = owner->screen()) {
++                const QRect a = screen->availableGeometry();
++                at.setX(std::clamp(at.x(), a.left(), std::max(a.left(), a.right()-width()+1)));
++                at.setY(std::clamp(at.y(), a.top(), std::max(a.top(), a.bottom()-height()+1)));
++            }
++            move(at);
++        }
++        return exec() == QDialog::Accepted;
++    }
++protected:
++    void resizeEvent(QResizeEvent *e) override
++    {
++        QDialog::resizeEvent(e);
++        int x = width() - Pad;
++        const int y = height() - Pad - buttonHeight();
++        for (auto it = buttons.rbegin(); it != buttons.rend(); ++it) {
++            x -= (*it)->width();
++            (*it)->move(x, y);
++            x -= 10;
++        }
++        backdrop.invalidate();
++    }
++    void moveEvent(QMoveEvent *e) override { QDialog::moveEvent(e); backdrop.invalidate(); }
++    void paintEvent(QPaintEvent *) override
++    {
++        QWidget *source = parentWidget() ? parentWidget()->window() : nullptr;
++        const QPoint origin = mapToGlobal(QPoint());
++        if (source && !backdrop.matches(origin, size(), source->size()))
++            backdrop.capture(source, origin, size());
++        QPainter p(this); p.setRenderHint(QPainter::Antialiasing);
++        backdrop.paint(p, QRectF(rect()));
++        p.setPen(QPen(PopupTheme::border(), 1));
++        p.drawRect(QRectF(rect()).adjusted(.5,.5,-.5,-.5));
++        const int w = width() - 2*Pad;
++        int y = Pad;
++        p.setFont(titleFont());
++        drawPopupText(p, QRect(Pad, y, w, titleHeight()), Qt::AlignLeft | Qt::AlignVCenter, title);
++        y += titleHeight() + Rule/2;
++        p.setPen(QPen(PopupTheme::border(), 1));
++        p.drawLine(QPointF(Pad, y + .5), QPointF(width() - Pad, y + .5));
++        y += Rule/2;
++        p.setFont(font());
++        drawPopupText(p, QRect(Pad, y, w, bodyHeight()), Wrap, text, PopupTheme::secondaryText());
++    }
++private:
++    static constexpr int Width = 460, Pad = 20, Rule = 20, Gap = 22;
++    static constexpr int Wrap = Qt::AlignLeft | Qt::AlignTop | Qt::TextWordWrap;
++    QFont titleFont() const { QFont f = font(); f.setBold(true); f.setPointSizeF(f.pointSizeF() * 1.2); return f; }
++    int titleHeight() const { return QFontMetrics(titleFont()).height() + 2; }
++    int bodyHeight() const { return QFontMetrics(font()).boundingRect(QRect(0,0,Width-2*Pad,4000), Wrap, text).height(); }
++    int buttonHeight() const { return buttons.empty() ? 0 : buttons.front()->height(); }
++    QString title, text;
++    std::vector<PanelButton *> buttons;
++    PopupBackdrop backdrop;
++};
++
++// A question with a confirming choice and Cancel; true when confirmed.
++inline bool askPanel(QWidget *parent, const QString &title, const QString &text,
++                     const QString &accept, const QString &cancel)
++{
++    MessagePanel panel(parent, title, text, accept, cancel);
++    return panel.ask();
++}
++// A notice with a single button.
++inline void tellPanel(QWidget *parent, const QString &title, const QString &text, const QString &ok)
++{
++    MessagePanel panel(parent, title, text, ok);
++    panel.ask();
++}
++
++}
++#endif
 diff --git a/src/qt/qt_amstraddiskbox.hpp b/src/qt/qt_amstraddiskbox.hpp
 new file mode 100644
 --- /dev/null
