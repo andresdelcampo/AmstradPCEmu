@@ -236,6 +236,5 @@ Components keep their own notices:
 
 ## Distributing a build
 
-Run `scripts/build.ps1`, commit, then `scripts/make-release.ps1`. It creates `local/release/AmstradPCEmu-<version>/`
-(launcher, binaries, cabinet artwork, the first-launch setup script, empty `roms` folders with a note on what goes where, licence texts and notices) plus a `-source.zip` containing the complete corresponding source (project files and
-the patched 86Box tree). Ship both together. No ROMs, disks or VM state are included.
+Run `scripts/build.ps1`, commit and tag, then `scripts/make-release.ps1`. It creates `local/release/AmstradPCEmu-<version>/`
+(launcher, binaries, cabinet artwork, the first-launch setup script, empty `roms` folders with a note on what goes where, licence texts and notices) and `AmstradPCEmu-<version>.zip` of it. Attach the zip to a GitHub release of the tag; GitHub adds the source archives itself, and they include `patches/86box-pc1512.patch` and the pinned 86Box commit in `UPSTREAM.md`. No ROMs, disks or VM state are included.
