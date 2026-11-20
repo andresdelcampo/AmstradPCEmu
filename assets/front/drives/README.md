@@ -35,8 +35,8 @@ Rebuild with `rtk proxy powershell -NoProfile -ExecutionPolicy Bypass -File scri
 The old `apply-closed-drive-master.ps1` command forwards to this script.
 Master hashes are verified unchanged after assembly.
 
-`all-states-preview.png` shows the shared six-state set;
-`configurations-preview.png` shows DD, SD, sticker and HD20 combinations.
+`previews/all-states-preview.png` shows the shared six-state set;
+`previews/configurations-preview.png` shows DD, SD, sticker and HD20 combinations.
 The existing HDD and blank modules remain distinct because they differ visually.
 
 Superseded A/B patches, masks, duplicate materials and previews are retained

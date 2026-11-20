@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent $PSScriptRoot
 $out = Join-Path $root 'assets/front/leds'
+New-Item -ItemType Directory -Force (Join-Path $out 'previews') | Out-Null  # comparison sheets, not shipped
 $work = Join-Path $root 'local/artwork/led-states'
 $frontPath = Join-Path $root 'assets/front/pc1512-front.png'
 $frontBytes = [IO.File]::ReadAllBytes($frontPath)
@@ -138,7 +139,7 @@ for ($i=0; $i -lt 2; $i++) {
     $composite.Dispose()
 }
 $sg.Dispose(); $font.Dispose()
-$sheet.Save((Join-Path $out 'preview.png'),[Drawing.Imaging.ImageFormat]::Png)
+$sheet.Save((Join-Path $out 'previews/preview.png'),[Drawing.Imaging.ImageFormat]::Png)
 # A compact review of just the two power states, at 3x cabinet scale.
 $powerSheet = [Drawing.Bitmap]::new(840,220)
 $pg = [Drawing.Graphics]::FromImage($powerSheet)
@@ -153,7 +154,7 @@ foreach ($i in 0..1) {
     $context.Dispose()
 }
 $pg.Dispose(); $pf.Dispose()
-$powerSheet.Save((Join-Path $out 'power-states-preview.png'),[Drawing.Imaging.ImageFormat]::Png)
+$powerSheet.Save((Join-Path $out 'previews/power-states-preview.png'),[Drawing.Imaging.ImageFormat]::Png)
 $powerSheet.Dispose()
 $sheet.Dispose(); $front.Dispose()
 $afterHash = [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($frontPath))).Replace('-','').ToLowerInvariant()

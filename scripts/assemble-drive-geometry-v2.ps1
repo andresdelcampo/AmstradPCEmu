@@ -4,6 +4,7 @@ Add-Type -AssemblyName System.Drawing
 $root=Split-Path -Parent $PSScriptRoot
 $work=Join-Path $root 'local/artwork/drive-geometry-v2'
 $out=Join-Path $root 'assets/front/drives'
+New-Item -ItemType Directory -Force (Join-Path $out 'previews') | Out-Null  # comparison sheets, not shipped
 $backup=Join-Path $work 'before'
 New-Item -ItemType Directory -Force $backup | Out-Null
 if (!(Test-Path (Join-Path $backup 'drive-a-open-empty.png'))) {
@@ -89,10 +90,10 @@ foreach($state in $states) {
     $row++
 }
 $sg.Dispose();$font.Dispose()
-$sheet.Save((Join-Path $out 'geometry-v2-preview.png'))
-$sheet.Save((Join-Path $out 'all-states-preview.png'))
+$sheet.Save((Join-Path $out 'previews/geometry-v2-preview.png'))
+$sheet.Save((Join-Path $out 'previews/all-states-preview.png'))
 $pair=$sheet.Clone([Drawing.Rectangle]::new(0,0,940,340),$sheet.PixelFormat)
-$pair.Save((Join-Path $out 'preview.png'));$pair.Dispose()
+$pair.Save((Join-Path $out 'previews/preview.png'));$pair.Dispose()
 $detail=$sheet.Clone([Drawing.Rectangle]::new(0,0,940,170),$sheet.PixelFormat)
 $detail.Save((Join-Path $out 'open-drives-detail.png'));$detail.Dispose();$sheet.Dispose()
 $samples.Values | ForEach-Object { $_.Dispose() };$front.Dispose()

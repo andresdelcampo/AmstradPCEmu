@@ -27,12 +27,13 @@ if (!(Test-Path -LiteralPath $launcher)) { throw 'Build first: Amstrad PC1512.ex
 Copy-Item -LiteralPath $launcher -Destination $out
 
 # What the launcher and emulator read at run time, relative to the launcher:
-# the first-launch VM setup and the cabinet artwork (tracked files only, without
-# the source masters and archived art).
+# the first-launch VM setup and the cabinet artwork. Tracked files only, without
+# source masters, archived art, comparison previews, notes, layout JSON or the
+# icon (built into the executables).
 New-Item -ItemType Directory -Path "$out\scripts" | Out-Null
 Copy-Item -LiteralPath (Join-Path $root 'scripts\prepare-vm.ps1') -Destination "$out\scripts"
 foreach ($file in git -C $root ls-files assets/front) {
-    if ($file -match '/(archive|masters)/') { continue }
+    if ($file -match '/(archive|masters|previews)/' -or $file -match '\.(md|json|ico)$') { continue }
     $target = Join-Path $out ($file -replace '/', '\')
     New-Item -ItemType Directory -Force -Path (Split-Path $target) | Out-Null
     Copy-Item -LiteralPath (Join-Path $root $file) -Destination $target

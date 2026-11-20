@@ -2,6 +2,7 @@ $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Drawing
 $root=Split-Path -Parent $PSScriptRoot
 $out=Join-Path $root 'assets/front/drives'
+New-Item -ItemType Directory -Force (Join-Path $out 'previews') | Out-Null  # comparison sheets, not shipped
 $colors=@('black','yellow','green','blue','red','purple')
 $hashes=@{}
 function Get-FileHash($path){$sha=[Security.Cryptography.SHA256]::Create();try{return @{Hash=[BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($path))).Replace('-','')}}finally{$sha.Dispose()}}
@@ -62,7 +63,7 @@ foreach($state in @('open-empty')+@($colors | ForEach-Object {"closed-$_"})){
     if($state -ne 'open-empty'){$sg.DrawImageUnscaled($closed,5,($row*160+20))}
     $p=[Drawing.Bitmap]::FromFile((Join-Path $out "drive-$state.png"));$sg.DrawImageUnscaled($p,5,($row*160+20));$p.Dispose();$row++
 }
-$sg.Dispose();Save-Png $sheet 'all-states-preview.png';$sheet.Dispose()
+$sg.Dispose();Save-Png $sheet 'previews/all-states-preview.png';$sheet.Dispose()
 $front=[Drawing.Bitmap]::FromFile((Join-Path $root 'assets/front/pc1512-front.png'))
 $configs=@(@('DD - OPEN / RED','open-empty','closed-red','dd'),@('SD - BLUE','blank','closed-blue','sd'),@('SD - STICKER / GREEN','blank-sticker','closed-green','sd'),@('HD20 - YELLOW','hdd','closed-yellow','hd20'))
 $sheet=[Drawing.Bitmap]::new(1050,1260);$sg=[Drawing.Graphics]::FromImage($sheet);$sg.Clear([Drawing.Color]::FromArgb(28,29,32));$row=0
@@ -79,7 +80,7 @@ foreach($config in $configs){
     $sg.DrawImage($comp,[Drawing.Rectangle]::new(0,($row*315+30),1050,275),[Drawing.Rectangle]::new(100,950,1050,275),[Drawing.GraphicsUnit]::Pixel)
     $comp.Dispose();$row++
 }
-$sg.Dispose();Save-Png $sheet 'configurations-preview.png'
+$sg.Dispose();Save-Png $sheet 'previews/configurations-preview.png'
 $sheet.Dispose();$front.Dispose();$font.Dispose();$opened.Dispose();$closed.Dispose()
 foreach($name in @('closed','opened')){if((Get-FileHash (Join-Path $out "masters/$name.png")).Hash -ne $hashes[$name]){throw "Master changed: $name"}}
 Write-Output 'Built shared drive set and previews; both master hashes unchanged.'

@@ -5,6 +5,7 @@ Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent $PSScriptRoot
 $assets = Join-Path $root 'assets/front'
 $badgeDir = Join-Path $assets 'badges'
+New-Item -ItemType Directory -Force (Join-Path $badgeDir 'previews') | Out-Null  # comparison sheets, not shipped
 $front = [Drawing.Bitmap]::FromFile((Join-Path $assets 'pc1512-front.png'))
 $originX = 870
 $originY = 1164
@@ -196,7 +197,7 @@ $number = [Drawing.Bitmap]::FromFile((Join-Path $badgeDir 'system-1640.png'))
 $g.DrawImageUnscaled($number, $originX, $originY)
 $number.Dispose(); $g.Dispose()
 $crop = $preview.Clone([Drawing.Rectangle]::new($originX, $originY, 216, 76), [Drawing.Imaging.PixelFormat]::Format32bppArgb)
-$crop.Save((Join-Path $badgeDir 'pc1640-dd-preview.png'), [Drawing.Imaging.ImageFormat]::Png)
+$crop.Save((Join-Path $badgeDir 'previews/pc1640-dd-preview.png'), [Drawing.Imaging.ImageFormat]::Png)
 $crop.Dispose(); $preview.Dispose()
 }
 
@@ -217,6 +218,6 @@ foreach ($model in @('dd', 'sd', 'hd20')) {
     $index++
 }
 $comparisonGraphics.Dispose()
-$comparison.Save((Join-Path $badgeDir 'model-options-preview.png'), [Drawing.Imaging.ImageFormat]::Png)
+$comparison.Save((Join-Path $badgeDir 'previews/model-options-preview.png'), [Drawing.Imaging.ImageFormat]::Png)
 $comparison.Dispose(); $front.Dispose()
 Write-Output 'Refreshed system and suffix badges for the current sharper, narrower front.'

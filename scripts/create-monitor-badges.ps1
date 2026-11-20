@@ -4,6 +4,7 @@ Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent $PSScriptRoot
 $frontPath = Join-Path $root 'assets/front/pc1512-front.png'
 $badgeDir = Join-Path $root 'assets/front/badges'
+New-Item -ItemType Directory -Force (Join-Path $badgeDir 'previews') | Out-Null  # comparison sheets, not shipped
 $front = [Drawing.Bitmap]::FromFile($frontPath)
 $scale = 4
 
@@ -80,5 +81,5 @@ for ($i = 0; $i -lt $labels.Count; $i++) {
     $badge.Dispose()
 }
 $g.Dispose(); $font.Dispose(); $front.Dispose()
-$sheet.Save((Join-Path $badgeDir 'monitor-options-preview.png'), [Drawing.Imaging.ImageFormat]::Png)
+$sheet.Save((Join-Path $badgeDir 'previews/monitor-options-preview.png'), [Drawing.Imaging.ImageFormat]::Png)
 $sheet.Dispose()

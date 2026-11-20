@@ -56,7 +56,7 @@ Under the hood it is a small fork of the 86Box emulator (Qt), with a port of IBM
 - **The cabinet is the interface.** Click the drive bays to insert disks, the model badge to choose the machine and drives, the monitor badge to swap monitors, and the AMSTRAD plate for About.
 - **PC1512 and PC1640**, each in DD, SD or HD20 (20 MB hard disk) layouts, with the matching monitors: PC-MM and PC-CM, or PC-MD, PC-CD and PC-ECD.
 - **Live front panel.** The power LED and each drive's LED follow the emulated hardware.
-- **Drive sounds.** Motor, seek and spindle sounds from period drives: a Panasonic JU-475-5 for the floppies and a Miniscribe 8425 for the HD20.
+- **Drive sounds.** Motor, seek and spindle sounds from period drives: a Panasonic JU-475-5 for the [floppies](https://github.com/andresdelcampo/RetroDriveSounds) and a Miniscribe 8425 for the HD20.
 - **CRT glass.** Curvature, reflections and the cabinet's dark glass around a sharp CGA picture.
 - **Monitor close-up** and fullscreen, with a square cabinet and a 4:3 display at any window size.
 
@@ -150,8 +150,8 @@ Keyboard notes:
 
 ## Emulated hardware
 
-- **Floppy drives:** both are 5.25-inch 360K, with the motor and seek sounds of a **Panasonic JU-475-5**.
-- **Hard disk (HD20):** a 20 MB drive with the spindle and seek sounds of a **Miniscribe 8425**, a 1987 drive of the same class. The head clicks while DOS reads and writes C:.
+- **Floppy drives:** both are 5.25-inch 360K, with the motor and seek sounds of a **Panasonic JU-475-5** ([source](https://github.com/andresdelcampo/RetroDriveSounds)).
+- **Hard disk (HD20):** a 20 MB drive with the [spindle and seek sounds](https://github.com/86Box/86Box) of a **Miniscribe 8425**, a 1987 drive of the same class. The head clicks while DOS reads and writes C:.
 - **Front LEDs:** the red power LED is lit while the machine runs. Each drive's green LED is lit while its motor runs, as on a real drive.
 - **Display:** a CRT shader adds the screen's curvature, and the cabinet's dark glass and reflections stay visible beneath the picture. [Shader details](docs/IBMULATOR-CRT.md).
 
@@ -229,7 +229,7 @@ Components keep their own notices:
 - `assets/shaders/` contains a port of IBMulator's CRT shader (GPL-3.0-or-later);
   see `assets/shaders/NOTICE-IBMulator.md` and `assets/shaders/COPYING-IBMulator`.
 - Runtime DLLs and other bundled components are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
-- Floppy-drive sounds were recorded by the project author. Front-panel artwork was created by the author with AI
+- [Floppy-drive sounds](https://github.com/andresdelcampo/RetroDriveSounds) were recorded by the project author. Front-panel artwork was created by the author with AI
   image tools ([provenance](docs/front-artwork.md)); no third-party artwork is reproduced.
 - Amstrad and PC1512/PC1640 are trademarks of their respective owners. ROMs and software are not included and
   remain the user's own.

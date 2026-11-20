@@ -3,6 +3,7 @@ Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent $PSScriptRoot
 $assets = Join-Path $root 'assets/front'
 $badges = Join-Path $assets 'badges'
+New-Item -ItemType Directory -Force (Join-Path $badges 'previews') | Out-Null  # comparison sheets, not shipped
 
 # Preview composition only: never call a badge or cabinet artwork generator.
 $sources = @(Get-ChildItem $assets -Recurse -File | Where-Object { $_.Name -notlike '*preview*' })
@@ -24,7 +25,7 @@ function CompositeBadge([Drawing.Rectangle]$crop, [string[]]$overlays) {
     return $badge
 }
 function SavePreview($bitmap, [string]$name) {
-    $bitmap.Save((Join-Path $badges $name), [Drawing.Imaging.ImageFormat]::Png)
+    $bitmap.Save((Join-Path $badges "previews/$name"), [Drawing.Imaging.ImageFormat]::Png)
 }
 function DrawEnlarged($g, $badge, [Drawing.Rectangle]$destination) {
     # Show the actual asset pixels, without adding smoothing to the preview.

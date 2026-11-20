@@ -3,6 +3,7 @@ if ((Get-Content (Join-Path $PSScriptRoot '../assets/front/drives/placement.json
 Add-Type -AssemblyName System.Drawing
 $root=Split-Path -Parent $PSScriptRoot
 $out=Join-Path $root 'assets/front/drives'
+New-Item -ItemType Directory -Force (Join-Path $out 'previews') | Out-Null  # comparison sheets, not shipped
 $work=Join-Path $root 'local/artwork/drive-states'
 $colors=@('yellow','green','blue','red')
 $manifestPath=Join-Path $out 'placement.json'
@@ -67,6 +68,6 @@ foreach ($state in $states) {
     $composite.Dispose(); $index++
 }
 $sg.Dispose();$font.Dispose();$front.Dispose()
-$sheet.Save((Join-Path $out 'all-states-preview.png'),[Drawing.Imaging.ImageFormat]::Png)
+$sheet.Save((Join-Path $out 'previews/all-states-preview.png'),[Drawing.Imaging.ImageFormat]::Png)
 $sheet.Dispose()
 Write-Output 'Saved eight coloured disk patches and updated the state manifest and overview. Existing geometry and alpha masks retained.'

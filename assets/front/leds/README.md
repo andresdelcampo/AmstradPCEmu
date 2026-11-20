@@ -46,8 +46,8 @@ loads these patches from this folder; the coordinates are duplicated there.
 
 `placement.json` contains the coordinates, filenames and canvas dimensions.
 Recheck alignment if the front changes.
-`preview.png` shows all off above all on, with enlarged lens details.
-`power-states-preview.png` compares just the current red power states.
+`previews/preview.png` shows all off above all on, with enlarged lens details.
+`previews/power-states-preview.png` compares just the current red power states.
 
 The current power source crops were edited with the built-in image_gen tool
 using the improved lens from the front master, then resampled and feathered

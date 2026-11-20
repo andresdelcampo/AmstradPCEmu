@@ -67,10 +67,10 @@ case brightness sources are under `local/artwork/case-edge/`.
 
 Rebuild new components with `scripts/assemble-configuration-assets.ps1`
 after rebuilding the existing drive states. It refreshes HDD LED metadata.
-`configurations-preview.png` is a compositing preview of SD plain/sticker
-and HD20 idle/active. `badges/monitor-preview.png` compares CM/MM.
+`drives/previews/configurations-preview.png` is a compositing preview of SD plain/sticker
+and HD20 idle/active. `badges/previews/monitor-preview.png` compares CM/MM.
 `case-highlight-comparison.png` shows the final brightness correction.
-`badges/monitor-options-preview.png` compares all five monitor badges.
+`badges/previews/monitor-options-preview.png` compares all five monitor badges.
 After changing the front artwork, rebuild the sharper, narrower system and
 suffix badges with `scripts/refresh-front-badges.ps1` and all five monitor
 badges with `scripts/create-monitor-badges.ps1`.

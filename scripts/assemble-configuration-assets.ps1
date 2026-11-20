@@ -3,6 +3,7 @@ Add-Type -AssemblyName System.Drawing
 $root=Split-Path -Parent $PSScriptRoot
 $work=Join-Path $root 'local/artwork/configurations'
 $assets=Join-Path $root 'assets/front'
+New-Item -ItemType Directory -Force (Join-Path (Join-Path $assets 'drives') 'previews') | Out-Null  # comparison sheets, not shipped
 $frontPath=Join-Path $assets 'pc1512-front.png'
 $front=[Drawing.Bitmap]::FromFile($frontPath)
 function Scaled([string]$name,[int]$w,[int]$h) {
@@ -129,5 +130,5 @@ foreach($config in @(@('SD - PLAIN BLANK COVER','blank','sd','off'),@('SD - FACT
     $sg.DrawImage($b,[Drawing.Rectangle]::new(0,($index*315+30),1050,275),[Drawing.Rectangle]::new(100,950,1050,275),[Drawing.GraphicsUnit]::Pixel)
     $b.Dispose();$index++
 }
-$sg.Dispose();$font.Dispose();$front.Dispose();$sheet.Save((Join-Path $assets 'configurations-preview.png'),[Drawing.Imaging.ImageFormat]::Png);$sheet.Dispose()
+$sg.Dispose();$font.Dispose();$front.Dispose();$sheet.Save((Join-Path $assets 'drives/previews/configurations-preview.png'),[Drawing.Imaging.ImageFormat]::Png);$sheet.Dispose()
 Write-Output 'Saved five bay modules, DD/SD/HD20 suffix badges, HDD LED off/on, configuration metadata and preview.'

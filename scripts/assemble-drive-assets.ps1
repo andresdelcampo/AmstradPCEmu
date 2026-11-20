@@ -5,6 +5,7 @@ Add-Type -AssemblyName System.Drawing
 $root = Split-Path -Parent $PSScriptRoot
 $work = Join-Path $root 'local/artwork/drive-states'
 $out = Join-Path $root 'assets/front/drives'
+New-Item -ItemType Directory -Force (Join-Path $out 'previews') | Out-Null  # comparison sheets, not shipped
 $frontPath = Join-Path $root 'assets/front/pc1512-front.png'
 $sha = [Security.Cryptography.SHA256]::Create()
 $hashBefore = [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($frontPath))).Replace('-','').ToLowerInvariant()
@@ -128,7 +129,7 @@ foreach ($state in @('open-empty','closed-black')) {
     $composite.Dispose(); $index++
 }
 $sg.Dispose(); $font.Dispose()
-$sheet.Save((Join-Path $out 'preview.png'),[Drawing.Imaging.ImageFormat]::Png)
+$sheet.Save((Join-Path $out 'previews/preview.png'),[Drawing.Imaging.ImageFormat]::Png)
 $sheet.Dispose(); $front.Dispose(); $leverSample.Dispose()
 $hashAfter=[BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($frontPath))).Replace('-','').ToLowerInvariant()
 $sha.Dispose()
