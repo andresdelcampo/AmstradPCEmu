@@ -40,16 +40,20 @@ foreach ($file in git -C $root ls-files assets/front) {
 }
 
 # Empty ROM folders for the user's own firmware.
-foreach ($machine in 'pc1512', 'pc1640') {
-    New-Item -ItemType Directory -Force -Path "$out\roms\machines\$machine" | Out-Null
+foreach ($folder in 'machines\pc1512', 'machines\pc1640', 'hdd\st506') {
+    New-Item -ItemType Directory -Force -Path "$out\roms\$folder" | Out-Null
 }
 @'
-Put your own Amstrad firmware here; it is not included.
+Put your own ROMs here; they are not included. They are the same files, with
+the same names and folders, as in 86Box's ROM set (https://github.com/86Box/roms);
+copying the whole roms folder of an 86Box installation also works.
 
-  machines\pc1512\  40043, 40044, 40078            (8 KB each)
+  machines\pc1512\  40043, 40044, 40078                 (8 KB each)
   machines\pc1640\  40043.v3, 40044.v3 (16 KB each), 40100 (32 KB)
+  hdd\st506\        wd1002a_wx1-62-000094-032.bin       (8 KB, HD20 hard disk controller)
 
-The PC1640 ROMs are only needed to run the PC1640.
+Only the PC1512 ROMs are needed to start. The PC1640 and HD20 ROMs are only
+needed to run those configurations.
 '@ | Set-Content -LiteralPath "$out\roms\README.txt" -Encoding ASCII
 
 # Licences and notices.
