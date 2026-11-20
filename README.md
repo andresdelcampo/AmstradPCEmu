@@ -10,28 +10,28 @@ Under the hood it is a small fork of the 86Box emulator (Qt), with a port of IBM
 
 <table>
   <tr>
-    <td width="50%"><a href="docs/screenshots/off.jpg"><img src="docs/screenshots/off.jpg" alt="The PC1512 switched off, with the rear power button shown in a close-up beside the monitor"></a></td>
     <td width="50%"><a href="docs/screenshots/dos.jpg"><img src="docs/screenshots/dos.jpg" alt="MS-DOS booted from drive A, showing a directory listing, with drive A's LED lit"></a></td>
+    <td width="50%"><a href="docs/screenshots/zoom.jpg"><img src="docs/screenshots/zoom.jpg" alt="Zoomed in on the PC-ECD monitor, showing the curved glass and glowing text"></a></td>
   </tr>
   <tr>
-    <td align="center"><strong>Switched off.</strong> Press the rear power button to start.</td>
     <td align="center"><strong>MS-DOS loaded</strong> from the disk in drive A.</td>
+    <td align="center"><strong>Lean in</strong> for the curved glass and the glow of the text.</td>
   </tr>
   <tr>
-    <td><a href="docs/screenshots/disks.jpg"><img src="docs/screenshots/disks.jpg" alt="The drive menu with the four Amstrad system discs and the user's own disks"></a></td>
-    <td><a href="docs/screenshots/config.jpg"><img src="docs/screenshots/config.jpg" alt="The machine configuration menu: PC1512 or PC1640, and the drive layouts DD, SD and HD20"></a></td>
+    <td width="50%"><a href="docs/screenshots/disks.jpg"><img src="docs/screenshots/disks.jpg" alt="The drive menu with the four Amstrad system discs and the user's own disks"></a></td>
+    <td width="50%"><a href="docs/screenshots/config.jpg"><img src="docs/screenshots/config.jpg" alt="The machine configuration menu: PC1512 or PC1640, and the drive layouts DD, SD and HD20"></a></td>
   </tr>
   <tr>
     <td align="center"><strong>Insert a disk</strong> from the drive bay.</td>
     <td align="center"><strong>Choose the machine</strong> from the model badge.</td>
   </tr>
   <tr>
-    <td><a href="docs/screenshots/monitor.jpg"><img src="docs/screenshots/monitor.jpg" alt="The monitor menu on the PC1640: PC-MD, PC-CD and PC-ECD"></a></td>
-    <td><a href="docs/screenshots/gem.jpg"><img src="docs/screenshots/gem.jpg" alt="The GEM Desktop running on the PC-MM monochrome monitor"></a></td>
+    <td width="50%"><a href="docs/screenshots/monitor.jpg"><img src="docs/screenshots/monitor.jpg" alt="The monitor menu on the PC1640: PC-MD, PC-CD and PC-ECD"></a></td>
+    <td width="50%"><a href="docs/screenshots/monitor-mono.jpg"><img src="docs/screenshots/monitor-mono.jpg" alt="The monitor menu on the PC1512 with PC-MM monochrome selected, showing the GEM Desktop"></a></td>
   </tr>
   <tr>
-    <td align="center"><strong>Swap the monitor</strong> from its badge.</td>
-    <td align="center"><strong>GEM Desktop</strong> on the monochrome PC-MM.</td>
+    <td align="center"><strong>Swap the monitor</strong> from its badge: the PC1640 offers PC-MD, PC-CD and PC-ECD.</td>
+    <td align="center"><strong>Colour or mono</strong> on the PC1512: GEM on the PC-MM.</td>
   </tr>
 </table>
 
