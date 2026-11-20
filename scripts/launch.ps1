@@ -3,12 +3,20 @@ param(
     [switch]$TestPattern,
     [switch]$NoCRT,
     [switch]$Wait,
+    # The user's firmware (roms\machines\<model>). Default: roms in the project root.
+    [string]$Roms,
+    # Optional folder with the MS-DOS and GEM Startup images for a NEW VM's A: and B:.
+    [string]$Disks,
+    # An installed upstream 86Box, used only by -Baseline.
     [string]$Installation = 'C:\Emulators\86Box'
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $name = if ($Baseline) { 'baseline' } else { 'amstrad' }
-& (Join-Path $PSScriptRoot 'prepare-vm.ps1') -Name $name -Installation $Installation
+if (!$Roms) { $Roms = Join-Path $root 'roms' }
+$prepare = @{ Name = $name; Roms = $Roms }
+if ($Disks) { $prepare.Disks = $Disks }
+& (Join-Path $PSScriptRoot 'prepare-vm.ps1') @prepare
 $vm = Join-Path $root "local\$name"
 $exe = if ($Baseline) { Join-Path $Installation '86Box.exe' } else { Join-Path $root 'local\dist\86Box.exe' }
 if (!(Test-Path $exe)) { throw "Build missing: $exe. Run scripts\build.ps1 first." }
@@ -23,7 +31,7 @@ try {
     $env:AMSTRAD_CRT = if ($NoCRT) { '0' } else { '1' }
     $env:AMSTRAD_CRT_LOG = Join-Path $vm 'crt.log'
     # A distinct global config prevents user/manager preferences leaking into this VM.
-    $arguments = '-P "{0}" -R "{1}" -O "{0}\global.cfg" -L "{0}\86box.log"' -f $vm, (Join-Path $Installation 'roms')
+    $arguments = '-P "{0}" -R "{1}" -O "{0}\global.cfg" -L "{0}\86box.log"' -f $vm, $Roms
     $process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory (Split-Path $exe) -PassThru
     Write-Output "Started $exe (PID $($process.Id)), VM: $vm"
     if ($Wait) { $process.WaitForExit(); if ($process.ExitCode) { throw "86Box exited with code $($process.ExitCode). See $vm\86box.log." } }

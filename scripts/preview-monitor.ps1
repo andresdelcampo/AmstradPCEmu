@@ -1,7 +1,7 @@
 param(
     [string]$Toolchain = 'C:\msys64\mingw64',
-    [string]$FontRom = 'C:\Emulators\86Box\roms\machines\pc1512\40078',
-    [string]$Rom1640 = 'C:\Emulators\86Box\roms\machines\pc1640\40100'
+    [string]$FontRom = (Join-Path (Split-Path $PSScriptRoot -Parent) 'roms\machines\pc1512\40078'),
+    [string]$Rom1640 = (Join-Path (Split-Path $PSScriptRoot -Parent) 'roms\machines\pc1640\40100')
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent

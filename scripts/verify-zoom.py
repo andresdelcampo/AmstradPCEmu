@@ -26,7 +26,7 @@ def main():
         port = listener.getsockname()[1]
     token = OUT/'automation.token'
     token.unlink(missing_ok=True)
-    command = [str(executable), '-P', str(VM), '-R', 'C:/Emulators/86Box/roms',
+    command = [str(executable), '-P', str(VM), '-R', str(ROOT / 'roms'),
                '-O', str(VM/'global.cfg'), '-L', str(OUT/'86box.log'), '--automation', f'tcp:{port}',
                '--automation-token-file', str(token), '--automation-hold']
     report = {'checks': {}}

@@ -23,7 +23,33 @@ python (Join-Path $PSScriptRoot 'gen-third-party-notices.py') | Out-Null
 # Binaries (mirror the repo layout the launcher expects); skip dev backup executables.
 robocopy $dist "$out\local\dist" /E /XF '86Box-before-*.exe' /NFL /NDL /NJH /NJS /NP | Out-Null
 $launcher = Join-Path $root 'Amstrad PC1512.exe'
-if (Test-Path -LiteralPath $launcher) { Copy-Item -LiteralPath $launcher -Destination $out }
+if (!(Test-Path -LiteralPath $launcher)) { throw 'Build first: Amstrad PC1512.exe is missing.' }
+Copy-Item -LiteralPath $launcher -Destination $out
+
+# What the launcher and emulator read at run time, relative to the launcher:
+# the first-launch VM setup and the cabinet artwork (tracked files only, without
+# the source masters and archived art).
+New-Item -ItemType Directory -Path "$out\scripts" | Out-Null
+Copy-Item -LiteralPath (Join-Path $root 'scripts\prepare-vm.ps1') -Destination "$out\scripts"
+foreach ($file in git -C $root ls-files assets/front) {
+    if ($file -match '/(archive|masters)/') { continue }
+    $target = Join-Path $out ($file -replace '/', '\')
+    New-Item -ItemType Directory -Force -Path (Split-Path $target) | Out-Null
+    Copy-Item -LiteralPath (Join-Path $root $file) -Destination $target
+}
+
+# Empty ROM folders for the user's own firmware.
+foreach ($machine in 'pc1512', 'pc1640') {
+    New-Item -ItemType Directory -Force -Path "$out\roms\machines\$machine" | Out-Null
+}
+@'
+Put your own Amstrad firmware here; it is not included.
+
+  machines\pc1512\  40043, 40044, 40078            (8 KB each)
+  machines\pc1640\  40043.v3, 40044.v3 (16 KB each), 40100 (32 KB)
+
+The PC1640 ROMs are only needed to run the PC1640.
+'@ | Set-Content -LiteralPath "$out\roms\README.txt" -Encoding ASCII
 
 # Licences and notices.
 foreach ($f in 'LICENSE','README.md','UPSTREAM.md','CHANGES.md','THIRD-PARTY-NOTICES.md') {

@@ -3,7 +3,10 @@
 
    It lives in the project root. On the first launch, when the VM does not
    exist yet, it runs scripts\prepare-vm.ps1 once, hidden, to create it.
-   Arguments: -NoCRT disables the CRT shader (same as scripts\launch.ps1). */
+   Arguments: -NoCRT disables the CRT shader (same as scripts\launch.ps1).
+
+   Everything is relative to the launcher's folder, so a release runs from
+   wherever it is unpacked. The user's firmware goes in roms\machines\<model>. */
 #define WIN32_LEAN_AND_MEAN
 #ifndef UNICODE
 #    define UNICODE
@@ -14,8 +17,6 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <wchar.h>
-
-#define INSTALLATION L"C:\\Emulators\\86Box"
 
 static wchar_t root[MAX_PATH];
 
@@ -48,8 +49,8 @@ prepare_vm(void)
     wchar_t script[MAX_PATH], cmd[2 * MAX_PATH + 128];
     path(script, L"scripts\\prepare-vm.ps1");
     _snwprintf(cmd, sizeof(cmd) / sizeof(cmd[0]),
-               L"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"%ls\" -Name amstrad -Installation \"%ls\"",
-               script, INSTALLATION);
+               L"powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"%ls\" -Name amstrad",
+               script);
     cmd[sizeof(cmd) / sizeof(cmd[0]) - 1] = 0;
 
     STARTUPINFOW        si = { sizeof(si) };
@@ -64,8 +65,8 @@ prepare_vm(void)
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
     if (code) {
-        fail(L"The first-launch VM setup failed. Check that the PC1512 ROMs and system disks are in place under "
-             INSTALLATION L" (roms\\machines\\pc1512 and Disks).",
+        fail(L"The first-launch VM setup failed. Check that the PC1512 ROMs (40043, 40044, 40078) are in "
+             L"roms\\machines\\pc1512 beside Amstrad PC1512.exe.",
              L"Run scripts\\prepare-vm.ps1 from PowerShell to see the details.");
         return 0;
     }
@@ -92,8 +93,9 @@ wWinMain(HINSTANCE inst, HINSTANCE prev, LPWSTR args, int show)
     LocalFree(argv);
     (void) args;
 
-    wchar_t exe[MAX_PATH], vm[MAX_PATH], cfg[MAX_PATH], cabinet[MAX_PATH], crtlog[MAX_PATH], workdir[MAX_PATH];
+    wchar_t exe[MAX_PATH], roms[MAX_PATH], vm[MAX_PATH], cfg[MAX_PATH], cabinet[MAX_PATH], crtlog[MAX_PATH], workdir[MAX_PATH];
     path(exe, L"local\\dist\\86Box.exe");
+    path(roms, L"roms");
     path(vm, L"local\\amstrad");
     path(cfg, L"local\\amstrad\\86box.cfg");
     path(cabinet, L"assets\\front\\pc1512-front.png");
@@ -119,8 +121,8 @@ wWinMain(HINSTANCE inst, HINSTANCE prev, LPWSTR args, int show)
 
     wchar_t cmd[6 * MAX_PATH];
     _snwprintf(cmd, sizeof(cmd) / sizeof(cmd[0]),
-               L"\"%ls\" -P \"%ls\" -R \"" INSTALLATION L"\\roms\" -O \"%ls\\global.cfg\" -L \"%ls\\86box.log\"",
-               exe, vm, vm, vm);
+               L"\"%ls\" -P \"%ls\" -R \"%ls\" -O \"%ls\\global.cfg\" -L \"%ls\\86box.log\"",
+               exe, vm, roms, vm, vm);
     cmd[sizeof(cmd) / sizeof(cmd[0]) - 1] = 0;
 
     STARTUPINFOW        si = { sizeof(si) };

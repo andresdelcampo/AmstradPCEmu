@@ -1,6 +1,10 @@
 param(
     [ValidatePattern('^[a-zA-Z0-9_-]+$')][string]$Name = 'amstrad',
-    [string]$Installation = 'C:\Emulators\86Box',
+    # The user's firmware, as roms\machines\<model>\... Default: roms beside the launcher.
+    [string]$Roms,
+    # Optional folder with the PC1512 MS-DOS and GEM Startup images to mount in A: and B:
+    # of a NEW VM. Without it the drives start empty; disks go in from the cabinet.
+    [string]$Disks,
     # The machine a NEW VM starts as. An existing VM keeps its own; switch it
     # from the cabinet's model badge instead.
     [ValidateSet('pc1512', 'pc1640')][string]$Machine = 'pc1512'
@@ -16,7 +20,7 @@ function Get-SHA256([string]$Path) {
     finally { $stream.Dispose(); $sha.Dispose() }
 }
 $vm = Join-Path $root "local\$Name"
-$roms = Join-Path $Installation 'roms'
+$roms = if ($Roms) { $Roms } else { Join-Path $root 'roms' }
 $firmware = if ($Machine -eq 'pc1640') { @{ '40043.v3' = 16384; '40044.v3' = 16384; '40100' = 32768 } }
             else { @{ '40043' = 8192; '40044' = 8192; '40078' = 8192 } }
 $label = $Machine.ToUpperInvariant()
@@ -30,15 +34,19 @@ foreach ($rom in $firmware.Keys) {
     }
 }
 New-Item -ItemType Directory -Force (Join-Path $vm 'media') | Out-Null
-$records = foreach ($pair in @(@('PC1512 A1 - MSDOS.img', 'dos.img'), @('PC1512 A2 - GEM1.img', 'gem1.img'))) {
-    $original = Join-Path $Installation "Disks\$($pair[0])"
-    $copy = Join-Path $vm "media\$($pair[1])"
-    if (!(Test-Path $original)) { throw "Missing media: $original. Supply a 360 KiB PC1512 disk image." }
-    if ((Get-Item $original).Length -ne 368640) { throw "Expected a 360 KiB disk: $original" }
-    if (!(Test-Path $copy)) { Copy-Item -LiteralPath $original -Destination $copy }
-    [PSCustomObject]@{ Original = $original; OriginalSHA256 = Get-SHA256 $original; Copy = $copy; CopySHA256 = Get-SHA256 $copy }
+$mounted = @()
+if ($Disks) {
+    $records = foreach ($pair in @(@('PC1512 A1 - MSDOS.img', 'dos.img'), @('PC1512 A2 - GEM1.img', 'gem1.img'))) {
+        $original = Join-Path $Disks $pair[0]
+        $copy = Join-Path $vm "media\$($pair[1])"
+        if (!(Test-Path $original)) { throw "Missing media: $original. Supply a 360 KiB PC1512 disk image." }
+        if ((Get-Item $original).Length -ne 368640) { throw "Expected a 360 KiB disk: $original" }
+        if (!(Test-Path $copy)) { Copy-Item -LiteralPath $original -Destination $copy }
+        [PSCustomObject]@{ Original = $original; OriginalSHA256 = Get-SHA256 $original; Copy = $copy; CopySHA256 = Get-SHA256 $copy }
+    }
+    $records | ConvertTo-Json | Set-Content (Join-Path $vm 'media-manifest.json') -Encoding UTF8
+    $mounted = @('media/dos.img', 'media/gem1.img')
 }
-$records | ConvertTo-Json | Set-Content (Join-Path $vm 'media-manifest.json') -Encoding UTF8
 $config = Join-Path $vm '86box.cfg'
 if (!(Test-Path $config)) {
 @'
@@ -82,6 +90,7 @@ fdd_02_writeprot = 1
 fdd_01_audio = panasonic_ju4755_40t
 fdd_02_audio = panasonic_ju4755_40t
 '@.Replace('machine = pc1512', "machine = $Machine").Replace('mem_size = 512', "mem_size = $(if ($Machine -eq 'pc1640') { 640 } else { 512 })") |
+        ForEach-Object { if ($mounted) { $_ } else { $_ -replace '(?m)^fdd_0[12]_(fn|writeprot) = .*\r?\n', '' } } |
         Set-Content -LiteralPath $config -Encoding ASCII
 }
 $global = Join-Path $vm 'global.cfg'

@@ -27,7 +27,9 @@ def digest(path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--installation', type=Path, default=Path('C:/Emulators/86Box'))
+    parser.add_argument('--roms', type=Path, default=ROOT/'roms')
+    parser.add_argument('--disks', type=Path, default=Path('C:/Emulators/86Box/Disks'),
+                        help='Folder with the PC1512 MS-DOS and GEM Startup images the checks boot from')
     parser.add_argument('--executable', type=Path, default=ROOT/'local/dist/86Box.exe')
     parser.add_argument('--pattern', action='store_true')
     parser.add_argument('--shader', action='store_true', help='Use WGL with an unshown application window')
@@ -39,7 +41,8 @@ def main():
     pc1640 = args.machine == 'pc1640'
     assert not (pc1640 and (args.pattern or args.windows or args.floppy_sounds)), \
         '--machine pc1640 combines only with --shader'
-    args.installation = args.installation.resolve()
+    args.roms = args.roms.resolve()
+    args.disks = args.disks.resolve()
     name = 'verify-shader-vm' if args.shader else ('verify-windows-vm' if args.windows else ('verify-pattern-vm' if args.pattern else 'verify-vm'))
     if args.floppy_sounds:
         name = 'verify-floppy-vm'
@@ -47,7 +50,7 @@ def main():
         name = 'verify-pc1640-vm'
     subprocess.run(['powershell.exe', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File',
                     str(ROOT/'scripts/prepare-vm.ps1'), '-Name', name, '-Machine', args.machine,
-                    '-Installation', str(args.installation)], check=True)
+                    '-Roms', str(args.roms), '-Disks', str(args.disks)], check=True)
     vm = ROOT / 'local' / name
     # A reused disposable VM can remember fullscreen from a previous run.
     # The F11 regression below deliberately starts in a normal window.
@@ -83,7 +86,7 @@ def main():
         port = listener.getsockname()[1]
     token = out / 'automation.token'
     token.unlink(missing_ok=True)
-    command = [str(exe), '-P', str(vm), '-R', str(args.installation / 'roms'),
+    command = [str(exe), '-P', str(vm), '-R', str(args.roms),
                '-O', str(vm / 'global.cfg'), '-L', str(out / '86box.log'),
                '--automation', f'tcp:{port}', '--automation-token-file', str(token),
                '--automation-hold', '--automation-seed', '1512']
@@ -93,8 +96,8 @@ def main():
               'pattern':args.pattern, 'checks':{}, 'responses':[]}
     if args.shader:
         report['crt_shader_sha256'] = digest(exe.parent/'shaders/ibmulator-crt.frag')
-    original_paths = [args.installation/'Disks/PC1512 A1 - MSDOS.img',
-                      args.installation/'Disks/PC1512 A2 - GEM1.img']
+    original_paths = [args.disks/'PC1512 A1 - MSDOS.img',
+                      args.disks/'PC1512 A2 - GEM1.img']
     before = {str(p):digest(p) for p in original_paths}
     report['original_media_before'] = before
     # A reused VM must start as the requested machine and layout, whatever a
