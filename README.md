@@ -151,7 +151,7 @@ Keyboard notes:
 ## Emulated hardware
 
 - **Floppy drives:** both are 5.25-inch 360K, with the motor and seek sounds of a **Panasonic JU-475-5** ([source](https://github.com/andresdelcampo/RetroDriveSounds)).
-- **Hard disk (HD20):** a 20 MB drive with the [spindle and seek sounds](https://github.com/86Box/86Box) of a **Miniscribe 8425**, a 1987 drive of the same class. The head clicks while DOS reads and writes C:.
+- **Hard disk (HD20):** a 20 MB drive with the [spindle and seek sounds](https://github.com/86Box/assets) of a **Miniscribe 8425**, a 1987 drive of the same class. The head clicks while DOS reads and writes C:.
 - **Front LEDs:** the red power LED is lit while the machine runs. Each drive's green LED is lit while its motor runs, as on a real drive.
 - **Display:** a CRT shader adds the screen's curvature, and the cabinet's dark glass and reflections stay visible beneath the picture. [Shader details](docs/IBMULATOR-CRT.md).
 
@@ -181,7 +181,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch.ps1 -Wait
 Build notes:
 
 - Optional MIDI engines, dynarec, disassembler, Discord and translations are disabled; the PC1512 model is unchanged. Runtime DLLs are deployed beside the executable.
-- At build time only, deployment copies an installed 86Box's floppy and hard disk sound profiles, recordings and attribution from `C:\Emulators\86Box\assets\sounds\fdd` and `...\hdd` into `local/dist/assets/sounds/`, so the built emulator carries them. The deployed table plays the Miniscribe's own spin-down recording (upstream reuses spin-up). For another installation, pass `-FloppySoundSource <path>` and `-HardDiskSoundSource <path>` to `scripts/build.ps1` or `scripts/deploy.ps1`. Fresh VMs select the Panasonic profile for both drives; existing VM preferences are kept.
+- At build time only, deployment copies the Panasonic floppy and Miniscribe hard disk sounds (just those profiles and recordings, with 86Box's floppy credits) from an installed 86Box's `C:\Emulators\86Box\assets\sounds\fdd` and `...\hdd` into `local/dist/assets/sounds/`, so the built emulator carries them. The deployed table plays the Miniscribe's own spin-down recording (upstream reuses spin-up). For another installation, pass `-FloppySoundSource <path>` and `-HardDiskSoundSource <path>` to `scripts/build.ps1` or `scripts/deploy.ps1`. Fresh VMs select the Panasonic profile for both drives; existing VM preferences are kept.
 - The executable and window icon is `assets/front/pc1512-front.ico`, made from the cabinet artwork `assets/front/pc1512-front.png`. To regenerate it, run the command below and rebuild:
 
 ```powershell

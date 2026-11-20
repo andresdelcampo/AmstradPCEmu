@@ -32,13 +32,28 @@ if (!(Test-Path -LiteralPath $profiles)) {
     throw "Floppy sound profiles missing: $profiles. Supply the 86Box floppy sound assets with -FloppySoundSource."
 }
 $profileText = Get-Content -LiteralPath $profiles -Raw
-if ($profileText -notmatch '(?m)^internal_name\s*=\s*panasonic_ju4755_40t\s*$') {
+# Only the drives the emulator uses are deployed (and so released): a table with
+# the "None" profile and that drive's profile, and just the files it references.
+function Select-Profile([string]$Text, [string]$InternalName) {
+    $pattern = '(?ms)^\[Profile "\d+"\][^\[]*?^internal_name\s*=\s*' + [regex]::Escape($InternalName) + '\s*$.*?(?=^\[|\z)'
+    return [regex]::Match($Text, $pattern)
+}
+function Select-Table([string]$Text, [string]$Section) {
+    $header = $Text.Substring(0, $Text.IndexOf('[Profile'))
+    $none = (Select-Profile $Text 'none').Value
+    return $header + $none.TrimEnd() + "`r`n`r`n" + $Section.TrimEnd() + "`r`n"
+}
+$panasonic = Select-Profile $profileText 'panasonic_ju4755_40t'
+if (!$panasonic.Success) {
     throw "The floppy sound assets do not include Panasonic JU-475-5 40-track audio: $profiles"
 }
-# Fail before deployment if the supplied table references missing recordings.
-foreach ($match in [regex]::Matches($profileText, '(?m)^\w+_file\s*=\s*assets/sounds/fdd/([^\r\n]+)')) {
-    $sample = Join-Path $FloppySoundSource $match.Groups[1].Value.Trim()
-    if (!(Test-Path -LiteralPath $sample -PathType Leaf)) { throw "Floppy sound sample missing: $sample" }
+$fddText = Select-Table $profileText $panasonic.Value
+$fddFiles = foreach ($match in [regex]::Matches($panasonic.Value, '(?m)^\w+_file\s*=\s*assets/sounds/fdd/([^\r\n]+)')) {
+    $relative = $match.Groups[1].Value.Trim()
+    if (!(Test-Path -LiteralPath (Join-Path $FloppySoundSource $relative) -PathType Leaf)) {
+        throw "Floppy sound sample missing: $(Join-Path $FloppySoundSource $relative)"
+    }
+    $relative
 }
 # The HD20 uses the Miniscribe 8425 (1987, 20 MB, 3600 RPM MFM) recordings.
 $hddProfiles = Join-Path $HardDiskSoundSource 'hdd_audio_profiles.cfg'
@@ -46,7 +61,7 @@ if (!(Test-Path -LiteralPath $hddProfiles)) {
     throw "Hard disk sound profiles missing: $hddProfiles. Supply the 86Box hard disk sound assets with -HardDiskSoundSource."
 }
 $hddText = Get-Content -LiteralPath $hddProfiles -Raw
-$miniscribe = [regex]::Match($hddText, '(?ms)^\[Profile "\d+"\][^\[]*?^internal_name\s*=\s*MINISCRIBE_8425_3600RPM\s*$.*?(?=^\[|\z)')
+$miniscribe = Select-Profile $hddText 'MINISCRIBE_8425_3600RPM'
 if (!$miniscribe.Success) { throw "The hard disk sound assets do not include Miniscribe 8425 audio: $hddProfiles" }
 # The upstream table plays the spin-up recording on spin-down although the
 # set includes a spin-down recording; use it when present.
@@ -56,10 +71,13 @@ if (Test-Path -LiteralPath (Join-Path $HardDiskSoundSource ($spindown -replace '
     $hddText = $hddText.Remove($miniscribe.Index, $miniscribe.Length).Insert($miniscribe.Index, $fixed)
     $miniscribe = [regex]::Match($hddText, [regex]::Escape($fixed))
 }
-foreach ($match in [regex]::Matches($miniscribe.Value, '(?m)^\w+_file\s*=\s*assets/sounds/hdd/([^
-]+)')) {
-    $sample = Join-Path $HardDiskSoundSource $match.Groups[1].Value.Trim()
-    if (!(Test-Path -LiteralPath $sample -PathType Leaf)) { throw "Hard disk sound sample missing: $sample" }
+$hddTable = Select-Table $hddText $miniscribe.Value
+$hddFiles = foreach ($match in [regex]::Matches($miniscribe.Value, '(?m)^\w+_file\s*=\s*assets/sounds/hdd/([^\r\n]+)')) {
+    $relative = $match.Groups[1].Value.Trim()
+    if (!(Test-Path -LiteralPath (Join-Path $HardDiskSoundSource $relative) -PathType Leaf)) {
+        throw "Hard disk sound sample missing: $(Join-Path $HardDiskSoundSource $relative)"
+    }
+    $relative
 }
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
 Copy-Item -LiteralPath $exe -Destination $Destination -Force
@@ -111,15 +129,29 @@ while ($queue.Count) {
 }
 @('[Paths]', 'Plugins = .') | Set-Content -LiteralPath (Join-Path $Destination 'qt.conf') -Encoding ASCII
 Copy-Item -LiteralPath (Join-Path $root 'upstream\86Box\COPYING') -Destination (Join-Path $Destination 'COPYING-86Box') -Force
-$soundTarget = Join-Path $Destination 'assets\sounds\fdd'
+# Start from an empty sounds folder so drives dropped from the set do not linger.
+$sounds = Join-Path $Destination 'assets\sounds'
+if (Test-Path -LiteralPath $sounds) { Remove-Item -LiteralPath $sounds -Recurse -Force }
+function Copy-Samples([string]$Source, [string]$Target, [string[]]$Files) {
+    foreach ($relative in $Files) {
+        $to = Join-Path $Target ($relative -replace '/', '\')
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null
+        Copy-Item -LiteralPath (Join-Path $Source $relative) -Destination $to -Force
+    }
+}
+$soundTarget = Join-Path $sounds 'fdd'
 New-Item -ItemType Directory -Force -Path $soundTarget | Out-Null
-Get-ChildItem -LiteralPath $FloppySoundSource | Copy-Item -Destination $soundTarget -Recurse -Force
+Copy-Samples $FloppySoundSource $soundTarget $fddFiles
+[IO.File]::WriteAllText((Join-Path $soundTarget 'fdd_audio_profiles.cfg'), $fddText)
+# 86Box's floppy sound credits (the Panasonic recordings are the project author's).
+$credits = Join-Path $FloppySoundSource 'readme.txt'
+if (Test-Path -LiteralPath $credits) { Copy-Item -LiteralPath $credits -Destination $soundTarget -Force }
 # Project-owned disk insert/eject sounds (Panasonic JU-475-5 recordings).
 Copy-Item -LiteralPath (Join-Path $root 'assets\sounds\fdd\amstrad') -Destination $soundTarget -Recurse -Force
-$hddTarget = Join-Path $Destination 'assets\sounds\hdd'
+$hddTarget = Join-Path $sounds 'hdd'
 New-Item -ItemType Directory -Force -Path $hddTarget | Out-Null
-Get-ChildItem -LiteralPath $HardDiskSoundSource | Copy-Item -Destination $hddTarget -Recurse -Force
-[IO.File]::WriteAllText((Join-Path $hddTarget 'hdd_audio_profiles.cfg'), $hddText)
+Copy-Samples $HardDiskSoundSource $hddTarget $hddFiles
+[IO.File]::WriteAllText((Join-Path $hddTarget 'hdd_audio_profiles.cfg'), $hddTable)
 New-Item -ItemType Directory -Force -Path (Join-Path $Destination 'shaders') | Out-Null
 foreach ($name in @('ibmulator-crt.frag', 'NOTICE-IBMulator.md', 'COPYING-IBMulator')) {
     Copy-Item -LiteralPath (Join-Path $root "assets\shaders\$name") -Destination (Join-Path $Destination 'shaders') -Force
