@@ -19,3 +19,6 @@ upstream/
 # Built launcher and shortcut (rebuild with scripts/build-launcher.ps1).
 *.exe
 *.lnk
+
+# Showcase video: recordings, edits and their scripts, kept out of git.
+video/

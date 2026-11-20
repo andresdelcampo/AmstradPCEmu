@@ -1,45 +1,196 @@
-# Amstrad PC1512 DD
+# Amstrad PC Emulator
 
-A runnable Windows PC1512 emulator with the approved Amstrad cabinet around its live display. Uses a small **86Box Qt fork**, preserving its PC1512 CPU, timing, video, floppy controller and input devices. IBMulator's complete machine/shell was not transplanted.
+*Remember the beige box on the desk, the clunk of the drive lever, the wait for `A>` and the first time GEM's desktop appeared on the screen?*
 
-Double-click **`Amstrad PC1512.exe`** in the project root. It starts `local/dist/86Box.exe` on the isolated `local/amstrad` VM with the external firmware, the cabinet and the CRT shader, without PowerShell or a console window. On the very first launch it creates the VM by running `scripts/prepare-vm.ps1` once, hidden; afterwards the VM and your settings are reused. Pin it to the taskbar or Start, or make a shortcut to it. `build.ps1` rebuilds it from `launcher/amstrad-launcher.c`; `scripts/launch.ps1` remains for the baseline and test-pattern modes. The cabinet opens switched off with the power close-up visible to the right of the monitor, joined by dashed lines to the button's place behind it. The window reserves space on the right for this inset; older saved windows widen once where screen space allows. Press its round rear power button to start it. Boot takes roughly 20 seconds of guest time. The supplied DOS disk installs mouse driver V5.00 and finishes at `A>`.
+Amstrad PC Emulator brings back what it felt like to sit in front of an Amstrad PC1512 or PC1640. The whole computer is on your screen: switch it on at the back, push a disk into the drive, hear it seek, watch its LED glow and see DOS come up behind curved glass. There are no menus or dialogs in the way. You choose disks, machines and monitors by reaching for the computer itself.
 
-The executable and app window use `assets/front/pc1512-front.ico`, with transparency outside the cabinet and 16, 24, 32, 48, 64, 96, 128 and 256 pixel sizes. It is made directly from the cabinet artwork, `assets/front/pc1512-front.png`. To regenerate the ICO, run `magick assets/front/pc1512-front.png -define icon:auto-resize=256,128,96,64,48,32,24,16 assets/front/pc1512-front.ico` and rebuild.
+**A nostalgia machine, not a museum replica.** The aim is to relive the experience of using these computers, not to reproduce them exactly. The cabinet, drives and badges are newly drawn artwork, not photographs of a real machine, so they look the part without being identical. Most sounds are borrowed for now: the floppy drives are a Panasonic JU-475-5 of the same era and the hard disk a Miniscribe 8425, not the Amstrad's own drives (yet). The machine underneath, though, is a real emulation: 86Box runs the PC1512's CPU, timing, video, floppy controller and input devices, with your own ROMs and disks.
 
-- Type DOS commands normally. Click inside the live screen picture to capture the mouse; cabinet, glass borders and background clicks leave it free. **Ctrl+End** or the middle mouse button releases it; each time the mouse is taken, a short pill on the monitor bezel, level with the badges, says so with the keys drawn as Amstrad keycaps, then fades after about 3 s (`AMSTRAD_CAPTURE_HINT=0` removes it).
-- The rear power-button inset **stays visible while the PC is off**. While on, hover or click the **space to the right where the inset appears**, even while hidden, to peek behind it. The same round beige pushbutton switches the PC on and off; off leaves the cabinet open with dark glass and LEDs, and on starts a fresh boot. Right-click the inset to compare **Button close-up** and **Rear cable bay**; the choice is remembered per VM. [Power button details and references](docs/POWER-BUTTON.md).
-- **Ctrl+F12** sends Ctrl+Alt+Del directly to the guest in windowed or fullscreen mode. There is no reset-button control. Release the captured mouse with Ctrl+End before using the cabinet's power switch.
-- On the PC1512, the modern ISO key between left Shift and Z sends the original key's `2Bh` scan code (including key release). The guest BIOS and DOS keyboard driver determine its character for the selected language; with `KEYBUK`, it types `\`, or `|` with Shift.
-- The window has no menu bar: disks, machine layout and monitor are all chosen on the cabinet itself. The **Windows** and **Menu** keys are left to the host, since the Amstrad keyboard has neither.
-- The three small controls in the upper-right corner switch between the whole computer and the monitor close-up (magnifying glass), between fullscreen and windowed mode (middle) and close the emulator through the usual exit confirmation (X). They match the help mark (**?**) in the lower-right corner, which, while the pointer rests on it, names the cabinet's live parts and lists every keyboard shortcut in a KEYS card above it. The controls and the mark are hidden while the guest holds the mouse; press Ctrl+End to release them. Resting the pointer on one of the three shows what it does and its keys (Ctrl+F11, F11, Alt+F4) in a tag below it. All four fade out once the mouse has rested for 2.5 s and return when it moves.
-- Hover briefly over the cabinet's drive bays, model badge or monitor badge to open graphical controls (the system unit's AMSTRAD plate opens About), or left-click to open them immediately. Right-click also works. Choose disks using labelled floppy cards; configuration and monitor choices show picture previews. Move away, click outside or press Escape to dismiss. [Menu details](docs/CABINET-MENUS.md).
-- **PC1640:** the model badge's menu has a second column for the PC1640 (640K, EGA). Choosing it restarts the PC as that machine; its monitor badge then offers the PC-MD, PC-CD and PC-ECD. [PC1640 details](docs/PC1640.md).
-- Resize freely: the cabinet stays square and the inset display stays 4:3.
-- The front image is transparent outside the hardware. The whole rendering area uses the former backdrop's sampled charcoal (`#13131c`), including wide/tall margins and fullscreen.
-- Press **Ctrl+F11**, or the magnifying glass beside the fullscreen control, to close in on the monitor: it fills the window, bezel included, and the system unit is out of view. The same key or control travels back to the whole computer. The choice is remembered (`view/monitor_zoom` in the VM's `amstrad.ini`).
-- Press **F11** or **Alt+Enter** to switch between windowed and fullscreen. The existing Ctrl+Alt+PageUp shortcut also remains available.
-- The first launch opens fullscreen. Later launches restore the last fullscreen, maximized or windowed state while the cabinet is still off. Power-on preserves the current window mode and leaves the mouse free. **Alt+F4** closes the app even while the mouse is captured. Window size and position are remembered (`window_remember` in the VM's `86box.cfg`). A maximized window centres the cabinet and fills the rest with the backdrop colour, also while the PC is off.
-- Upstream renderer, scale factor, stretch, aspect-ratio, HiDPI, composite and extra-monitor options do not apply: the window is always resizable and uses the software renderer.
-- The IBMulator CRT port keeps curvature with sharper sampling for CGA text and no colour fringe by default. Add `-NoCRT` after the launcher in a shortcut's target to disable it. [Shader details](docs/IBMULATOR-CRT.md).
-- The display preserves the cabinet's dark glass, reflection and edge shading beneath the live picture. The upper-left highlight is softened for readability; black video pixels retain the unlit glass surface, including with `-NoCRT`.
-- The cabinet's front LEDs are live: the red **power** LED is lit while the machine runs, and each drive's green LED is lit while that drive's emulated motor runs, like a real drive. It stays on for the guest BIOS's motor-off delay after the last access (about 2 s, the same moment the spindle sound stops). 86Box's per-command activity flag is also included. Patches load from `assets/front/leds/` beside the cabinet image (override with `AMSTRAD_LEDS`); if missing, the photographed LEDs remain.
-- Both drives are 5.25-inch 360K. Initially mounted disk copies are write-protected.
-- Both drives use 86Box's **Panasonic JU-475-5 180K/360K, 40-track** motor and seek sounds. Each drive's Audio profile is the `fdd_01_audio` / `fdd_02_audio` entry of the VM's `86box.cfg`.
-- The HD20's hard disk uses 86Box's **Miniscribe 8425, 3600 RPM, 1987** spindle and seek sounds: a 20 MB MFM drive of the same era and class as the HD20's. Fitting the HD20 from the cabinet menu selects it; it is stored in the VM's `86box.cfg`. Head seeks click while DOS reads and writes C:. Upstream's XT MFM controller never set up its drive's seek geometry and only moved the head for DMA transfers, so the fork fixes both; the HD20 BIOS uses PIO, whose timing is unchanged.
-- Firmware stays under `C:\Emulators\86Box\roms`; original disks stay under `C:\Emulators\86Box\Disks`. Working copies and VM state are ignored under `local/`.
+Under the hood it is a small fork of the 86Box emulator (Qt), with a port of IBMulator's CRT shader for the glass.
 
-Build and launch with the installed MSYS2 MinGW64 toolchain:
+<table>
+  <tr>
+    <td width="50%"><a href="docs/screenshots/off.jpg"><img src="docs/screenshots/off.jpg" alt="The PC1512 switched off, with the rear power button shown in a close-up beside the monitor"></a></td>
+    <td width="50%"><a href="docs/screenshots/dos.jpg"><img src="docs/screenshots/dos.jpg" alt="MS-DOS booted from drive A, showing a directory listing, with drive A's LED lit"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Switched off.</strong> Press the rear power button to start.</td>
+    <td align="center"><strong>MS-DOS loaded</strong> from the disk in drive A.</td>
+  </tr>
+  <tr>
+    <td><a href="docs/screenshots/disks.jpg"><img src="docs/screenshots/disks.jpg" alt="The drive menu with the four Amstrad system discs and the user's own disks"></a></td>
+    <td><a href="docs/screenshots/config.jpg"><img src="docs/screenshots/config.jpg" alt="The machine configuration menu: PC1512 or PC1640, and the drive layouts DD, SD and HD20"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Insert a disk</strong> from the drive bay.</td>
+    <td align="center"><strong>Choose the machine</strong> from the model badge.</td>
+  </tr>
+  <tr>
+    <td><a href="docs/screenshots/monitor.jpg"><img src="docs/screenshots/monitor.jpg" alt="The monitor menu on the PC1640: PC-MD, PC-CD and PC-ECD"></a></td>
+    <td><a href="docs/screenshots/gem.jpg"><img src="docs/screenshots/gem.jpg" alt="The GEM Desktop running on the PC-MM monochrome monitor"></a></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>Swap the monitor</strong> from its badge.</td>
+    <td align="center"><strong>GEM Desktop</strong> on the monochrome PC-MM.</td>
+  </tr>
+</table>
+
+## Contents
+
+- [Highlights](#highlights)
+- [Getting started](#getting-started)
+- [ROMs](#roms)
+- [Disks](#disks)
+- [Using the emulator](#using-the-emulator)
+- [Keyboard and mouse shortcuts](#keyboard-and-mouse-shortcuts)
+- [Emulated hardware](#emulated-hardware)
+- [Settings and options](#settings-and-options)
+- [Building from source](#building-from-source)
+- [Testing](#testing)
+- [Working with git](#working-with-git)
+- [License](#license)
+- [Distributing a build](#distributing-a-build)
+
+## Highlights
+
+- **The cabinet is the interface.** Click the drive bays to insert disks, the model badge to choose the machine and drives, the monitor badge to swap monitors, and the AMSTRAD plate for About.
+- **PC1512 and PC1640**, each in DD, SD or HD20 (20 MB hard disk) layouts, with the matching monitors: PC-MM and PC-CM, or PC-MD, PC-CD and PC-ECD.
+- **Live front panel.** The power LED and each drive's LED follow the emulated hardware.
+- **Drive sounds.** Motor, seek and spindle sounds from period drives: a Panasonic JU-475-5 for the floppies and a Miniscribe 8425 for the HD20.
+- **CRT glass.** Curvature, reflections and the cabinet's dark glass around a sharp CGA picture.
+- **Monitor close-up** and fullscreen, with a square cabinet and a 4:3 display at any window size.
+
+## Getting started
+
+You need two things the emulator cannot include: the Amstrad's ROMs and some disks to boot.
+
+1. **Add the ROMs.** Take the PC1512 files `40043`, `40044` and `40078` from [86Box's ROM set](https://github.com/86Box/roms) and put them in `roms\machines\pc1512\` beside `Amstrad PC1512.exe`. Copying the whole `roms` folder of an 86Box installation also works, and covers the PC1640 and HD20 too. Details in [ROMs](#roms).
+2. **Get some disks.** Any 360 KB disk images will do: the Amstrad system discs in your language, a bootable game, or your own disks. For example, the English PC1512 system discs are at [Amstrad PC1512 System Disks](https://archive.org/details/PC1512_System_Disks). More sets are listed in [Disks](#disks).
+3. **Start the emulator.** Double-click **`Amstrad PC1512.exe`**. The computer appears switched off, with empty drives.
+4. **Insert a bootable disk.** Click drive A (the left slot) and choose a disk: one of the system discs (MS-DOS or DOS Plus), **Open…** for any other image, or one you used before. A system disc with no image yet asks for its file the first time.
+5. **Switch on.** Press the round **power button** in the close-up to the right of the monitor. The PC boots from drive A, just as the real one did.
+
+Swap disks at any time from the drive bays, and press Ctrl+F12 to restart. On the Amstrad system discs, typing `gem` at the MS-DOS prompt starts GEM, which asks for its discs as it needs them.
+
+## ROMs
+
+No firmware is included; it remains your own. The emulator uses the same ROM files, with the same names and layout, as [86Box's ROM set](https://github.com/86Box/roms); the set that came with 86Box 6.0 is known to work. Copy the files below from it, or the whole `roms` folder of an 86Box installation, into the `roms` folder beside `Amstrad PC1512.exe`:
+
+| For | Folder | Files (size) |
+|---|---|---|
+| PC1512 | `roms\machines\pc1512\` | `40043`, `40044`, `40078` (8 KB each) |
+| PC1640 | `roms\machines\pc1640\` | `40043.v3`, `40044.v3` (16 KB each), `40100` (32 KB) |
+| HD20 hard disk | `roms\hdd\st506\` | `wd1002a_wx1-62-000094-032.bin` (Western Digital WD1002A-WX1 controller) |
+
+Only the PC1512 ROMs are needed to start. The PC1640 and HD20 ROMs are needed only to run those configurations.
+
+## Disks
+
+No disks are included either. Insert your own 360 KB images from the drive bays: the four Amstrad system discs (MS-DOS, GEM Startup, GEM Desktop, DOS Plus), the HD20's hard disc utilities, or any other disk. The menu remembers recent disks and where each system disc's image is, and a disc with no image asks for its file on the first click. System discs always go in write-protected. See [Cabinet menus](docs/CABINET-MENUS.md).
+
+The English PC1512 system discs are available as ready-to-use 360 KB images at [Amstrad PC1512 System Disks](https://archive.org/details/PC1512_System_Disks) on the Internet Archive: `Disk1.img` (MS-DOS 3.2), `Disk2.img` (GEM Startup), `Disk3.img` (GEM Desktop and Locomotive BASIC 2) and `Disk4.img` (DOS Plus and GEM Paint).
+
+The PC1640 shipped with its own set, with GEM drivers for its EGA graphics:
+
+- English: the PC1640's MS-DOS 3.2 disc is `msdos47001.img` in [MS DOS v3.2 for Amstrad PC](https://archive.org/details/MSDOSV32Amstrad).
+- Italian: the full set of four discs (MS-DOS 3.2, GEM Boot, GEM Desktop, GEM Apps) is in [Amstrad PC1640 System Disks Italian](https://archive.org/details/Amstrad_PC1640_Ita).
+
+## Using the emulator
+
+### Power
+
+- The rear power-button close-up **stays visible while the PC is off**. While it is on, hover or click the **space to the right of the monitor** (even when the close-up is hidden) to bring it back.
+- The same round beige button switches the PC on and off. Off leaves the cabinet with dark glass and LEDs; on starts a fresh boot. There is no reset button; use **Ctrl+F12** instead.
+- Right-click the close-up to choose between **Button close-up** and **Rear cable bay**; the choice is remembered. [Power button details](docs/POWER-BUTTON.md).
+
+### Mouse
+
+- Click inside the live screen to capture the mouse. Clicks on the cabinet, glass borders and background leave it free.
+- **Ctrl+End** or the **middle mouse button** releases it. Each time the mouse is captured, a short hint on the monitor bezel shows these keys.
+- Release the mouse before using the power button or cabinet menus.
+
+### Cabinet menus
+
+Hover briefly over a part of the cabinet to open its menu, or left- or right-click to open it at once. Move away, click outside or press Escape to dismiss.
+
+| Part | Opens |
+|---|---|
+| Drive bays | Disk choice on labelled floppy cards, with write-protect tabs |
+| Model badge (system unit) | Machine configuration: PC1512 or PC1640, and the drive layout (DD, SD, HD20) |
+| Monitor badge | Monitor choice, with picture previews |
+| AMSTRAD plate (system unit) | About |
+
+Choosing the PC1640 restarts the PC as that machine; its monitor badge then offers the PC-MD, PC-CD and PC-ECD. [Menu details](docs/CABINET-MENUS.md) · [PC1640 details](docs/PC1640.md).
+
+### Window, fullscreen and close-up
+
+- Three small controls in the upper-right corner switch between the **whole computer and the monitor close-up** (magnifying glass), between **fullscreen and windowed** (middle) and **close** the emulator (X). Resting the pointer on one shows what it does and its keys.
+- The **?** mark in the lower-right corner names the cabinet's live parts and shows a KEYS card with every shortcut while the pointer rests on it.
+- These four controls hide while the guest holds the mouse, and fade out after the mouse rests for 2.5 s.
+- The monitor close-up fills the window with the monitor, bezel included. The choice is remembered.
+- Resize freely: the cabinet stays square and the display stays 4:3.
+- The first launch opens fullscreen. Later launches restore the last fullscreen, maximized or windowed state, size and position. Power-on keeps the current window mode and leaves the mouse free.
+
+## Keyboard and mouse shortcuts
+
+| Keys | Action |
+|---|---|
+| **Ctrl+End** or middle mouse button | Release the captured mouse |
+| **Ctrl+F12** | Send Ctrl+Alt+Del to the guest (windowed or fullscreen) |
+| **Ctrl+F11** | Whole computer ↔ monitor close-up |
+| **F11**, **Alt+Enter** or Ctrl+Alt+PageUp | Windowed ↔ fullscreen |
+| **Alt+F4** | Close the emulator, even while the mouse is captured |
+| **Escape** | Dismiss an open cabinet menu |
+| **P** (in the disk menu) | Fit or peel the write-protect tab of the focused disk |
+
+Keyboard notes:
+
+- The **Windows** and **Menu** keys are left to the host, since the Amstrad keyboard has neither.
+- The ISO key between left Shift and Z sends the original key's `2Bh` scan code. Its character depends on the guest's keyboard driver: with `KEYBUK` it types `\`, or `|` with Shift.
+
+## Emulated hardware
+
+- **Floppy drives:** both are 5.25-inch 360K, with the motor and seek sounds of a **Panasonic JU-475-5**.
+- **Hard disk (HD20):** a 20 MB drive with the spindle and seek sounds of a **Miniscribe 8425**, a 1987 drive of the same class. The head clicks while DOS reads and writes C:.
+- **Front LEDs:** the red power LED is lit while the machine runs. Each drive's green LED is lit while its motor runs, as on a real drive.
+- **Display:** a CRT shader adds the screen's curvature, and the cabinet's dark glass and reflections stay visible beneath the picture. [Shader details](docs/IBMULATOR-CRT.md).
+
+## Settings and options
+
+| Setting | Where | Effect |
+|---|---|---|
+| `-NoCRT` | After the launcher in a shortcut's target | Disable the CRT shader |
+| `AMSTRAD_CAPTURE_HINT=0` | Environment | Hide the mouse-release hint |
+
+## Building from source
+
+Requires `C:\msys64\mingw64` with GCC, CMake, Ninja, Qt5, SDL2, OpenAL and the libraries CMake resolves.
+
+For a fresh source checkout, fetch the pinned upstream commits listed in [UPSTREAM.md](UPSTREAM.md), then apply `patches/86box-pc1512.patch` with `scripts/apply-patch.ps1`. Build and launch:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1
+```
+
+```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/launch.ps1 -Wait
 ```
 
-Requires `C:\msys64\mingw64` with GCC, CMake, Ninja, Qt5, SDL2, OpenAL, and the libraries resolved by CMake. Paths with spaces were built successfully. Scripts change PATH only for their own process. Optional MIDI engines, dynarec, disassembler, Discord and translations are disabled; the PC1512 model is unchanged. Runtime DLLs are deployed beside the executable.
+`build.ps1` also rebuilds `Amstrad PC1512.exe` from `launcher/amstrad-launcher.c`. `scripts/launch.ps1` remains for the baseline and test-pattern modes.
 
-Deployment also copies the installed 86Box floppy sound profiles, recordings and attribution from `C:\Emulators\86Box\assets\sounds\fdd` into `local/dist/assets/sounds/fdd`. Hard disk profiles and recordings are copied likewise from `C:\Emulators\86Boxssets\sounds\hdd` into `local/dist/assets/sounds/hdd`; the deployed table plays the Miniscribe's own spin-down recording (the upstream table reuses spin-up). For another installation, pass `-FloppySoundSource <path>` and `-HardDiskSoundSource <path>` to `scripts/build.ps1` or `scripts/deploy.ps1`. Fresh VMs select Panasonic audio for both drives; existing VM preferences are preserved. No sample synthesis or extra sound card is required.
+Build notes:
 
-For a fresh **pinned** source checkout, apply `patches/86box-pc1512.patch` with `scripts/apply-patch.ps1` before building. The patch and upstream notices are retained. No firmware/system disks are included.
+- Optional MIDI engines, dynarec, disassembler, Discord and translations are disabled; the PC1512 model is unchanged. Runtime DLLs are deployed beside the executable.
+- At build time only, deployment copies an installed 86Box's floppy and hard disk sound profiles, recordings and attribution from `C:\Emulators\86Box\assets\sounds\fdd` and `...\hdd` into `local/dist/assets/sounds/`, so the built emulator carries them. The deployed table plays the Miniscribe's own spin-down recording (upstream reuses spin-up). For another installation, pass `-FloppySoundSource <path>` and `-HardDiskSoundSource <path>` to `scripts/build.ps1` or `scripts/deploy.ps1`. Fresh VMs select the Panasonic profile for both drives; existing VM preferences are kept.
+- The executable and window icon is `assets/front/pc1512-front.ico`, made from the cabinet artwork `assets/front/pc1512-front.png`. To regenerate it, run the command below and rebuild:
+
+```powershell
+magick assets/front/pc1512-front.png -define icon:auto-resize=256,128,96,64,48,32,24,16 assets/front/pc1512-front.ico
+```
+
+86Box source: `978030cd0dc626bab794e74c8ddaa512c1a9fcc9` (7.0 development). Installed comparison: 6.0 build 9001.
+
+## Testing
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-scene.ps1
@@ -49,18 +200,16 @@ python scripts/verify-milestone.py --floppy-sounds
 python scripts/verify-milestone.py --machine pc1640
 ```
 
-Verification boots a separate disposable VM offscreen, issues scancode keyboard input, reads both drives, tests focus-loss key release, saves application/raw captures and checks clean exit. Normal launches open no automation socket. [Milestone report](docs/MILESTONE-1.md) records exact revisions, results and limitations. [Implementation handoff](docs/IMPLEMENTATION-HANDOFF.md) records the initial scope; floppy sounds are now enabled, while other mechanical sounds, disk animations and full GEM/mouse compatibility work remain later stages.
+Verification boots a separate disposable VM offscreen from the MS-DOS and GEM Startup images in `C:\Emulators\86Box\Disks` (pass `--disks <folder>` for another place; `--roms` likewise), sends scancode keyboard input, reads both drives, tests key release on focus loss, saves application and raw captures, and checks a clean exit. Normal launches open no automation socket.
 
-The floppy sound check records the dedicated FDD stream during independent reads of A: and B:, checks that it returns to silence between reads, and verifies profile persistence. [Floppy sound verification](docs/FLOPPY-SOUNDS.md).
-
-86Box source: `978030cd0dc626bab794e74c8ddaa512c1a9fcc9` (7.0 development). Installed comparison: 6.0 build 9001. See `upstream/86Box/COPYING` and [artwork provenance](docs/front-artwork.md). No claim of hardware-exact fidelity.
+The floppy sound check records the dedicated drive sound stream during independent reads of A: and B:, checks that it returns to silence between reads, and verifies that the profile persists.
 
 ## Working with git
 
 Read [UPSTREAM.md](UPSTREAM.md) first. `upstream/` (86Box, IBMulator) is not tracked, and 86Box is edited in place, so git only protects those edits through `patches/86box-pc1512.patch`.
 
 - **Before every commit that follows changes under `upstream/86Box`, run `python scripts/export-patch.py` and commit the updated patch.**
-- Do not commit ignored areas: `upstream/`, `local/` (ROMs, disks, VM state), `backups/`, `assets/reference/`, `assets/front/backups/`, built `*.exe`. Review any new large binary first.
+- Do not commit ignored areas: `upstream/`, `roms/` (your firmware), `local/` (builds, disks, VM state), `backups/`, `video/`, `assets/reference/`, `assets/front/backups/`, built `*.exe`. Review any new large binary first.
 - Do not change the pinned upstream commits in `UPSTREAM.md` without a reason; if they change, update the table and re-export the patch.
 - Pushing needs `git config http.sslBackend schannel` (already set in this clone; antivirus HTTPS scanning breaks git's default certificate bundle).
 - New files that go into 86Box carry a GPL-2.0-or-later header, like 86Box. Do not add GPL-2.0-only or GPL-incompatible code to the build.
@@ -88,5 +237,5 @@ Components keep their own notices:
 ## Distributing a build
 
 Run `scripts/build.ps1`, commit, then `scripts/make-release.ps1`. It creates `local/release/AmstradPCEmu-<version>/`
-(binaries, licence texts, notices) plus a `-source.zip` containing the complete corresponding source (project files and
+(launcher, binaries, cabinet artwork, the first-launch setup script, empty `roms` folders with a note on what goes where, licence texts and notices) plus a `-source.zip` containing the complete corresponding source (project files and
 the patched 86Box tree). Ship both together. No ROMs, disks or VM state are included.
