@@ -64,6 +64,14 @@ needed to run those configurations.
 foreach ($f in 'LICENSE','README.md','UPSTREAM.md','CHANGES.md','THIRD-PARTY-NOTICES.md') {
     Copy-Item -LiteralPath (Join-Path $root $f) -Destination $out
 }
+# The README's screenshots and the guides it links to, at the paths it uses, so it reads
+# the same from the release folder as on GitHub (and the guides' own links resolve).
+New-Item -ItemType Directory -Path "$out\docs" | Out-Null
+Copy-Item -LiteralPath (Join-Path $root 'docs\screenshots') -Destination "$out\docs" -Recurse
+foreach ($f in 'CABINET-MENUS.md','IBMULATOR-CRT.md','PC1640.md','POWER-BUTTON.md','front-artwork.md',
+              'power-art-prompts.txt','front-transparency-prompt.txt','visual-reference-review.md') {
+    Copy-Item -LiteralPath (Join-Path $root "docs\$f") -Destination "$out\docs"
+}
 Copy-Item -LiteralPath (Join-Path $root 'upstream\86Box\COPYING') -Destination (Join-Path $out 'COPYING-86Box')
 Copy-Item -LiteralPath (Join-Path $root 'assets\shaders\COPYING-IBMulator') -Destination $out
 Copy-Item -LiteralPath (Join-Path $root 'assets\shaders\NOTICE-IBMulator.md') -Destination $out
