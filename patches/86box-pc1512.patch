@@ -4984,7 +4984,7 @@ new file mode 100644
 +    }
 +};
 +
-+// In a list of keys, the mouse's middle button: drawn as a mouse, not a key.
++// In a list of keys, the mouse's middle button (or wheel): drawn as a mouse, not a key.
 +// The Amstrad mouse has two buttons, so 86Box keeps the middle one to
 +// release the mouse (mouse_get_release_buttons()).
 +inline const QString &middleButton()
@@ -5574,7 +5574,7 @@ new file mode 100644
 +        if (role == Exit) return { tr("Exit emulator"), { QStringLiteral("Alt"), QStringLiteral("F4") } };
 +        if (role == Zoom)
 +            return { zoomed && zoomed() ? tr("Show the whole computer") : tr("Zoom in on the monitor"),
-+                     { QStringLiteral("Ctrl"), QStringLiteral("F11") } };
++                     { QStringLiteral("Ctrl"), QStringLiteral("F11"), amstrad::middleButton() } }; // the wheel too
 +        return { fullscreen && fullscreen() ? tr("Leave fullscreen") : tr("Fullscreen"), { QStringLiteral("F11") } };
 +    }
 +
@@ -5587,8 +5587,8 @@ new file mode 100644
 +        setGeometry(parentWidget()->width() - side - gap - int(role) * (side + side / 8), gap, side, side);
 +        if (role != Exit) {
 +            const bool on = role == Zoom ? zoomed && zoomed() : fullscreen && fullscreen();
-+            const QString label = role == Zoom ? (on ? tr("Show the whole computer (Ctrl+F11)")
-+                                                     : tr("Zoom in on the monitor (Ctrl+F11)"))
++            const QString label = role == Zoom ? (on ? tr("Show the whole computer (Ctrl+F11 or mouse wheel)")
++                                                     : tr("Zoom in on the monitor (Ctrl+F11 or mouse wheel)"))
 +                                               : on ? tr("Exit fullscreen") : tr("Enter fullscreen");
 +            if (accessibleName() != label) {
 +                setAccessibleName(label);
