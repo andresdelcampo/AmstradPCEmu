@@ -95,6 +95,10 @@ The PC1640 shipped with its own set, with GEM drivers for its EGA graphics:
 - English: the PC1640's MS-DOS 3.2 disc is `msdos47001.img` in [MS DOS v3.2 for Amstrad PC](https://archive.org/details/MSDOSV32Amstrad).
 - Italian: the full set of four discs (MS-DOS 3.2, GEM Boot, GEM Desktop, GEM Apps) is in [Amstrad PC1640 System Disks Italian](https://archive.org/details/Amstrad_PC1640_Ita).
 
+### Preparing the HD20
+
+The HD20's hard disk starts out blank, so C: does not exist yet. Boot from a system disc in drive A, then run `FDISK` to create an active DOS partition, restart, and run `FORMAT C: /S` to format it and copy the system files (use the HD20 utilities disc if your MS-DOS disc has no `FDISK`). Both programs come from your own discs; none are included. Afterwards the PC boots from C: and the disc in drive A can be removed.
+
 ## Using the emulator
 
 ### Power
