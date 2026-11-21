@@ -72,6 +72,8 @@ You need two things the emulator cannot include: the Amstrad's ROMs and some dis
 4. **Insert a bootable disk.** Click drive A (the left slot) and choose a disk: one of the system discs (MS-DOS or DOS Plus), **Open…** for any other image, or one you used before. A system disc with no image yet asks for its file the first time.
 5. **Switch on.** Press the round **power button** in the close-up to the right of the monitor. The PC boots from drive A, just as the real one did.
 
+**If the first launch shows a "cabinet image is missing" or "could not be read" message**, your antivirus (Avast, for example) is checking the new download. Click **OK** on the messages, and the emulator may show a black window for a moment. Once the check has finished, which takes a few seconds, the antivirus starts the emulator again and it opens normally; it is safe to run. Nothing is wrong with the download. If this happens on every launch, add the folder as an exception in your antivirus.
+
 Swap disks at any time from the drive bays, and press Ctrl+F12 to restart. On the Amstrad system discs, typing `gem` at the MS-DOS prompt starts GEM, which asks for its discs as it needs them.
 
 ## ROMs
