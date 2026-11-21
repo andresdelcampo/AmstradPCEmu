@@ -5134,8 +5134,8 @@ new file mode 100644
 +{
 +    static const QList<Shortcut> all = {
 +        { { QStringLiteral("Ctrl"), QStringLiteral("End"), middleButton() }, QStringLiteral("Release the mouse") },
++        { { QStringLiteral("Ctrl"), QStringLiteral("F11"), middleButton() }, QStringLiteral("Monitor close-up") },
 +        { { QStringLiteral("Ctrl"), QStringLiteral("F12") }, QStringLiteral("Ctrl + Alt + Del") },
-+        { { QStringLiteral("Ctrl"), QStringLiteral("F11") }, QStringLiteral("Monitor close-up") },
 +        { { QStringLiteral("F11") }, QStringLiteral("Fullscreen") },
 +        { { QStringLiteral("Alt"), QStringLiteral("F4") }, QStringLiteral("Exit") },
 +    };
