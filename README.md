@@ -138,6 +138,7 @@ Choosing the PC1640 restarts the PC as that machine; its monitor badge then offe
 | **Ctrl+End** or middle mouse button | Release the captured mouse |
 | **Ctrl+F12** | Send Ctrl+Alt+Del to the guest (windowed or fullscreen) |
 | **Ctrl+F11** | Whole computer ↔ monitor close-up |
+| **Mouse wheel** (over the cabinet, mouse not captured) | Zoom toward the monitor (up) or back out (down), a quarter at a time |
 | **F11**, **Alt+Enter** or Ctrl+Alt+PageUp | Windowed ↔ fullscreen |
 | **Alt+F4** | Close the emulator, even while the mouse is captured |
 | **Escape** | Dismiss an open cabinet menu |
