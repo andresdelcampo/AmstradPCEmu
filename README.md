@@ -124,10 +124,10 @@ Choosing the PC1640 restarts the PC as that machine; its monitor badge then offe
 
 ### Window, fullscreen and close-up
 
-- Three small controls in the upper-right corner switch between the **whole computer and the monitor close-up** (magnifying glass), between **fullscreen and windowed** (middle) and **close** the emulator (X). Resting the pointer on one shows what it does and its keys.
+- Three small controls in the upper-right corner switch between the **whole computer and the monitor close-up** (magnifying glass), between **fullscreen and windowed** (middle) and **close** the emulator (X). Resting the pointer on one shows what it does and its keys. The **mouse wheel** over the cabinet does the same as the magnifying glass, a quarter of the way per notch, so you can stop partway (while the mouse is not captured).
 - The **?** mark in the lower-right corner names the cabinet's live parts and shows a KEYS card with every shortcut while the pointer rests on it.
 - These four controls hide while the guest holds the mouse, and fade out after the mouse rests for 2.5 s.
-- The monitor close-up fills the window with the monitor, bezel included. The choice is remembered.
+- The monitor close-up fills the window with the monitor, bezel included. Whether you left it closer or farther is remembered (a partial zoom is restored as whichever end is nearer).
 - Resize freely: the cabinet stays square and the display stays 4:3.
 - The first launch opens fullscreen. Later launches restore the last fullscreen, maximized or windowed state, size and position. Power-on keeps the current window mode and leaves the mouse free.
 
