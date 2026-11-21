@@ -4,6 +4,8 @@
 
 Amstrad PC Emulator brings back what it felt like to sit in front of an Amstrad PC1512 or PC1640. The whole computer is on your screen: switch it on at the back, push a disk into the drive, hear it seek, watch its LED glow and see DOS come up behind curved glass. There are no menus or dialogs in the way. You choose disks, machines and monitors by reaching for the computer itself.
 
+<p align="center"><a href="https://www.youtube.com/watch?v=LJkakRkrZ3I"><img src="https://img.youtube.com/vi/LJkakRkrZ3I/maxresdefault.jpg" width="640" alt="Watch the Amstrad PC Emulator video on YouTube"></a><br><em>Click to watch the video on YouTube</em></p>
+
 **A nostalgia machine, not a museum replica.** The aim is to relive the experience of using these computers, not to reproduce them exactly. The cabinet, drives and badges are newly drawn artwork, not photographs of a real machine, so they look the part without being identical. Most sounds are borrowed for now: the floppy drives are a Panasonic JU-475-5 of the same era and the hard disk a Miniscribe 8425, not the Amstrad's own drives (yet). The machine underneath, though, is a real emulation: 86Box runs the PC1512's CPU, timing, video, floppy controller and input devices, with your own ROMs and disks.
 
 Under the hood it is a small fork of the 86Box emulator (Qt), with a port of IBMulator's CRT shader for the glass.
