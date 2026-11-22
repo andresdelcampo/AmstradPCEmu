@@ -24,6 +24,9 @@ each release). In summary:
   machine has a cassette port.
 - Build and configuration changes in `CMakeLists.txt`, `config.c`, `qt_defs.hpp`,
   `qt_main.cpp`, resources.
+- **Linux**: a missing include in `qt_main.cpp` (it only compiled on Windows), and
+  the power button click played through the floppy sound mixer (`fdd_audio`)
+  outside Windows.
 
 The IBMulator-derived files are modified adaptations of IBMulator
 (https://github.com/barotto/IBMulator, pinned in UPSTREAM.md).

@@ -72,6 +72,8 @@ You need two things the emulator cannot include: the Amstrad's ROMs and some dis
 4. **Insert a bootable disk.** Click drive A (the left slot) and choose a disk: one of the system discs (MS-DOS or DOS Plus), **Open…** for any other image, or one you used before. A system disc with no image yet asks for its file the first time.
 5. **Switch on.** Press the round **power button** in the close-up to the right of the monitor. The PC boots from drive A, just as the real one did.
 
+**On Linux (experimental)**, download the `…-linux-x86_64.tar.gz` release instead and unpack it. Install the libraries it uses once (see [Linux](#linux-experimental) for the command), put the ROMs in `roms/machines/pc1512/`, and run `./amstrad-pc1512.sh` where the steps above say `Amstrad PC1512.exe`.
+
 **If the first launch shows a "cabinet image is missing" or "could not be read" message**, your antivirus (Avast, for example) is checking the new download. Click **OK** on the messages, and the emulator may show a black window for a moment. Once the check has finished, which takes a few seconds, the antivirus starts the emulator again and it opens normally; it is safe to run. Nothing is wrong with the download. If this happens on every launch, add the folder as an exception in your antivirus.
 
 Swap disks at any time from the drive bays, and press Ctrl+F12 to restart. On the Amstrad system discs, typing `gem` at the MS-DOS prompt starts GEM, which asks for its discs as it needs them.
@@ -201,7 +203,22 @@ magick assets/front/pc1512-front.png -define icon:auto-resize=256,128,96,64,48,3
 
 ### Linux (experimental)
 
-Linux builds from the same patched source. Install the build packages (Debian/Ubuntu names):
+Linux runs the same patched source. It has been tested only in a virtual machine, Ubuntu 24.04 in VirtualBox 7.2.4, not yet on a real Linux PC. The release is built on Ubuntu 22.04 and runs on Ubuntu 22.04 or later (and similar Debian-based systems) with these libraries installed:
+
+```sh
+# Ubuntu 24.04 or later
+sudo apt install libqt5widgets5t64 libqt5network5t64 libqt5gui5t64 qtwayland5 libsdl2-2.0-0 \
+  libopenal1 libsndfile1 libslirp0 libserialport0 libevdev2 libxkbcommon-x11-0 libxi6 \
+  libfreetype6 libpng16-16 libzstd1
+# Ubuntu 22.04: the same, with libqt5widgets5 libqt5network5 libqt5gui5 for the first three
+```
+
+- `./amstrad-pc1512.sh --install-desktop` adds **Amstrad PC1512** to the desktop's app menu. Started from there, no terminal window appears.
+- On a Wayland desktop (Ubuntu's default) the launcher runs the emulator as a Wayland program, which captures the mouse with Wayland's pointer lock; that needs `qtwayland5`. `QT_QPA_PLATFORM=xcb ./amstrad-pc1512.sh` forces X11.
+- In VirtualBox, turn off **Input > Mouse Integration** before clicking into the PC's screen: with it on, the desktop cannot lock the pointer and the mouse does not reach the PC.
+- Differences from Windows: a status bar shows below the cabinet in windowed mode. Without 3D acceleration (as in most virtual machines), the CRT glass is drawn by the CPU, and zooming may make the sound crackle; `./amstrad-pc1512.sh -NoCRT` turns the glass off.
+
+To build it, install the build packages (Debian/Ubuntu names):
 
 ```sh
 sudo apt install build-essential cmake ninja-build pkg-config qtbase5-dev qtbase5-private-dev \
@@ -219,8 +236,7 @@ scripts/build-linux.sh --sounds <folder>
 
 - `build-linux.sh` builds into `local/build-linux` and deploys to `local/dist-linux`, beside the Windows build, so one folder can serve both systems and share the `local/amstrad` VM.
 - Drive sounds: `--sounds` takes a deployed `assets/sounds` folder (for example `local/dist/assets/sounds` from a Windows build, which is the default when present) or an 86Box installation's `assets/sounds`. Without it the drives are silent. The power button click and the disk insert and eject sounds come from this repository.
-- `./amstrad-pc1512.sh --install-desktop` adds **Amstrad PC1512** to the desktop's app menu. Started from there, no terminal window appears.
-- Known differences from Windows: a status bar shows below the cabinet in windowed mode, and mouse capture may not work yet (it was not working under WSLg).
+- WSL2 works for building (with WSLg it also runs, but its mouse capture does not).
 
 ## Testing
 
@@ -270,3 +286,5 @@ Components keep their own notices:
 
 Run `scripts/build.ps1`, commit and tag, then `scripts/make-release.ps1`. It creates `local/release/AmstradPCEmu-<version>/`
 (launcher, binaries, cabinet artwork, the first-launch setup script, empty `roms` folders with a note on what goes where, licence texts and notices) and `AmstradPCEmu-<version>.zip` of it. Attach the zip to a GitHub release of the tag; GitHub adds the source archives itself, and they include `patches/86box-pc1512.patch` and the pinned 86Box commit in `UPSTREAM.md`. No ROMs, disks or VM state are included.
+
+For Linux, run `scripts/build-linux.sh` on Ubuntu 22.04 (WSL2 works), then `scripts/make-release-linux.sh --version <version>`. It creates `local/release/AmstradPCEmu-<version>-linux-x86_64/` with the same contents (the Linux launcher and `prepare-vm.sh` instead of the Windows ones) and a `.tar.gz` of it, which keeps the executable bits. Attach it to the same GitHub release.
