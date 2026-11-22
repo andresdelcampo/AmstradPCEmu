@@ -203,7 +203,7 @@ magick assets/front/pc1512-front.png -define icon:auto-resize=256,128,96,64,48,3
 
 ### Linux (experimental)
 
-Linux runs the same patched source. It has been tested only in a virtual machine, Ubuntu 24.04 in VirtualBox 7.2.4, not yet on a real Linux PC. The release is built on Ubuntu 22.04 and runs on Ubuntu 22.04 or later (and similar Debian-based systems) with these libraries installed:
+Linux runs the same patched source. It has been tested on a real PC with Zorin OS (Linux 6.14), and in a virtual machine, Ubuntu 24.04 in VirtualBox 7.2.4. The release is built on Ubuntu 22.04 and runs on Ubuntu 22.04 or later (and similar Debian-based systems) with these libraries installed:
 
 ```sh
 # Ubuntu 24.04 or later
