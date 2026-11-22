@@ -199,6 +199,29 @@ magick assets/front/pc1512-front.png -define icon:auto-resize=256,128,96,64,48,3
 
 86Box source: `978030cd0dc626bab794e74c8ddaa512c1a9fcc9` (7.0 development). Installed comparison: 6.0 build 9001.
 
+### Linux (experimental)
+
+Linux builds from the same patched source. Install the build packages (Debian/Ubuntu names):
+
+```sh
+sudo apt install build-essential cmake ninja-build pkg-config qtbase5-dev qtbase5-private-dev \
+  qttools5-dev libqt5opengl5-dev libsdl2-dev libopenal-dev libfreetype-dev libsndfile1-dev \
+  libslirp-dev libpng-dev zlib1g-dev libzstd-dev libevdev-dev libxkbcommon-x11-dev libxi-dev \
+  libx11-dev libwayland-dev extra-cmake-modules libserialport-dev libvdeplug-dev
+```
+
+Fetch the upstream sources and apply the patch as in [UPSTREAM.md](UPSTREAM.md) (`git -C upstream/86Box apply ../../patches/86box-pc1512.patch`), put the ROMs in `roms/machines/pc1512/`, then build and start:
+
+```sh
+scripts/build-linux.sh --sounds <folder>
+./amstrad-pc1512.sh
+```
+
+- `build-linux.sh` builds into `local/build-linux` and deploys to `local/dist-linux`, beside the Windows build, so one folder can serve both systems and share the `local/amstrad` VM.
+- Drive sounds: `--sounds` takes a deployed `assets/sounds` folder (for example `local/dist/assets/sounds` from a Windows build, which is the default when present) or an 86Box installation's `assets/sounds`. Without it the drives are silent. The power button click and the disk insert and eject sounds come from this repository.
+- `./amstrad-pc1512.sh --install-desktop` adds **Amstrad PC1512** to the desktop's app menu. Started from there, no terminal window appears.
+- Known differences from Windows: a status bar shows below the cabinet in windowed mode, and mouse capture may not work yet (it was not working under WSLg).
+
 ## Testing
 
 ```powershell

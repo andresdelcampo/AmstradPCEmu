@@ -970,7 +970,7 @@ index 669a347..68fcdaa 100644
  
  /* Set the "drive type" switches for the IBM Xebec controller. */
 diff --git a/src/floppy/fdd_audio.c b/src/floppy/fdd_audio.c
-index 5d919b2..bfbd1f7 100644
+index 5d919b2..cc47dab 100644
 --- a/src/floppy/fdd_audio.c
 +++ b/src/floppy/fdd_audio.c
 @@ -32,6 +32,7 @@
@@ -981,7 +981,7 @@ index 5d919b2..bfbd1f7 100644
  
  #ifndef DISABLE_FDD_AUDIO
  
-@@ -666,11 +667,156 @@ fdd_audio_get_seek_time(void *priv, int track_count, int is_seek_down)
+@@ -666,11 +667,189 @@ fdd_audio_get_seek_time(void *priv, int track_count, int is_seek_down)
      return 0;
  }
  
@@ -998,6 +998,11 @@ index 5d919b2..bfbd1f7 100644
 +    int             then_insert;
 +} media_play[FDD_NUM];
 +
++/* The power button click: one voice, independent of the drives. */
++static audio_sample_t click_sound;
++static atomic_int     click_request;
++static int            click_pos = -1; /* -1 while quiet */
++
 +static void
 +media_sounds_load(void)
 +{
@@ -1009,10 +1014,22 @@ index 5d919b2..bfbd1f7 100644
 +            media_sound[i].volume = 1.0f;
 +        }
 +    }
++    if (click_sound.buffer == NULL) {
++        click_sound.buffer = sound_load_wav("assets/sounds/fdd/amstrad/power_click.wav", &click_sound.samples);
++        click_sound.volume = 1.0f;
++    }
 +    for (int i = 0; i < FDD_NUM; i++) {
 +        atomic_store(&media_request[i], 0);
 +        media_play[i].sample = NULL;
 +    }
++}
++
++/* GUI thread: play the power button click. Quiet if the sample is missing. */
++void
++fdd_audio_play_click(void)
++{
++    if (click_sound.buffer)
++        atomic_store(&click_request, 1);
 +}
 +
 +/* GUI thread: request the eject and/or insert sound for a drive. A swap asks
@@ -1086,7 +1103,7 @@ index 5d919b2..bfbd1f7 100644
 +    for (int drive = 0; drive < FDD_NUM; drive++)
 +        if (media_play[drive].sample || atomic_load(&media_request[drive]))
 +            return 1;
-+    return 0;
++    return (click_pos >= 0) || atomic_load(&click_request);
 +}
 +
 +/* Adds the insert/eject sounds onto an already filled stereo buffer. */
@@ -1107,6 +1124,22 @@ index 5d919b2..bfbd1f7 100644
 +                buffer[i * 2]     = (int16_t) (buffer[i * 2] + (int16_t) ((float) sample->buffer[pos * 2] / 4.0f * sample->volume));
 +                buffer[i * 2 + 1] = (int16_t) (buffer[i * 2 + 1] + (int16_t) ((float) sample->buffer[pos * 2 + 1] / 4.0f * sample->volume));
 +            }
++        }
++    }
++    if (atomic_exchange(&click_request, 0))
++        click_pos = 0;
++    for (int i = 0; (click_pos >= 0) && (i < frames); i++) {
++        if (click_pos >= click_sound.samples) {
++            click_pos = -1;
++            break;
++        }
++        const int pos = click_pos++;
++        if (sound_is_float) {
++            float_buffer[i * 2] += (float) click_sound.buffer[pos * 2] / 131072.0f * click_sound.volume;
++            float_buffer[i * 2 + 1] += (float) click_sound.buffer[pos * 2 + 1] / 131072.0f * click_sound.volume;
++        } else {
++            buffer[i * 2]     = (int16_t) (buffer[i * 2] + (int16_t) ((float) click_sound.buffer[pos * 2] / 4.0f * click_sound.volume));
++            buffer[i * 2 + 1] = (int16_t) (buffer[i * 2 + 1] + (int16_t) ((float) click_sound.buffer[pos * 2 + 1] / 4.0f * click_sound.volume));
 +        }
 +    }
 +}
@@ -1138,7 +1171,7 @@ index 5d919b2..bfbd1f7 100644
      /* Load audio profiles configuration */
      fdd_audio_load_profiles();
  
-@@ -716,6 +862,14 @@ fdd_audio_close(void)
+@@ -716,6 +895,14 @@ fdd_audio_close(void)
  {
      fdd_log("FDD Audio: Shutting down audio system\n");
  
@@ -1153,7 +1186,7 @@ index 5d919b2..bfbd1f7 100644
      /* Free loaded profile samples */
      for (int profile_id = 0; profile_id < audio_profile_count; profile_id++) {
          drive_audio_samples_t *samples = &profile_samples[profile_id];
-@@ -987,8 +1141,12 @@ fdd_audio_callback(int16_t *buffer, const int length)
+@@ -987,8 +1174,12 @@ fdd_audio_callback(int16_t *buffer, const int length)
              break;
      }
  
@@ -1167,7 +1200,7 @@ index 5d919b2..bfbd1f7 100644
  
      float   *float_buffer      = (float *) buffer;
      int16_t *int16_buffer      = (int16_t *) buffer;
-@@ -1221,6 +1379,9 @@ fdd_audio_callback(int16_t *buffer, const int length)
+@@ -1221,6 +1412,9 @@ fdd_audio_callback(int16_t *buffer, const int length)
              }
          }
      }
@@ -1177,7 +1210,7 @@ index 5d919b2..bfbd1f7 100644
  }
  #else
  
-@@ -1281,5 +1442,29 @@ fdd_audio_callback(int16_t *buffer, int length)
+@@ -1281,5 +1475,33 @@ fdd_audio_callback(int16_t *buffer, int length)
  {
      memset(buffer, 0, length * sizeof(int16_t));
  }
@@ -1194,6 +1227,10 @@ index 5d919b2..bfbd1f7 100644
 +fdd_audio_media_ejecting(int drive)
 +{
 +    return 0;
++}
++void
++fdd_audio_play_click(void)
++{
 +}
 +int
 +fdd_audio_media_active(void)
@@ -1415,10 +1452,10 @@ index 82aebee..86c62f3 100644
 -#endif /*PCE_IBMPC_CASSETTE_H*/
 +#endif /*EMU_CASSETTE_H*/
 diff --git a/src/include/86box/fdd_audio.h b/src/include/86box/fdd_audio.h
-index 4f480da..0292f70 100644
+index 4f480da..c208787 100644
 --- a/src/include/86box/fdd_audio.h
 +++ b/src/include/86box/fdd_audio.h
-@@ -134,6 +134,16 @@ extern void fdd_audio_play_multi_track_seek(void *priv, int from_track, int to_t
+@@ -134,6 +134,19 @@ extern void fdd_audio_play_multi_track_seek(void *priv, int from_track, int to_t
  /* Audio callback function */
  extern void fdd_audio_callback(int16_t *buffer, int length);
  
@@ -1428,6 +1465,9 @@ index 4f480da..0292f70 100644
 +extern int fdd_audio_media_inserting(int drive);
 +/* True until a requested eject sound is a quarter through. */
 +extern int fdd_audio_media_ejecting(int drive);
++/* The cabinet's power button click, mixed like the media sounds (used where
++   the GUI has no native way to play it, i.e. outside Windows). */
++extern void fdd_audio_play_click(void);
 +/* For the audio thread while emulation is paused: only the media sounds. */
 +extern int  fdd_audio_media_active(void);
 +extern void fdd_audio_media_callback(int16_t *buffer, int length);
@@ -1631,7 +1671,7 @@ index d4d8f5d..20162e4 100644
  #define SETTINGS_CHANGED            1
  #define SETTINGS_REQUIRE_HARD_RESET 2
 diff --git a/src/qt/qt_main.cpp b/src/qt/qt_main.cpp
-index f694a38..475f014 100644
+index f694a38..73bd524 100644
 --- a/src/qt/qt_main.cpp
 +++ b/src/qt/qt_main.cpp
 @@ -32,6 +32,14 @@
@@ -1688,25 +1728,35 @@ index f694a38..475f014 100644
  #endif
  
  #include <thread>
-@@ -93,6 +126,8 @@ extern "C" {
+@@ -93,6 +126,9 @@ extern "C" {
  #include "qt_vmmanager_mainwindow.hpp"
  
  #include "qt_osd.hpp"
 +#include "qt_softwarerenderer.hpp"
++#include "qt_rendererstack.hpp"
 +#include "qt_amstradpower.hpp"
  
  // Void Cast
  #define VC(x) const_cast<wchar_t *>(x)
-@@ -100,6 +135,361 @@ extern "C" {
+@@ -100,6 +136,370 @@ extern "C" {
  extern QElapsedTimer elapsed_timer;
  extern MainWindow   *main_window;
  
++#ifndef Q_OS_WINDOWS
++extern "C" void fdd_audio_play_click(void); /* 86box/fdd_audio.h */
++#endif
++
 +void amstrad_power_click()
 +{
 +#ifdef Q_OS_WINDOWS
 +    const QString path = QFileInfo(qEnvironmentVariable("AMSTRAD_CABINET")).dir().filePath("power/button-click.wav");
 +    if (!sound_muted && QFileInfo::exists(path))
 +        PlaySoundW(reinterpret_cast<LPCWSTR>(path.utf16()), nullptr, SND_FILENAME | SND_ASYNC | SND_NODEFAULT);
++#else
++    // Elsewhere the click goes through the floppy sound mixer, which keeps
++    // running while the PC is off. The Linux deploy places the sample there.
++    if (!sound_muted)
++        fdd_audio_play_click();
 +#endif
 +}
 +
@@ -2059,7 +2109,7 @@ index f694a38..475f014 100644
  extern "C" {
  #include <86box/keyboard.h>
  #include "cpu.h"
-@@ -178,6 +568,14 @@ keyboard_getkeymap()
+@@ -178,6 +578,14 @@ keyboard_getkeymap()
  void
  win_keyboard_handle(uint32_t scancode, int up, int e0, int e1)
  {
@@ -2074,7 +2124,7 @@ index f694a38..475f014 100644
      /* If it's not a scan code that starts with 0xE1 */
      if (e1) {
          if (scancode == 0x1D) {
-@@ -389,9 +787,9 @@ emu_LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
+@@ -389,9 +797,9 @@ emu_LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam)
          ret = TRUE;
      else if ((lpKdhs->scanCode == 0x39) && (lpKdhs->flags & LLKHF_ALTDOWN) && !(lpKdhs->flags & (LLKHF_UP | LLKHF_EXTENDED)))
          ret = TRUE;
@@ -2086,7 +2136,7 @@ index f694a38..475f014 100644
          ret = TRUE;
      else if (inhibit_multimedia_keys &&
              (lpKdhs->vkCode == VK_MEDIA_PLAY_PAUSE ||
-@@ -483,6 +881,17 @@ int
+@@ -483,6 +891,17 @@ int
  main(int argc, char *argv[])
  {
  #ifdef Q_OS_WINDOWS
@@ -2104,7 +2154,7 @@ index f694a38..475f014 100644
  #    ifdef USE_QDARKSTYLE
      bool wasDarkTheme = false;
  #    endif
-@@ -737,6 +1146,10 @@ main(int argc, char *argv[])
+@@ -737,6 +1156,10 @@ main(int argc, char *argv[])
  #endif
  
      main_window = new MainWindow();
@@ -2116,7 +2166,7 @@ index f694a38..475f014 100644
          main_window->showMaximized();
      } else {
 diff --git a/src/qt/qt_mainwindow.cpp b/src/qt/qt_mainwindow.cpp
-index 8b91429..93ce7a9 100644
+index 8b91429..9c4f17e 100644
 --- a/src/qt/qt_mainwindow.cpp
 +++ b/src/qt/qt_mainwindow.cpp
 @@ -32,7 +32,10 @@
@@ -2488,7 +2538,7 @@ index 8b91429..93ce7a9 100644
      if (acpi_enabled) {
          acpi_pwrbut_press();
          return;
-@@ -2950,3 +3098,438 @@ MainWindow::on_actionCGA_composite_settings_triggered()
+@@ -2950,3 +3098,455 @@ MainWindow::on_actionCGA_composite_settings_triggered()
      isNonPause = false;
      config_save();
  }
@@ -2515,7 +2565,14 @@ index 8b91429..93ce7a9 100644
 +{
 +    if (amstrad_power_busy || !amstradCabinet()) return;
 +    extern void amstrad_power_click();
++#ifdef Q_OS_WINDOWS
 +    amstrad_power_click();
++#else
++    // The click goes through the emulator's audio output, which the power-on
++    // hard reset restarts: that click plays once it is done (finishAmstradPowerOn).
++    if (amstrad_power_on)
++        amstrad_power_click();
++#endif
 +    if (amstrad_power_on) {
 +        // A distinct reason prevents Pause, dialogs or focus changes from resuming an off PC.
 +        runctl_pause_wait(RUN_PAUSE_POWER);
@@ -2542,6 +2599,10 @@ index 8b91429..93ce7a9 100644
 +    if (!amstrad_power_busy) return;
 +    amstrad_power_busy = false;
 +    amstrad_power_on = true;
++#ifndef Q_OS_WINDOWS
++    extern void amstrad_power_click();
++    amstrad_power_click();
++#endif
 +    keyboard_all_up();
 +    if (auto *sw = ui->stackedWidget->softwareRenderer()) sw->setCabinetPower(true);
 +    ui->actionCtrl_Alt_Del->setEnabled(true);
@@ -2575,11 +2636,16 @@ index 8b91429..93ce7a9 100644
 +void
 +MainWindow::showAmstradMenu(QPoint pos, QPoint globalPos)
 +{
++    /* The cabinet layout is proportional, so logical pixels work as well as device ones. */
++    openAmstradMenu(amstrad::hotspot(amstrad::sceneLayout(ui->stackedWidget->size()), QPointF(pos)), globalPos);
++}
++
++void
++MainWindow::openAmstradMenu(int hot, QPoint globalPos)
++{
 +    auto *sw = ui->stackedWidget->softwareRenderer();
 +    if (!sw || !sw->hasCabinet())
 +        return;
-+    /* The cabinet layout is proportional, so logical pixels work as well as device ones. */
-+    const auto hot   = amstrad::hotspot(amstrad::sceneLayout(ui->stackedWidget->size()), QPointF(pos));
 +    const auto front = SoftwareRenderer::machineFront();
 +    if (hot == amstrad::HotNone)
 +        return;
@@ -2714,11 +2780,12 @@ index 8b91429..93ce7a9 100644
 +                amstrad::addCard(&menu, picture(front, bayCrop(0)), tr("Left bay: blank plate"),
 +                                 tr("No drive fitted. Choose a fitting below."));
 +            menu.addSeparator();
-+            auto *bayMenu = new amstrad::CabinetMenu(&menu);
-+            bayMenu->setTitle(tr("Machine configurationâ€¦"));
-+            menu.addMenu(bayMenu);
-+            bayMenu->setSeparatorsCollapsible(true);
-+            addModelChoices(bayMenu);
++            /* A plain item, not a submenu: it sits where the pointer enters
++               this panel from the bay below, and a submenu opening on the way
++               up covered the disks. It opens the model badge's own panel. */
++            menu.addAction(tr("Machine configurationâ€¦"), this, [this, globalPos] {
++                QTimer::singleShot(0, this, [this, globalPos] { openAmstradMenu(amstrad::HotModelBadge, globalPos); });
++            });
 +            break;
 +        }
 +        case amstrad::HotRightBay:
@@ -2928,7 +2995,7 @@ index 8b91429..93ce7a9 100644
 +    refreshAmstradFront();
 +}
 diff --git a/src/qt/qt_mainwindow.hpp b/src/qt/qt_mainwindow.hpp
-index e085af5..9a1c9a6 100644
+index e085af5..af72dd9 100644
 --- a/src/qt/qt_mainwindow.hpp
 +++ b/src/qt/qt_mainwindow.hpp
 @@ -85,6 +85,11 @@ public slots:
@@ -2943,12 +3010,14 @@ index e085af5..9a1c9a6 100644
  private slots:
      void on_actionForce_interpretation_triggered();
      void on_actionFullscreen_triggered();
-@@ -182,7 +187,17 @@ private slots:
+@@ -182,7 +187,19 @@ private slots:
  
      void on_actionCGA_composite_settings_triggered();
  
 +    /* Cabinet right-click menus: drive bays, model and monitor badges. */
 +    void showAmstradMenu(QPoint pos, QPoint globalPos);
++    /* The menu of one cabinet part (amstrad::Hotspot), opened at globalPos. */
++    void openAmstradMenu(int hot, QPoint globalPos);
 +    /* The machine (PC1512/PC1640) and its left bay (amstrad::LeftBay). */
 +    void setAmstradModel(bool pc1640, int bay);
 +
@@ -2961,7 +3030,7 @@ index e085af5..9a1c9a6 100644
      Ui::MainWindow                *ui;
      std::unique_ptr<MachineStatus> status;
      std::shared_ptr<MediaMenu>     mm;
-@@ -233,6 +248,8 @@ private:
+@@ -233,6 +250,8 @@ private:
      bool window_blocked = false;
  
      bool skip_exit_confirmation = false;
@@ -6969,7 +7038,7 @@ diff --git a/src/qt/qt_amstradpopup.hpp b/src/qt/qt_amstradpopup.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradpopup.hpp
-@@ -0,0 +1,306 @@
+@@ -0,0 +1,440 @@
 +// Shared cabinet popup appearance. GPL-2.0-or-later, like 86Box.
 +#ifndef QT_AMSTRADPOPUP_HPP
 +#define QT_AMSTRADPOPUP_HPP
@@ -6981,7 +7050,10 @@ new file mode 100644
 +#include <QGraphicsBlurEffect>
 +#include <QGraphicsPixmapItem>
 +#include <QGraphicsScene>
++#include <QHelpEvent>
 +#include <QImage>
++#include <QScreen>
++#include <QTimer>
 +#include <QMenu>
 +#include <QPainter>
 +#include <QPointer>
@@ -7006,6 +7078,15 @@ new file mode 100644
 +    static QColor border() { return QColor(255,255,255,80); }
 +    static QColor hover() { return QColor(255,255,255,36); }
 +    static QColor shadow() { return QColor(0,0,0,220); }
++    // Widget tooltips are drawn frosted by PopupToolTip. Any tooltip Qt still
++    // draws itself (a menu action's, say) gets this: set on the widgets that
++    // show tooltips, since a parent's stylesheet (the cabinet's black
++    // background) otherwise reaches them and leaves black text on black.
++    static QString toolTipStyle()
++    {
++        return QStringLiteral("QToolTip { color:white; background-color:black;"
++                              " border:1px solid rgba(255,255,255,80); padding:5px 8px; }");
++    }
 +};
 +
 +inline void drawPopupText(QPainter &p, const QRectF &rect, int flags,
@@ -7153,8 +7234,100 @@ new file mode 100644
 +        "QMenu { background:transparent; color:white; border:1px solid rgba(255,255,255,80); padding:%1px; }"
 +        "QMenu::item { background:transparent; padding:8px 20px; }"
 +        "QMenu::item:selected { background:transparent; }"
-+        "QMenu::item:disabled { color:#b9b9b9; }").arg(padding));
++        "QMenu::item:disabled { color:#b9b9b9; }").arg(padding) + PopupTheme::toolTipStyle());
 +}
++
++// Widget tooltips in the popups' look: a frosted backdrop of the window under
++// it, the popup border and shadowed text. One instance, shown by the filter
++// below instead of QToolTip; it never takes focus or mouse input.
++class PopupToolTip : public QWidget {
++public:
++    static PopupToolTip *instance()
++    {
++        static QPointer<PopupToolTip> tip;
++        if (!tip) tip = new PopupToolTip;
++        return tip;
++    }
++
++    void showFor(QWidget *widget, const QPoint &globalPos)
++    {
++        const QString content = widget->toolTip();
++        if (owner == widget && isVisible() && content == text) { hideTimer.start(); return; }
++        owner = widget;
++        text = content;
++        // Balanced lines: the narrowest width that keeps the line count the
++        // widest wrap gives, so a last line is not left with one word.
++        const QFontMetrics metrics(font());
++        auto measure = [&](int width) {
++            return metrics.boundingRect(QRect(0,0,width,10000),Qt::TextWordWrap,text);
++        };
++        QRect bounds = measure(MaxTextWidth);
++        for (int low = 1, high = bounds.width(); low < high;) {
++            const int mid = (low+high)/2;
++            if (measure(mid).height() > bounds.height()) low = mid+1; else high = mid;
++            if (low == high) bounds = measure(low);
++        }
++        QSize size = bounds.size() + QSize(2*PadX+2,2*PadY+2);
++        // Below and right of the pointer, kept on its screen.
++        QPoint pos = globalPos + QPoint(14,20);
++        if (const QScreen *screen = QGuiApplication::screenAt(globalPos)) {
++            const QRect area = screen->availableGeometry();
++            if (pos.x()+size.width() > area.right()) pos.setX(std::max(area.left(),area.right()-size.width()));
++            if (pos.y()+size.height() > area.bottom()) pos.setY(globalPos.y()-size.height()-6);
++        }
++        setGeometry(QRect(pos,size));
++        if (QWidget *source = widget->window())
++            backdrop.capture(source,pos,size);
++        else
++            backdrop.invalidate();
++        show();
++        raise();
++        update();
++        hideTimer.start();
++    }
++
++    void hideFor(QObject *widget = nullptr)
++    {
++        if (widget && widget != owner) return;
++        hideTimer.stop();
++        owner = nullptr;
++        hide();
++    }
++
++    QWidget *currentOwner() const { return owner; }
++
++protected:
++    void paintEvent(QPaintEvent *) override
++    {
++        QPainter painter(this);
++        backdrop.paint(painter,QRectF(rect()));
++        painter.setPen(QPen(PopupTheme::border(),1));
++        painter.drawRect(QRectF(rect()).adjusted(.5,.5,-.5,-.5));
++        painter.setFont(font());
++        drawPopupText(painter,QRectF(rect().adjusted(PadX+1,PadY+1,-PadX-1,-PadY-1)),
++                      Qt::AlignLeft|Qt::AlignVCenter|Qt::TextWordWrap,text);
++    }
++
++private:
++    static constexpr int PadX = 9, PadY = 6, MaxTextWidth = 360;
++
++    PopupToolTip()
++        : QWidget(nullptr,Qt::ToolTip|Qt::FramelessWindowHint|Qt::WindowDoesNotAcceptFocus)
++    {
++        setObjectName("amstradToolTip");
++        setAttribute(Qt::WA_TransparentForMouseEvents);
++        setAttribute(Qt::WA_ShowWithoutActivating);
++        setAttribute(Qt::WA_DeleteOnClose);
++        hideTimer.setSingleShot(true);
++        hideTimer.setInterval(10000);
++        QObject::connect(&hideTimer,&QTimer::timeout,this,[this] { hideFor(); });
++    }
++
++    QPointer<QWidget> owner;
++    QString text;
++    PopupBackdrop backdrop;
++    QTimer hideTimer;
++};
 +
 +// QMenu still owns action geometry, input, focus, keyboard navigation and
 +// submenu placement. This filter replaces only painting, with sharp native
@@ -7165,6 +7338,7 @@ new file mode 100644
 +protected:
 +    bool eventFilter(QObject *object, QEvent *event) override
 +    {
++        if (filterToolTip(object,event)) return true;
 +        auto *menu = qobject_cast<QMenu *>(object);
 +        if (!menu) return false;
 +        if (event->type() == QEvent::Show) {
@@ -7194,6 +7368,35 @@ new file mode 100644
 +        return false;
 +    }
 +private:
++    // A widget's own tooltip opens the frosted one. Menus keep theirs, which
++    // QMenu shows for its actions. Any press, key, wheel or leaving the widget
++    // closes it, as with QToolTip.
++    static bool filterToolTip(QObject *object, QEvent *event)
++    {
++        switch (event->type()) {
++            case QEvent::ToolTip: {
++                auto *widget = qobject_cast<QWidget *>(object);
++                if (!widget || qobject_cast<QMenu *>(widget) || widget->toolTip().isEmpty()) return false;
++                PopupToolTip::instance()->showFor(widget,static_cast<QHelpEvent *>(event)->globalPos());
++                return true;
++            }
++            case QEvent::Leave:
++            case QEvent::Hide:
++                if (QWidget *owner = PopupToolTip::instance()->currentOwner(); owner && object == owner)
++                    PopupToolTip::instance()->hideFor(object);
++                return false;
++            case QEvent::MouseButtonPress:
++            case QEvent::KeyPress:
++            case QEvent::Wheel:
++            case QEvent::WindowDeactivate:
++                if (PopupToolTip::instance()->currentOwner())
++                    PopupToolTip::instance()->hideFor();
++                return false;
++            default:
++                return false;
++        }
++    }
++
 +    static void paintActions(QMenu *menu,QPainter &painter)
 +    {
 +        int iconWidth = 0, shortcutWidth = 0;
@@ -7280,7 +7483,7 @@ diff --git a/src/qt/qt_amstradpower.hpp b/src/qt/qt_amstradpower.hpp
 new file mode 100644
 --- /dev/null
 +++ b/src/qt/qt_amstradpower.hpp
-@@ -0,0 +1,434 @@
+@@ -0,0 +1,436 @@
 +// Rear monitor power-button close-up. GPL-2.0-or-later, like 86Box.
 +#ifndef QT_AMSTRADPOWER_HPP
 +#define QT_AMSTRADPOWER_HPP
@@ -7392,13 +7595,15 @@ new file mode 100644
 +        setAccessibleName(tr("Rear monitor power button"));
 +        setAccessibleDescription(tr("Round pushbutton. Press to switch the PC on or off."));
 +        setToolTip(tr("Right-click to compare the button close-up and rear cable bay."));
++        setStyleSheet(amstrad::PopupTheme::toolTipStyle());
++        amstrad::installPopupTheme(); // frosted tooltips, before any menu has opened
 +        viewButton = new QToolButton(this);
 +        viewButton->setText(QString::fromUtf8("\u22ef"));
 +        viewButton->setToolTip(tr("Change power view"));
 +        viewButton->setAccessibleName(tr("Change power view"));
 +        viewButton->setCursor(Qt::PointingHandCursor);
 +        viewButton->setFocusPolicy(Qt::NoFocus);
-+        viewButton->setStyleSheet("QToolButton { color: rgba(240,234,222,125); background: transparent; border: none; border-radius: 5px; font: bold 18px 'Segoe UI'; padding: 0; } QToolButton:hover { color: rgba(240,234,222,210); background: rgba(240,234,222,25); }");
++        viewButton->setStyleSheet("QToolButton { color: rgba(240,234,222,125); background: transparent; border: none; border-radius: 5px; font: bold 18px 'Segoe UI'; padding: 0; } QToolButton:hover { color: rgba(240,234,222,210); background: rgba(240,234,222,25); }" + amstrad::PopupTheme::toolTipStyle());
 +        viewButton->hide();
 +        connect(viewButton, &QToolButton::clicked, this, [this] {
 +            showViewMenu(viewButton->mapToGlobal(QPoint(0, viewButton->height())));
