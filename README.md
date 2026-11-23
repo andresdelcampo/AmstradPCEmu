@@ -288,3 +288,8 @@ Run `scripts/build.ps1`, commit and tag, then `scripts/make-release.ps1`. It cre
 (launcher, binaries, cabinet artwork, the first-launch setup script, empty `roms` folders with a note on what goes where, licence texts and notices) and `AmstradPCEmu-<version>.zip` of it. Attach the zip to a GitHub release of the tag; GitHub adds the source archives itself, and they include `patches/86box-pc1512.patch` and the pinned 86Box commit in `UPSTREAM.md`. No ROMs, disks or VM state are included.
 
 For Linux, run `scripts/build-linux.sh` on Ubuntu 22.04 (WSL2 works), then `scripts/make-release-linux.sh --version <version>`. It creates `local/release/AmstradPCEmu-<version>-linux-x86_64/` with the same contents (the Linux launcher and `prepare-vm.sh` instead of the Windows ones) and a `.tar.gz` of it, which keeps the executable bits. Attach it to the same GitHub release.
+
+
+## More projects
+
+For more of my projects, visit [Software Workshop](https://andresdelcampo.github.io/software-showcase/).
